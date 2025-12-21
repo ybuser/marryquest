@@ -6,7 +6,6 @@
     "node": ">=20 <21"
   },
   "scripts": {
-    "preinstall": "node -e \"const required='https://registry.npmjs.org/'; const reg=(process.env.npm_config_registry)||''; if(reg && reg!==required){console.error('Registry must be '+required+' (found '+reg+')'); process.exit(1);} console.log('Registry OK:', reg||required);\"",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
