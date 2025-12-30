@@ -1,50 +1,59 @@
 import type { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
 
-type RateLimitEntry = {
-  count: number;
-  resetAt: number;
-};
-
-type RateLimitOptions = {
-  intervalMs: number;
+interface RateLimitOptions {
+  windowMs: number;
   max: number;
-};
+}
 
-const rateLimitStore = new Map<string, RateLimitEntry>();
+interface RateEntry {
+  count: number;
+  firstRequest: number;
+}
 
-const getClientIp = (req: NextApiRequest) => {
+const rateStore = new Map<string, RateEntry>();
+
+function getClientKey(req: NextApiRequest): string {
   const forwarded = req.headers['x-forwarded-for'];
   if (typeof forwarded === 'string') {
-    return forwarded.split(',')[0]?.trim() || 'unknown';
+    return forwarded.split(',')[0]?.trim() ?? req.socket.remoteAddress ?? 'unknown';
   }
   if (Array.isArray(forwarded)) {
-    return forwarded[0] || 'unknown';
+    return forwarded[0];
   }
-  return req.socket.remoteAddress || 'unknown';
-};
+  return req.socket.remoteAddress ?? 'unknown';
+}
 
-export const withRateLimit = (
-  handler: NextApiHandler,
-  { intervalMs, max }: RateLimitOptions
-) => {
-  return async (req: NextApiRequest, res: NextApiResponse) => {
-    const ip = getClientIp(req);
+export function withRateLimit(handler: NextApiHandler, options: RateLimitOptions = { windowMs: 60_000, max: 30 }): NextApiHandler {
+  const { windowMs, max } = options;
+
+  return async function rateLimitedHandler(req: NextApiRequest, res: NextApiResponse) {
+    const key = getClientKey(req);
     const now = Date.now();
-    const entry = rateLimitStore.get(ip);
+    const entry = rateStore.get(key);
 
-    if (!entry || entry.resetAt <= now) {
-      rateLimitStore.set(ip, { count: 1, resetAt: now + intervalMs });
-    } else {
-      entry.count += 1;
-      if (entry.count > max) {
-        const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
-        res.setHeader('Retry-After', retryAfter.toString());
-        res.status(429).json({ error: 'Too many requests' });
-        return;
+    if (entry) {
+      const delta = now - entry.firstRequest;
+      if (delta < windowMs) {
+        entry.count += 1;
+        if (entry.count > max) {
+          res.status(429).json({ error: 'Rate limit exceeded. Please try again soon.' });
+          return;
+        }
+      } else {
+        rateStore.set(key, { count: 1, firstRequest: now });
       }
+    } else {
+      rateStore.set(key, { count: 1, firstRequest: now });
     }
 
-    // TODO: Replace with a shared store (Redis, Upstash) for production scale.
-    await handler(req, res);
+    res.setHeader('X-RateLimit-Limit', String(max));
+    res.setHeader('X-RateLimit-Remaining', String(Math.max(0, max - (rateStore.get(key)?.count ?? 0))));
+    res.setHeader('X-RateLimit-Reset', String((rateStore.get(key)?.firstRequest ?? now) + windowMs));
+
+    return handler(req, res);
   };
-};
+}
+
+export function resetRateLimits() {
+  rateStore.clear();
+}

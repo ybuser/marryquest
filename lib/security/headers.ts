@@ -1,10 +1,10 @@
-const contentSecurityPolicy = [
+export const contentSecurityPolicy = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
-  "font-src 'self' data:",
+  "img-src 'self' data: blob:",
   "connect-src 'self'",
+  "font-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'"
@@ -21,7 +21,7 @@ export const securityHeaders = [
   },
   {
     key: 'Referrer-Policy',
-    value: 'strict-origin-when-cross-origin'
+    value: 'no-referrer'
   },
   {
     key: 'X-Content-Type-Options',
