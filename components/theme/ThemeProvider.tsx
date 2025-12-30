@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useMemo } from 'react';
+import { cn } from '@/lib/utils';
 import type { TemplateKey, ThemeTokens } from './tokens';
 import { themeTokens } from './tokens';
 
@@ -12,9 +13,10 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 interface ThemeProviderProps {
   templateKey?: TemplateKey;
   children: React.ReactNode;
+  className?: string;
 }
 
-export function ThemeProvider({ templateKey = 'mono', children }: ThemeProviderProps) {
+export function ThemeProvider({ templateKey = 'mono', children, className }: ThemeProviderProps) {
   const selected = useMemo(() => themeTokens[templateKey] ?? themeTokens.mono, [templateKey]);
 
   const cssVars: React.CSSProperties = {
@@ -46,7 +48,7 @@ export function ThemeProvider({ templateKey = 'mono', children }: ThemeProviderP
 
   return (
     <ThemeContext.Provider value={value}>
-      <div style={cssVars} className="min-h-screen" data-template={selected.key}>
+      <div style={cssVars} className={cn('min-h-screen', className)} data-template={selected.key}>
         {children}
       </div>
     </ThemeContext.Provider>

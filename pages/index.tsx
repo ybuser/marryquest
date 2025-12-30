@@ -1,11 +1,11 @@
 import Head from 'next/head';
 import Image from 'next/image';
 import type { GetServerSideProps } from 'next';
+import { useTheme } from '@/components/theme/ThemeProvider';
+import type { TemplateKey } from '@/components/theme/tokens';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { useTheme } from '../components/theme/ThemeProvider';
-import type { TemplateKey } from '../components/theme/tokens';
 
 interface HomeProps {
   templateKey: TemplateKey;

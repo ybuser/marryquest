@@ -8,7 +8,11 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        border: 'hsl(0 0% 90%)'
+        border: 'hsl(0 0% 90%)',
+        brand: {
+          DEFAULT: '#8b5cf6',
+          accent: '#22d3ee'
+        }
       }
     }
   },

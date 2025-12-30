@@ -1,8 +1,8 @@
 import type { AppProps } from 'next/app';
 import Head from 'next/head';
-import { ThemeProvider } from '../components/theme/ThemeProvider';
+import { ThemeProvider } from '@/components/theme/ThemeProvider';
+import type { TemplateKey } from '@/components/theme/tokens';
 import '../styles/globals.css';
-import type { TemplateKey } from '../components/theme/tokens';
 
 interface ExtendedPageProps {
   templateKey?: TemplateKey;
