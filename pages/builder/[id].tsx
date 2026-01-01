@@ -414,8 +414,8 @@ export default function InvitationBuilder({ invitation: initialInvitation }: Bui
   );
 }
 
-export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (context) =>
-  requirePageAuth(context, async (userId) => {
+export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (context) => {
+  return requirePageAuth<BuilderPageProps>(context, async (userId) => {
     const id = context.params?.id as string;
 
     const invitation = await prisma.invitation.findFirst({
@@ -427,7 +427,7 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
     });
 
     if (!invitation) {
-      return { notFound: true } as const;
+      return { notFound: true };
     }
 
     const normalizedSections = invitation.sections.length
@@ -464,3 +464,4 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
       }
     };
   });
+};
