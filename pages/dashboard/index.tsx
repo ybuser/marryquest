@@ -22,8 +22,8 @@ interface DashboardProps {
   invitations: InvitationListItem[];
 }
 
-export const getServerSideProps: GetServerSideProps<DashboardProps> = async (context) =>
-  requirePageAuth(context, async (userId) => {
+export const getServerSideProps: GetServerSideProps<DashboardProps> = async (context) => {
+  return requirePageAuth<DashboardProps>(context, async (userId) => {
     type InvitationRow = {
       id: string;
       title: string | null;
@@ -51,12 +51,15 @@ export const getServerSideProps: GetServerSideProps<DashboardProps> = async (con
     })) as InvitationRow[];
 
     return {
-      invitations: invitations.map((invitation: InvitationRow) => ({
-        ...invitation,
-        dateTime: invitation.dateTime.toISOString()
-      })) as InvitationListItem[]
+      props: {
+        invitations: invitations.map((invitation: InvitationRow) => ({
+          ...invitation,
+          dateTime: invitation.dateTime.toISOString()
+        })) as InvitationListItem[]
+      }
     };
   });
+};
 
 export default function Dashboard({ invitations: initialInvitations }: DashboardProps) {
   const [invitations, setInvitations] = useState(initialInvitations);
