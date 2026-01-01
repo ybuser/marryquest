@@ -82,12 +82,10 @@ export async function requireApiAuth(req: NextApiRequest, res: NextApiResponse) 
   return session;
 }
 
-export async function requirePageAuth<
-  P extends { [key: string]: unknown }
->(
+export async function requirePageAuth<T>(
   context: GetServerSidePropsContext,
-  getProps: (sessionId: string) => Promise<P>
-): Promise<GetServerSidePropsResult<P>> {
+  handler: (userId: string) => Promise<GetServerSidePropsResult<T>>
+): Promise<GetServerSidePropsResult<T>> {
   const session = await getServerSession(context.req, context.res, authOptions);
 
   if (!session?.user?.id) {
@@ -99,6 +97,5 @@ export async function requirePageAuth<
     };
   }
 
-  const props = await getProps(session.user.id);
-  return { props };
+  return handler(session.user.id);
 }
