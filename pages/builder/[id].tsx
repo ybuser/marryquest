@@ -1,6 +1,6 @@
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -63,6 +63,8 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
   const [slugInput, setSlugInput] = useState(initialInvitation.slug);
   const [slugError, setSlugError] = useState<string | null>(null);
   const [statusSaving, setStatusSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [rsvpSummary, setRsvpSummary] = useState<{
     countsByAttendance: { yes: number; no: number; maybe: number };
     totals: { guestsTotal: number; kidsTotal: number; responsesTotal: number };
@@ -70,11 +72,29 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
   } | null>(null);
   const [rsvpLoading, setRsvpLoading] = useState(false);
 
+  const invitationRef = useRef(invitation);
+  const pendingUpdatesRef = useRef<Partial<InvitationDetails>>({});
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const saveInFlightRef = useRef(false);
+  const pendingSaveRef = useRef(false);
+  const requestIdRef = useRef(0);
+  const lastErrorTimeRef = useRef(0);
+
   const sensors = useSensors(useSensor(PointerSensor));
 
   useEffect(() => {
     setSlugInput(invitation.slug);
   }, [invitation.slug]);
+
+  useEffect(() => {
+    invitationRef.current = invitation;
+  }, [invitation]);
+
+  useEffect(() => () => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     async function fetchSummary() {
@@ -92,31 +112,112 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     }
   }, [activeTab, invitation.id, rsvpLoading, rsvpSummary]);
 
-  async function patchInvitation(updates: Partial<InvitationDetails>) {
-    const previous = invitation;
-    setInvitation((prev) => ({ ...prev, ...updates }));
+  function showError(message: string) {
+    const now = Date.now();
+    if (saveErrorMessage === message && now - lastErrorTimeRef.current < 5000) {
+      return;
+    }
+    lastErrorTimeRef.current = now;
+    setSaveErrorMessage(message);
+    setSaveStatus('error');
+  }
 
-    const response = await fetch(`/api/invitations/${invitation.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...updates,
-        dateTime: updates.dateTime ?? invitation.dateTime
-      })
-    });
-
-    if (!response.ok) {
-      setInvitation(previous);
-      alert('Failed to save changes');
+  async function flushInvitationUpdates(allowRetry = true) {
+    if (saveInFlightRef.current) {
+      pendingSaveRef.current = true;
       return;
     }
 
-    const updated = await response.json();
-    setInvitation((prev) => ({
-      ...prev,
-      ...updated,
-      dateTime: new Date(updated.dateTime).toISOString()
-    }));
+    const updates = pendingUpdatesRef.current;
+    pendingUpdatesRef.current = {};
+
+    if (!Object.keys(updates).length) return;
+
+    saveInFlightRef.current = true;
+    pendingSaveRef.current = false;
+    setSaveStatus('saving');
+
+    const requestId = ++requestIdRef.current;
+    let scheduleDelayedRetry = false;
+    let skipImmediateFlush = false;
+
+    try {
+      const currentInvitation = invitationRef.current;
+      const response = await fetch(`/api/invitations/${currentInvitation.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...updates,
+          dateTime: updates.dateTime ?? currentInvitation.dateTime
+        })
+      });
+
+      if (response.status === 401) {
+        if (typeof window !== 'undefined') {
+          const callbackUrl = encodeURIComponent(window.location.pathname + window.location.search);
+          window.location.href = `/login?callbackUrl=${callbackUrl}`;
+        }
+        return;
+      }
+
+      if (response.status === 429) {
+        showError('Saving too fast. Retrying…');
+        pendingUpdatesRef.current = { ...updates, ...pendingUpdatesRef.current };
+        skipImmediateFlush = true;
+        if (allowRetry) {
+          scheduleDelayedRetry = true;
+        }
+      }
+
+      if (!response.ok) {
+        showError('Failed to save changes');
+        return;
+      }
+
+      const updated = await response.json();
+
+      if (requestId === requestIdRef.current) {
+        setInvitation((prev) => ({
+          ...prev,
+          dateTime: updates.dateTime && updated.dateTime ? new Date(updated.dateTime).toISOString() : prev.dateTime
+        }));
+        setSaveErrorMessage(null);
+        setSaveStatus('saved');
+      }
+    } catch (error) {
+      console.error(error);
+      showError('Failed to save changes');
+    } finally {
+      saveInFlightRef.current = false;
+    }
+
+    if (scheduleDelayedRetry) {
+      pendingSaveRef.current = false;
+      setTimeout(() => {
+        void flushInvitationUpdates(false);
+      }, 2000);
+      return;
+    }
+
+    if (!skipImmediateFlush && (pendingSaveRef.current || Object.keys(pendingUpdatesRef.current).length)) {
+      pendingSaveRef.current = false;
+      void flushInvitationUpdates();
+    }
+  }
+
+  function patchInvitation(updates: Partial<InvitationDetails>) {
+    setInvitation((prev) => ({ ...prev, ...updates }));
+    pendingUpdatesRef.current = { ...pendingUpdatesRef.current, ...updates };
+    setSaveErrorMessage(null);
+    setSaveStatus('saving');
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    debounceRef.current = setTimeout(() => {
+      void flushInvitationUpdates();
+    }, 800);
   }
 
   async function saveSections(sections: SectionConfig[]) {
@@ -127,11 +228,13 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     });
 
     if (!response.ok) {
-      alert('Unable to update sections');
+      showError('Unable to update sections');
       return;
     }
 
     const updated: SectionConfig[] = await response.json();
+    setSaveErrorMessage(null);
+    setSaveStatus('saved');
     setInvitation((prev) => ({ ...prev, sections: updated }));
   }
 
@@ -194,7 +297,7 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     setInvitation((prev) => ({ ...prev, slug: updated.slug }));
   }
 
-  async function saveStatus(status: InvitationDetails['status']) {
+  async function updateStatus(status: InvitationDetails['status']) {
     setStatusSaving(true);
     const response = await fetch(`/api/invitations/${invitation.id}/status`, {
       method: 'PATCH',
@@ -203,13 +306,15 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     });
 
     if (!response.ok) {
-      alert('Unable to update status');
+      showError('Unable to update status');
       setStatusSaving(false);
       return;
     }
 
     const updated = await response.json();
     setInvitation((prev) => ({ ...prev, status: updated.status }));
+    setSaveErrorMessage(null);
+    setSaveStatus('saved');
     setStatusSaving(false);
   }
 
@@ -225,6 +330,22 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
       </Head>
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 lg:flex-row">
         <div className="w-full space-y-4 lg:w-1/2">
+          {saveErrorMessage && (
+            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              <span className="mt-0.5">⚠️</span>
+              <div>
+                <p className="font-medium">{saveErrorMessage}</p>
+                {saveStatus === 'saving' && <p className="text-xs text-red-700">Retrying…</p>}
+              </div>
+            </div>
+          )}
+
+          {saveStatus === 'saving' && !saveErrorMessage && (
+            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+              Saving…
+            </div>
+          )}
+
           <div className="flex gap-2 overflow-x-auto rounded-lg bg-white p-2 shadow-sm">
             {tabs.map((tab) => (
               <button
@@ -384,7 +505,7 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
                   {['draft', 'published', 'private'].map((status) => (
                     <button
                       key={status}
-                      onClick={() => saveStatus(status as any)}
+                      onClick={() => updateStatus(status as any)}
                       disabled={statusSaving}
                       className={`rounded-lg border px-3 py-2 text-sm capitalize shadow-sm ${
                         invitation.status === status ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200'
