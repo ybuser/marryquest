@@ -54,3 +54,4 @@ No required environment variables for the baseline. Add as needed for APIs or an
 ## Notes
 - The project intentionally omits the `/app` directory. Pages Router only.
 - Upgrade the in-memory rate limiter before deploying behind multiple instances.
+- Database migrations are applied automatically during the Vercel build via `npm run build`.

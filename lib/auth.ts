@@ -3,7 +3,6 @@ import type { GetServerSidePropsContext, GetServerSidePropsResult } from 'next';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession, type NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import prisma from './db';
 
 export const ADMIN_EMAIL = 'admin@marryquest.local';
@@ -16,7 +15,6 @@ function secureCompare(provided: string, expected: string) {
 }
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
   secret: process.env.NEXTAUTH_SECRET,
   providers: [
     CredentialsProvider({
@@ -58,15 +56,26 @@ export const authOptions: NextAuthOptions = {
     })
   ],
   session: {
-    strategy: 'database'
+    strategy: 'jwt'
   },
   pages: {
     signIn: '/login'
   },
   callbacks: {
-    session({ session, user }) {
-      if (session.user) {
-        session.user.id = user.id;
+    async jwt({ token, user }) {
+      if (user?.id) {
+        token.sub = user.id;
+        // Preserve explicit userId for clarity in session callback
+        // because some providers may not set `sub`.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (token as any).userId = user.id;
+      }
+      return token;
+    },
+    session({ session, token }) {
+      const userId = (token as { sub?: string; userId?: string }).userId || token.sub;
+      if (session.user && userId) {
+        session.user.id = userId;
       }
       return session;
     }
