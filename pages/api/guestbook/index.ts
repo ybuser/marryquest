@@ -93,6 +93,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'PATCH') {
     const session = await requireApiAuth(req, res);
     if (!session?.user?.id) return;
+    const userId = session.user.id;
 
     const parsed = validate(patchSchema, req.body);
     if (!parsed.success) {
@@ -116,7 +117,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(404).json({ error: 'Some entries were not found' });
     }
 
-    const unauthorized = existing.some((entry) => entry.invitation.userId !== session.user.id);
+    const unauthorized = existing.some((entry) => entry.invitation.userId !== userId);
     if (unauthorized) {
       return res.status(404).json({ error: 'Entries not found' });
     }
