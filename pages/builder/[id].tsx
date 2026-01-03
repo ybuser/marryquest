@@ -9,14 +9,16 @@ import { requirePageAuth } from '@/lib/auth';
 import { InvitationPage } from '@/components/invitation/InvitationPage';
 import type { GalleryPhoto, InvitationDetails, SectionConfig } from '@/types/invitation';
 import { DEFAULT_SECTIONS } from '@/types/invitation';
+import type { GuestbookEntryDto } from '@/types/guestbook';
 
 interface BuilderPageProps {
   invitation: InvitationDetails;
   templateKey: string;
   photos: GalleryPhoto[];
+  guestbookEntries: GuestbookEntryDto[];
 }
 
-const tabs = ['Basic', 'Design', 'Sections', 'Games', 'Publish', 'Export'] as const;
+const tabs = ['Basic', 'Design', 'Sections', 'Guestbook', 'Games', 'Publish', 'Export'] as const;
 type TabKey = (typeof tabs)[number];
 
 interface SortableItemProps {
@@ -57,11 +59,13 @@ function SortableItem({ section, label, onToggle }: SortableItemProps) {
   );
 }
 
-export default function InvitationBuilder({ invitation: initialInvitation, photos }: BuilderPageProps) {
+export default function InvitationBuilder({ invitation: initialInvitation, photos, guestbookEntries }: BuilderPageProps) {
   const [savedInvitation, setSavedInvitation] = useState<InvitationDetails>(initialInvitation);
   const [draftInvitation, setDraftInvitation] = useState<InvitationDetails>(initialInvitation);
   const [savedSections, setSavedSections] = useState<SectionConfig[]>(initialInvitation.sections);
   const [draftSections, setDraftSections] = useState<SectionConfig[]>(initialInvitation.sections);
+  const [savedGuestbookEntries, setSavedGuestbookEntries] = useState<GuestbookEntryDto[]>(guestbookEntries);
+  const [draftGuestbookEntries, setDraftGuestbookEntries] = useState<GuestbookEntryDto[]>(guestbookEntries);
   const [activeTab, setActiveTab] = useState<TabKey>('Basic');
   const [slugError, setSlugError] = useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
@@ -75,6 +79,7 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
   const [basicSaving, setBasicSaving] = useState(false);
   const [designSaving, setDesignSaving] = useState(false);
   const [sectionsSaving, setSectionsSaving] = useState(false);
+  const [guestbookSaving, setGuestbookSaving] = useState(false);
   const [publishSaving, setPublishSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -127,12 +132,21 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     });
   }, [draftSections, savedSections]);
 
+  const hasGuestbookChanges = useMemo(() => {
+    if (draftGuestbookEntries.length !== savedGuestbookEntries.length) return true;
+    return draftGuestbookEntries.some((entry, index) => {
+      const saved = savedGuestbookEntries[index];
+      return entry.id !== saved.id || entry.hidden !== saved.hidden;
+    });
+  }, [draftGuestbookEntries, savedGuestbookEntries]);
+
   const hasPublishChanges = useMemo(
     () => draftInvitation.slug !== savedInvitation.slug || draftInvitation.status !== savedInvitation.status,
     [draftInvitation.slug, draftInvitation.status, savedInvitation.slug, savedInvitation.status]
   );
 
-  const hasUnsavedChanges = hasBasicChanges || hasDesignChanges || hasSectionsChanges || hasPublishChanges;
+  const hasUnsavedChanges =
+    hasBasicChanges || hasDesignChanges || hasSectionsChanges || hasGuestbookChanges || hasPublishChanges;
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -261,6 +275,44 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     }
   }
 
+  async function saveGuestbook() {
+    setGuestbookSaving(true);
+    resetStatus('Saving…');
+
+    const updates = draftGuestbookEntries
+      .filter((entry, index) => entry.hidden !== savedGuestbookEntries[index]?.hidden)
+      .map((entry) => ({ id: entry.id, hidden: entry.hidden }));
+
+    if (updates.length === 0) {
+      resetStatus('Saved');
+      setGuestbookSaving(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/guestbook', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates })
+      });
+
+      if (!response.ok) {
+        showError('Unable to update guestbook');
+        return;
+      }
+
+      const refreshed: GuestbookEntryDto[] = await response.json();
+      setSavedGuestbookEntries(refreshed);
+      setDraftGuestbookEntries(refreshed);
+      resetStatus('Saved');
+    } catch (error) {
+      console.error(error);
+      showError('Unable to update guestbook');
+    } finally {
+      setGuestbookSaving(false);
+    }
+  }
+
   async function savePublish() {
     setPublishSaving(true);
     resetStatus('Saving…');
@@ -344,6 +396,12 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     setDraftSections(updated);
   }
 
+  function handleGuestbookToggle(entryId: string) {
+    setDraftGuestbookEntries((prev) =>
+      prev.map((entry) => (entry.id === entryId ? { ...entry, hidden: !entry.hidden } : entry))
+    );
+  }
+
   const publishUrl = useMemo(() => {
     const slugPart = draftInvitation.slug?.trim() ?? '';
     if (!origin) return slugPart ? `/${slugPart}` : '';
@@ -378,6 +436,15 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     }
   }
 
+  const guestbookDate = (value: string) =>
+    new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
+
+  const guestbookBadgeLabel = (badge: GuestbookEntryDto['badge']) => {
+    if (badge === 'none') return null;
+    const label = badge.replace(/_/g, ' ');
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  };
+
   const unsavedLabel = (tab: TabKey) => {
     const hasChanges =
       tab === 'Basic'
@@ -386,9 +453,11 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
           ? hasDesignChanges
           : tab === 'Sections'
             ? hasSectionsChanges
-            : tab === 'Publish'
-              ? hasPublishChanges
-              : false;
+            : tab === 'Guestbook'
+              ? hasGuestbookChanges
+              : tab === 'Publish'
+                ? hasPublishChanges
+                : false;
 
     return hasChanges ? (
       <span className="text-xs font-medium text-amber-700">Unsaved changes</span>
@@ -580,6 +649,57 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
             </div>
           )}
 
+          {activeTab === 'Guestbook' && (
+            <div className="space-y-4 rounded-xl bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                {unsavedLabel('Guestbook')}
+                <button
+                  className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  onClick={saveGuestbook}
+                  disabled={!hasGuestbookChanges || guestbookSaving}
+                >
+                  {guestbookSaving ? 'Saving…' : 'Save changes'}
+                </button>
+              </div>
+              <p className="text-sm text-slate-700">Toggle visibility to hide messages from the public guestbook.</p>
+              <div className="space-y-3">
+                {draftGuestbookEntries.length === 0 && (
+                  <p className="text-sm text-slate-600">No guestbook entries yet.</p>
+                )}
+                {draftGuestbookEntries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm shadow-sm"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="space-y-1">
+                        <p className="font-semibold text-slate-900">{entry.nickname}</p>
+                        <p className="text-slate-700">{entry.message}</p>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                          <span>{guestbookDate(entry.createdAt)}</span>
+                          {guestbookBadgeLabel(entry.badge) && (
+                            <span className="inline-flex rounded-full bg-slate-200 px-2 py-1 font-medium text-slate-800">
+                              {guestbookBadgeLabel(entry.badge)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={entry.hidden}
+                          onChange={() => handleGuestbookToggle(entry.id)}
+                          className="h-4 w-4 rounded border-slate-300"
+                        />
+                        Hidden
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {activeTab === 'Games' && (
             <div className="space-y-4 rounded-xl bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between">
@@ -761,6 +881,23 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
       }))
       .sort((a, b) => a.order - b.order);
 
+    const guestbookEntries = await prisma.guestbookEntry
+      .findMany({
+        where: { invitationId: invitation.id },
+        orderBy: { createdAt: 'desc' }
+      })
+      .then((entries) =>
+        entries.map((entry) => ({
+          id: entry.id,
+          invitationId: entry.invitationId,
+          nickname: entry.nickname,
+          message: entry.message,
+          badge: entry.badge,
+          hidden: entry.hidden,
+          createdAt: entry.createdAt.toISOString()
+        }))
+      );
+
     const invitationDetails: InvitationDetails = {
       id: invitation.id,
       slug: invitation.slug,
@@ -783,7 +920,8 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
       props: {
         invitation: invitationDetails,
         templateKey: invitation.templateKey,
-        photos
+        photos,
+        guestbookEntries
       }
     };
   });

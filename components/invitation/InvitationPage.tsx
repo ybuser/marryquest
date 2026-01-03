@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import type { GalleryPhoto, InvitationDetails, SectionConfig } from '@/types/invitation';
 import { DEFAULT_SECTIONS } from '@/types/invitation';
+import { PublicGuestbook } from '@/components/guestbook/PublicGuestbook';
 import { HeroSection } from './sections/Hero';
 import { InfoSection } from './sections/Info';
 import { MapButtons } from './sections/MapButtons';
@@ -83,12 +84,16 @@ export function InvitationPage({ invitation, sections, photos }: InvitationPageP
                   accountBride={invitation.accountBride}
                 />
               );
-            case 'guestbook':
-              return (
-                <SectionCard key={section.key} title="Guestbook" eyebrow="Messages">
-                  <p className="opacity-80">Guestbook is coming soon. Check back for heartfelt messages.</p>
-                </SectionCard>
-              );
+          case 'guestbook':
+            return (
+              <SectionCard key={section.key} title="Guestbook" eyebrow="Messages">
+                <PublicGuestbook
+                  invitationId={invitation.id}
+                  slug={invitation.slug}
+                  invitationStatus={invitation.status}
+                />
+              </SectionCard>
+            );
             case 'rsvp':
               return (
                 <SectionCard key={section.key} title="RSVP" eyebrow="Attendance">
