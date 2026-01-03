@@ -25,11 +25,19 @@ export interface InvitationDetails {
   sections: SectionConfig[];
 }
 
+export interface GalleryPhoto {
+  id: string;
+  url: string;
+  caption?: string | null;
+  order: number;
+}
+
 export const DEFAULT_SECTIONS: { key: string; label: string }[] = [
   { key: 'hero', label: 'Hero' },
-  { key: 'details', label: 'Details' },
-  { key: 'story', label: 'Our Story' },
+  { key: 'info', label: 'Info' },
+  { key: 'maps', label: 'Map Buttons' },
   { key: 'gallery', label: 'Gallery' },
-  { key: 'rsvp', label: 'RSVP' },
-  { key: 'guestbook', label: 'Guestbook' }
+  { key: 'accounts', label: 'Accounts' },
+  { key: 'guestbook', label: 'Guestbook' },
+  { key: 'rsvp', label: 'RSVP' }
 ];
