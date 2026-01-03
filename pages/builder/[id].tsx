@@ -79,6 +79,12 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
   const pendingSaveRef = useRef(false);
   const requestIdRef = useRef(0);
   const lastErrorTimeRef = useRef(0);
+  const pendingSectionsRef = useRef<SectionConfig[] | null>(null);
+  const sectionsDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const sectionsSaveInFlightRef = useRef(false);
+  const sectionsPendingSaveRef = useRef(false);
+  const sectionsRequestIdRef = useRef(0);
+  const [sectionsSaving, setSectionsSaving] = useState(false);
 
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -93,6 +99,9 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
   useEffect(() => () => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
+    }
+    if (sectionsDebounceRef.current) {
+      clearTimeout(sectionsDebounceRef.current);
     }
   }, []);
 
@@ -220,22 +229,67 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     }, 800);
   }
 
-  async function saveSections(sections: SectionConfig[]) {
-    const response = await fetch(`/api/invitations/${invitation.id}/sections`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sections })
-    });
+  function queueSectionsSave(sections: SectionConfig[]) {
+    pendingSectionsRef.current = sections;
+    setSaveErrorMessage(null);
+    setSaveStatus('saving');
 
-    if (!response.ok) {
-      showError('Unable to update sections');
+    if (sectionsDebounceRef.current) {
+      clearTimeout(sectionsDebounceRef.current);
+    }
+
+    sectionsDebounceRef.current = setTimeout(() => {
+      void flushSections();
+    }, 500);
+  }
+
+  async function flushSections() {
+    if (sectionsSaveInFlightRef.current) {
+      sectionsPendingSaveRef.current = true;
       return;
     }
 
-    const updated: SectionConfig[] = await response.json();
-    setSaveErrorMessage(null);
-    setSaveStatus('saved');
-    setInvitation((prev) => ({ ...prev, sections: updated }));
+    const sections = pendingSectionsRef.current;
+    pendingSectionsRef.current = null;
+
+    if (!sections) return;
+
+    sectionsSaveInFlightRef.current = true;
+    sectionsPendingSaveRef.current = false;
+    setSectionsSaving(true);
+
+    const requestId = ++sectionsRequestIdRef.current;
+
+    try {
+      const response = await fetch(`/api/invitations/${invitation.id}/sections`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sections })
+      });
+
+      if (!response.ok) {
+        showError('Unable to update sections');
+        return;
+      }
+
+      const updated: SectionConfig[] = await response.json();
+      if (requestId === sectionsRequestIdRef.current) {
+        setInvitation((prev) => ({ ...prev, sections: updated }));
+        setSaveErrorMessage(null);
+        setSaveStatus('saved');
+      }
+    } catch (error) {
+      console.error(error);
+      showError('Unable to update sections');
+    } finally {
+      sectionsSaveInFlightRef.current = false;
+      setSectionsSaving(false);
+    }
+
+    if (sectionsPendingSaveRef.current || pendingSectionsRef.current) {
+      sectionsPendingSaveRef.current = false;
+      void flushSections();
+    }
   }
 
   const orderedSections = useMemo(() => {
@@ -268,7 +322,7 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     }));
 
     setInvitation((prev) => ({ ...prev, sections: newSections }));
-    void saveSections(newSections);
+    queueSectionsSave(newSections);
   }
 
   function handleToggle(section: SectionConfig) {
@@ -276,7 +330,7 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
       item.id === section.id ? { ...item, enabled: !item.enabled } : item
     );
     setInvitation((prev) => ({ ...prev, sections: updated }));
-    void saveSections(updated);
+    queueSectionsSave(updated);
   }
 
   async function saveSlug() {
@@ -467,7 +521,10 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
 
           {activeTab === 'Sections' && (
             <div className="space-y-4 rounded-xl bg-white p-6 shadow-sm">
-              <p className="text-sm text-slate-700">Drag to reorder sections. Toggle visibility as needed.</p>
+              <div className="flex items-center justify-between text-sm text-slate-700">
+                <p>Drag to reorder sections. Toggle visibility as needed.</p>
+                {sectionsSaving && <span className="text-xs text-slate-500">Saving…</span>}
+              </div>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={orderedSections.map((section) => section.id)} strategy={verticalListSortingStrategy}>
                   <div className="space-y-3">
