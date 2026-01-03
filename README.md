@@ -16,9 +16,10 @@ Visit `http://localhost:3000`.
 
 ## Scripts
 - `npm run dev` – start the development server
-- `npm run build` – create a production build
+- `npm run build` – generate Prisma client and create a production build
 - `npm run start` – serve the production build
 - `npm run lint` – lint with `next lint`
+- `npm run db:migrate` – apply database migrations (one-off)
 
 ## Project structure
 - `/pages` – pages router entries (`index.tsx`, `api/health.ts`)
@@ -54,4 +55,5 @@ No required environment variables for the baseline. Add as needed for APIs or an
 ## Notes
 - The project intentionally omits the `/app` directory. Pages Router only.
 - Upgrade the in-memory rate limiter before deploying behind multiple instances.
-- Database migrations are applied automatically during the Vercel build via `npm run build`.
+- Database migrations are not run during Vercel builds; apply them separately with `npm run db:migrate` using a direct database
+  connection (Supabase Transaction pooler may hang during migrations).

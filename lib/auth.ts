@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import type { GetServerSidePropsContext, GetServerSidePropsResult } from 'next';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession, type NextAuthOptions } from 'next-auth';
+import type { JWT } from 'next-auth/jwt';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import prisma from './db';
 
@@ -64,11 +65,11 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user?.id) {
+        const enrichedToken = token as JWT & { userId?: string };
         token.sub = user.id;
         // Preserve explicit userId for clarity in session callback
         // because some providers may not set `sub`.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (token as any).userId = user.id;
+        enrichedToken.userId = user.id;
       }
       return token;
     },
