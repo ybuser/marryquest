@@ -7,6 +7,7 @@ import { MapButtons } from './sections/MapButtons';
 import { GallerySection } from './sections/Gallery';
 import { AccountsSection } from './sections/Accounts';
 import { SectionCard } from './sections/SectionCard';
+import { RSVPSection } from './sections/RSVPSection';
 
 interface InvitationPageProps {
   invitation: InvitationDetails;
@@ -91,7 +92,7 @@ export function InvitationPage({ invitation, sections, photos }: InvitationPageP
             case 'rsvp':
               return (
                 <SectionCard key={section.key} title="RSVP" eyebrow="Attendance">
-                  <p className="opacity-80">RSVP experiences are on the way. Stay tuned.</p>
+                  <RSVPSection invitationId={invitation.id} invitationStatus={invitation.status} />
                 </SectionCard>
               );
             default:
