@@ -57,3 +57,5 @@ No required environment variables for the baseline. Add as needed for APIs or an
 - Upgrade the in-memory rate limiter before deploying behind multiple instances.
 - Database migrations are not run during Vercel builds; apply them separately with `npm run db:migrate` using a direct database
   connection (Supabase Transaction pooler may hang during migrations).
+- For Supabase deployments, **do not** use the Transaction Pooler (`6543`) with Prisma. Configure `DATABASE_URL` to use the
+  Session Pooler (`5432`) or the direct connection string instead.

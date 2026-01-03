@@ -39,14 +39,27 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        const user = await prisma.user.upsert({
-          where: { email: ADMIN_EMAIL },
-          update: {},
-          create: {
-            email: ADMIN_EMAIL,
-            name: 'Admin'
-          }
-        });
+        const user = await prisma.user
+          .upsert({
+            where: { email: ADMIN_EMAIL },
+            update: {},
+            create: {
+              email: ADMIN_EMAIL,
+              name: 'Admin'
+            }
+          })
+          .catch((err) => {
+            const label = err?.constructor?.name || 'PrismaError';
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            console.error(
+              `[auth] Failed to upsert admin user (${label}): ${message}. Check database connectivity or pooling configuration.`
+            );
+            return null;
+          });
+
+        if (!user) {
+          return null;
+        }
 
         return {
           id: user.id,
