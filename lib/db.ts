@@ -18,13 +18,9 @@ const prismaInstance = shouldSkip
       }
     ) as unknown as import('@prisma/client').PrismaClient)
   : (globalForPrisma.prisma ||
-      new PrismaClientCtor!({
+      (globalForPrisma.prisma = new PrismaClientCtor!({
         log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error']
-      }));
-
-if (!shouldSkip && process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prismaInstance;
-}
+      })));
 
 export const prisma = prismaInstance;
 
