@@ -64,6 +64,8 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
   const [draftSections, setDraftSections] = useState<SectionConfig[]>(initialInvitation.sections);
   const [activeTab, setActiveTab] = useState<TabKey>('Basic');
   const [slugError, setSlugError] = useState<string | null>(null);
+  const [copyMessage, setCopyMessage] = useState<string | null>(null);
+  const [origin, setOrigin] = useState('');
   const [rsvpSummary, setRsvpSummary] = useState<{
     countsByAttendance: { yes: number; no: number; maybe: number };
     totals: { guestsTotal: number; kidsTotal: number; responsesTotal: number };
@@ -133,6 +135,10 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
   const hasUnsavedChanges = hasBasicChanges || hasDesignChanges || hasSectionsChanges || hasPublishChanges;
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOrigin(window.location.origin);
+    }
+
     const handler = (event: BeforeUnloadEvent) => {
       if (hasUnsavedChanges) {
         event.preventDefault();
@@ -319,8 +325,6 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     return merged.sort((a, b) => a.order - b.order);
   }, [draftInvitation.id, draftSections]);
 
-  const activeSections = useMemo(() => orderedSections.filter((section) => section.enabled), [orderedSections]);
-
   function handleDragEnd(event: any) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -340,10 +344,39 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     setDraftSections(updated);
   }
 
-  const publishUrl = useMemo(
-    () => `${typeof window === 'undefined' ? '' : window.location.origin}/${savedInvitation.slug}`,
-    [savedInvitation.slug]
-  );
+  const publishUrl = useMemo(() => {
+    const slugPart = draftInvitation.slug?.trim() ?? '';
+    if (!origin) return slugPart ? `/${slugPart}` : '';
+    return `${origin}/${slugPart}`;
+  }, [draftInvitation.slug, origin]);
+
+  useEffect(() => {
+    if (!copyMessage) return;
+    const timer = setTimeout(() => setCopyMessage(null), 1500);
+    return () => clearTimeout(timer);
+  }, [copyMessage]);
+
+  async function copyPublishUrl() {
+    if (!publishUrl) return;
+
+    try {
+      await navigator.clipboard.writeText(publishUrl);
+      setCopyMessage('Copied!');
+    } catch (error) {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = publishUrl;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        setCopyMessage('Copied!');
+      } catch (fallbackError) {
+        console.error(fallbackError);
+        showError('Unable to copy link');
+      }
+    }
+  }
 
   const unsavedLabel = (tab: TabKey) => {
     const hasChanges =
@@ -595,22 +628,34 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium text-slate-800">Slug</p>
-                <div className="flex gap-2">
-                  <input
-                    value={draftInvitation.slug}
-                    onChange={(e) => setDraftInvitation((prev) => ({ ...prev, slug: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                  />
-                  <button
-                    onClick={() => setDraftInvitation((prev) => ({ ...prev, slug: savedInvitation.slug }))}
-                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 shadow-sm"
-                    disabled={!hasPublishChanges}
-                  >
-                    Reset
-                  </button>
-                </div>
+                <input
+                  value={draftInvitation.slug}
+                  onChange={(e) => setDraftInvitation((prev) => ({ ...prev, slug: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2"
+                />
                 {slugError && <p className="text-xs text-red-600">{slugError}</p>}
-                <p className="text-xs text-slate-600">Public URL: {publishUrl}</p>
+                {draftInvitation.status === 'published' && (
+                  <div className="mt-3 space-y-2 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Public URL</p>
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div className="flex flex-wrap items-center gap-2 text-lg font-semibold text-slate-900">
+                        <span className="text-slate-600">{origin ? `${origin}/` : '/'}</span>
+                        <span className="rounded-full bg-slate-900/5 px-3 py-1 font-mono text-slate-900 underline">
+                          {draftInvitation.slug || 'your-slug'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={copyPublishUrl}
+                        className="inline-flex items-center justify-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm disabled:opacity-50"
+                        disabled={!draftInvitation.slug}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    {copyMessage && <p className="text-xs text-emerald-600">{copyMessage}</p>}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -672,7 +717,7 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
         <div className="w-full lg:w-1/2">
           <div className="sticky top-6 rounded-3xl bg-white p-4 shadow-lg">
             <p className="mb-3 text-sm text-slate-600">Live preview</p>
-            <InvitationPage invitation={draftInvitation} sections={activeSections} photos={photos} />
+            <InvitationPage invitation={draftInvitation} sections={orderedSections} photos={photos} />
           </div>
         </div>
       </div>
