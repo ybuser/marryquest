@@ -6,14 +6,14 @@ import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } 
 import { CSS } from '@dnd-kit/utilities';
 import prisma from '@/lib/db';
 import { requirePageAuth } from '@/lib/auth';
-import { InvitationView } from '@/components/invitation/InvitationView';
-import { ThemeProvider } from '@/components/theme/ThemeProvider';
-import type { InvitationDetails, SectionConfig } from '@/types/invitation';
+import { InvitationPage } from '@/components/invitation/InvitationPage';
+import type { GalleryPhoto, InvitationDetails, SectionConfig } from '@/types/invitation';
 import { DEFAULT_SECTIONS } from '@/types/invitation';
 
 interface BuilderPageProps {
   invitation: InvitationDetails;
   templateKey: string;
+  photos: GalleryPhoto[];
 }
 
 const tabs = ['Basic', 'Design', 'Sections', 'Games', 'Publish', 'Export'] as const;
@@ -57,7 +57,7 @@ function SortableItem({ section, label, onToggle }: SortableItemProps) {
   );
 }
 
-export default function InvitationBuilder({ invitation: initialInvitation }: BuilderPageProps) {
+export default function InvitationBuilder({ invitation: initialInvitation, photos }: BuilderPageProps) {
   const [invitation, setInvitation] = useState<InvitationDetails>(initialInvitation);
   const [activeTab, setActiveTab] = useState<TabKey>('Basic');
   const [slugInput, setSlugInput] = useState(initialInvitation.slug);
@@ -125,6 +125,11 @@ export default function InvitationBuilder({ invitation: initialInvitation }: Bui
 
     return merged.sort((a, b) => a.order - b.order);
   }, [invitation.id, invitation.sections]);
+
+  const activeSections = useMemo(
+    () => orderedSections.filter((section) => section.enabled),
+    [orderedSections]
+  );
 
   function handleDragEnd(event: any) {
     const { active, over } = event;
@@ -404,9 +409,7 @@ export default function InvitationBuilder({ invitation: initialInvitation }: Bui
         <div className="w-full lg:w-1/2">
           <div className="sticky top-6 rounded-3xl bg-white p-4 shadow-lg">
             <p className="mb-3 text-sm text-slate-600">Live preview</p>
-            <ThemeProvider templateKey={invitation.templateKey as any}>
-              <InvitationView invitation={invitation} />
-            </ThemeProvider>
+            <InvitationPage invitation={invitation} sections={activeSections} photos={photos} />
           </div>
         </div>
       </div>
@@ -423,21 +426,31 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
         userId,
         OR: [{ id }, { slug: id }]
       },
-      include: { sections: true }
+      include: { sections: true, galleryPhotos: true }
     });
 
     if (!invitation) {
       return { notFound: true };
     }
 
-    const normalizedSections = invitation.sections.length
+    const normalizedSections = (invitation.sections.length
       ? invitation.sections
       : DEFAULT_SECTIONS.map((section, index) => ({
           id: `${invitation.id}-${section.key}`,
           key: section.key,
           enabled: true,
           order: index
-        }));
+        })))
+      .sort((a, b) => a.order - b.order);
+
+    const photos: GalleryPhoto[] = invitation.galleryPhotos
+      .map((photo) => ({
+        id: photo.id,
+        url: photo.url,
+        caption: photo.caption,
+        order: photo.order
+      }))
+      .sort((a, b) => a.order - b.order);
 
     const invitationDetails: InvitationDetails = {
       id: invitation.id,
@@ -460,7 +473,8 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
     return {
       props: {
         invitation: invitationDetails,
-        templateKey: invitation.templateKey
+        templateKey: invitation.templateKey,
+        photos
       }
     };
   });
