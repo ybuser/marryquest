@@ -63,12 +63,34 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
   const [slugInput, setSlugInput] = useState(initialInvitation.slug);
   const [slugError, setSlugError] = useState<string | null>(null);
   const [statusSaving, setStatusSaving] = useState(false);
+  const [rsvpSummary, setRsvpSummary] = useState<{
+    countsByAttendance: { yes: number; no: number; maybe: number };
+    totals: { guestsTotal: number; kidsTotal: number; responsesTotal: number };
+    recentSampleCount?: number;
+  } | null>(null);
+  const [rsvpLoading, setRsvpLoading] = useState(false);
 
   const sensors = useSensors(useSensor(PointerSensor));
 
   useEffect(() => {
     setSlugInput(invitation.slug);
   }, [invitation.slug]);
+
+  useEffect(() => {
+    async function fetchSummary() {
+      setRsvpLoading(true);
+      const response = await fetch(`/api/invitations/${invitation.id}/rsvp-summary`);
+      if (response.ok) {
+        const data = await response.json();
+        setRsvpSummary(data);
+      }
+      setRsvpLoading(false);
+    }
+
+    if (activeTab === 'Export' && !rsvpSummary && !rsvpLoading) {
+      void fetchSummary();
+    }
+  }, [activeTab, invitation.id, rsvpLoading, rsvpSummary]);
 
   async function patchInvitation(updates: Partial<InvitationDetails>) {
     const previous = invitation;
@@ -400,8 +422,57 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
           )}
 
           {activeTab === 'Export' && (
-            <div className="rounded-xl bg-white p-6 shadow-sm text-sm text-slate-700">
-              Export options for RSVP and Guestbook will appear here.
+            <div className="space-y-4 rounded-xl bg-white p-6 shadow-sm text-sm text-slate-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">RSVP Summary</p>
+                  <p className="text-base font-semibold text-slate-900">Quick attendance snapshot</p>
+                </div>
+                <a
+                  href={`/api/export/rsvp.csv?invitationId=${invitation.id}`}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 shadow-sm"
+                >
+                  Download CSV
+                </a>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-4">
+                <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Total Responses</p>
+                  <p className="text-2xl font-semibold text-slate-900">
+                    {rsvpSummary ? rsvpSummary.totals.responsesTotal : rsvpLoading ? '…' : '0'}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Guests</p>
+                  <p className="text-2xl font-semibold text-slate-900">
+                    {rsvpSummary ? rsvpSummary.totals.guestsTotal : rsvpLoading ? '…' : '0'}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Kids</p>
+                  <p className="text-2xl font-semibold text-slate-900">
+                    {rsvpSummary ? rsvpSummary.totals.kidsTotal : rsvpLoading ? '…' : '0'}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Recent Samples</p>
+                  <p className="text-2xl font-semibold text-slate-900">
+                    {rsvpSummary ? rsvpSummary.recentSampleCount ?? 0 : rsvpLoading ? '…' : '0'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                {(['yes', 'maybe', 'no'] as const).map((key) => (
+                  <div key={key} className="rounded-lg border border-slate-100 p-4">
+                    <p className="text-xs uppercase tracking-wide text-slate-500">{key}</p>
+                    <p className="text-2xl font-semibold text-slate-900">
+                      {rsvpSummary ? rsvpSummary.countsByAttendance[key] : rsvpLoading ? '…' : '0'}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
