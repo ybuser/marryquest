@@ -7,6 +7,7 @@ import { validate } from '@/lib/validate';
 const rsvpSchema = z.object({
   invitationId: z.string().min(1),
   attendance: z.enum(['yes', 'no', 'maybe']),
+  attendeeName: z.string().trim().min(1).max(40),
   guestsCount: z.number().int().min(0).max(10),
   kidsCount: z.number().int().min(0).max(10),
   allergiesText: z.string().max(120).optional()
@@ -23,7 +24,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(400).json({ error: parsed.errors });
   }
 
-  const { invitationId, attendance, guestsCount, kidsCount, allergiesText } = parsed.data;
+  const { invitationId, attendance, attendeeName, guestsCount, kidsCount, allergiesText } = parsed.data;
 
   const invitation = await prisma.invitation.findUnique({
     where: { id: invitationId },
@@ -37,6 +38,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   await prisma.rSVPResponse.create({
     data: {
       invitationId,
+      attendeeName,
       attendance,
       guestsCount,
       kidsCount,

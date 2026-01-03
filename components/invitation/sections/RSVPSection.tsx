@@ -10,6 +10,7 @@ type AttendanceOption = 'yes' | 'no' | 'maybe';
 
 export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps) {
   const [attendance, setAttendance] = useState<AttendanceOption>('yes');
+  const [attendeeName, setAttendeeName] = useState('');
   const [guestsCount, setGuestsCount] = useState(1);
   const [kidsCount, setKidsCount] = useState(0);
   const [allergiesText, setAllergiesText] = useState('');
@@ -30,6 +31,7 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         invitationId,
+        attendeeName: attendeeName.trim(),
         attendance,
         guestsCount,
         kidsCount,
@@ -48,6 +50,20 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 text-sm text-slate-800">
+      <label className="block space-y-2">
+        <span className="block text-xs uppercase tracking-wide text-slate-500">Name</span>
+        <input
+          type="text"
+          value={attendeeName}
+          onChange={(event) => setAttendeeName(event.target.value)}
+          disabled={disabled || submitting}
+          required
+          maxLength={40}
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 shadow-sm"
+          placeholder="Your full name"
+        />
+      </label>
+
       <div className="grid gap-3 md:grid-cols-3">
         <label className="space-y-2">
           <span className="block text-xs uppercase tracking-wide text-slate-500">Attendance</span>
@@ -107,6 +123,10 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
           placeholder="Optional notes (max 120 characters)"
         />
       </label>
+
+      <p className="text-xs text-slate-600">
+        This RSVP is for approximate headcount only — final numbers don’t have to be exact.
+      </p>
 
       <div className="flex items-center gap-3">
         <button
