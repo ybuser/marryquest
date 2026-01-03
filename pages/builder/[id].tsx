@@ -58,48 +58,32 @@ function SortableItem({ section, label, onToggle }: SortableItemProps) {
 }
 
 export default function InvitationBuilder({ invitation: initialInvitation, photos }: BuilderPageProps) {
-  const [invitation, setInvitation] = useState<InvitationDetails>(initialInvitation);
+  const [savedInvitation, setSavedInvitation] = useState<InvitationDetails>(initialInvitation);
+  const [draftInvitation, setDraftInvitation] = useState<InvitationDetails>(initialInvitation);
+  const [savedSections, setSavedSections] = useState<SectionConfig[]>(initialInvitation.sections);
+  const [draftSections, setDraftSections] = useState<SectionConfig[]>(initialInvitation.sections);
   const [activeTab, setActiveTab] = useState<TabKey>('Basic');
-  const [slugInput, setSlugInput] = useState(initialInvitation.slug);
   const [slugError, setSlugError] = useState<string | null>(null);
-  const [statusSaving, setStatusSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [rsvpSummary, setRsvpSummary] = useState<{
     countsByAttendance: { yes: number; no: number; maybe: number };
     totals: { guestsTotal: number; kidsTotal: number; responsesTotal: number };
     recentSampleCount?: number;
   } | null>(null);
   const [rsvpLoading, setRsvpLoading] = useState(false);
+  const [basicSaving, setBasicSaving] = useState(false);
+  const [designSaving, setDesignSaving] = useState(false);
+  const [sectionsSaving, setSectionsSaving] = useState(false);
+  const [publishSaving, setPublishSaving] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const invitationRef = useRef(invitation);
-  const pendingUpdatesRef = useRef<Partial<InvitationDetails>>({});
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
-  const saveInFlightRef = useRef(false);
-  const pendingSaveRef = useRef(false);
-  const requestIdRef = useRef(0);
   const lastErrorTimeRef = useRef(0);
 
   const sensors = useSensors(useSensor(PointerSensor));
 
   useEffect(() => {
-    setSlugInput(invitation.slug);
-  }, [invitation.slug]);
-
-  useEffect(() => {
-    invitationRef.current = invitation;
-  }, [invitation]);
-
-  useEffect(() => () => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-  }, []);
-
-  useEffect(() => {
     async function fetchSummary() {
       setRsvpLoading(true);
-      const response = await fetch(`/api/invitations/${invitation.id}/rsvp-summary`);
+      const response = await fetch(`/api/invitations/${savedInvitation.id}/rsvp-summary`);
       if (response.ok) {
         const data = await response.json();
         setRsvpSummary(data);
@@ -110,138 +94,222 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     if (activeTab === 'Export' && !rsvpSummary && !rsvpLoading) {
       void fetchSummary();
     }
-  }, [activeTab, invitation.id, rsvpLoading, rsvpSummary]);
+  }, [activeTab, savedInvitation.id, rsvpLoading, rsvpSummary]);
+
+  const hasBasicChanges = useMemo(() => {
+    const fields: (keyof InvitationDetails)[] = [
+      'groomName',
+      'brideName',
+      'dateTime',
+      'venueName',
+      'address',
+      'accountGroom',
+      'accountBride',
+      'contactGroom',
+      'contactBride'
+    ];
+
+    return fields.some((field) => draftInvitation[field] !== savedInvitation[field]);
+  }, [draftInvitation, savedInvitation]);
+
+  const hasDesignChanges = useMemo(
+    () => draftInvitation.templateKey !== savedInvitation.templateKey,
+    [draftInvitation.templateKey, savedInvitation.templateKey]
+  );
+
+  const hasSectionsChanges = useMemo(() => {
+    if (draftSections.length !== savedSections.length) return true;
+    return draftSections.some((section, index) => {
+      const saved = savedSections[index];
+      return section.id !== saved.id || section.enabled !== saved.enabled || section.order !== saved.order;
+    });
+  }, [draftSections, savedSections]);
+
+  const hasPublishChanges = useMemo(
+    () => draftInvitation.slug !== savedInvitation.slug || draftInvitation.status !== savedInvitation.status,
+    [draftInvitation.slug, draftInvitation.status, savedInvitation.slug, savedInvitation.status]
+  );
+
+  const hasUnsavedChanges = hasBasicChanges || hasDesignChanges || hasSectionsChanges || hasPublishChanges;
+
+  useEffect(() => {
+    const handler = (event: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasUnsavedChanges]);
 
   function showError(message: string) {
     const now = Date.now();
-    if (saveErrorMessage === message && now - lastErrorTimeRef.current < 5000) {
+    if (statusMessage === message && now - lastErrorTimeRef.current < 5000) {
       return;
     }
     lastErrorTimeRef.current = now;
-    setSaveErrorMessage(message);
-    setSaveStatus('error');
+    setStatusMessage(message);
   }
 
-  async function flushInvitationUpdates(allowRetry = true) {
-    if (saveInFlightRef.current) {
-      pendingSaveRef.current = true;
-      return;
-    }
+  function resetStatus(message: string | null = null) {
+    setStatusMessage(message);
+  }
 
-    const updates = pendingUpdatesRef.current;
-    pendingUpdatesRef.current = {};
-
-    if (!Object.keys(updates).length) return;
-
-    saveInFlightRef.current = true;
-    pendingSaveRef.current = false;
-    setSaveStatus('saving');
-
-    const requestId = ++requestIdRef.current;
-    let scheduleDelayedRetry = false;
-    let skipImmediateFlush = false;
-
+  async function saveBasic() {
+    setBasicSaving(true);
+    resetStatus('Saving…');
     try {
-      const currentInvitation = invitationRef.current;
-      const response = await fetch(`/api/invitations/${currentInvitation.id}`, {
+      const response = await fetch(`/api/invitations/${savedInvitation.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...updates,
-          dateTime: updates.dateTime ?? currentInvitation.dateTime
+          groomName: draftInvitation.groomName,
+          brideName: draftInvitation.brideName,
+          dateTime: draftInvitation.dateTime,
+          venueName: draftInvitation.venueName,
+          address: draftInvitation.address,
+          accountGroom: draftInvitation.accountGroom,
+          accountBride: draftInvitation.accountBride,
+          contactGroom: draftInvitation.contactGroom,
+          contactBride: draftInvitation.contactBride,
+          templateKey: savedInvitation.templateKey,
+          slug: savedInvitation.slug
         })
       });
 
-      if (response.status === 401) {
-        if (typeof window !== 'undefined') {
-          const callbackUrl = encodeURIComponent(window.location.pathname + window.location.search);
-          window.location.href = `/login?callbackUrl=${callbackUrl}`;
-        }
-        return;
-      }
-
-      if (response.status === 429) {
-        showError('Saving too fast. Retrying…');
-        pendingUpdatesRef.current = { ...updates, ...pendingUpdatesRef.current };
-        skipImmediateFlush = true;
-        if (allowRetry) {
-          scheduleDelayedRetry = true;
-        }
-      }
-
       if (!response.ok) {
-        showError('Failed to save changes');
+        showError('Failed to save basic details');
         return;
       }
 
       const updated = await response.json();
-
-      if (requestId === requestIdRef.current) {
-        setInvitation((prev) => ({
-          ...prev,
-          dateTime: updates.dateTime && updated.dateTime ? new Date(updated.dateTime).toISOString() : prev.dateTime
-        }));
-        setSaveErrorMessage(null);
-        setSaveStatus('saved');
-      }
+      const normalizedDate = updated.dateTime ? new Date(updated.dateTime).toISOString() : draftInvitation.dateTime;
+      const next = { ...draftInvitation, ...updated, dateTime: normalizedDate } as InvitationDetails;
+      setSavedInvitation((prev) => ({ ...prev, ...next }));
+      setDraftInvitation((prev) => ({ ...prev, ...next }));
+      resetStatus('Saved');
     } catch (error) {
       console.error(error);
-      showError('Failed to save changes');
+      showError('Failed to save basic details');
     } finally {
-      saveInFlightRef.current = false;
-    }
-
-    if (scheduleDelayedRetry) {
-      pendingSaveRef.current = false;
-      setTimeout(() => {
-        void flushInvitationUpdates(false);
-      }, 2000);
-      return;
-    }
-
-    if (!skipImmediateFlush && (pendingSaveRef.current || Object.keys(pendingUpdatesRef.current).length)) {
-      pendingSaveRef.current = false;
-      void flushInvitationUpdates();
+      setBasicSaving(false);
     }
   }
 
-  function patchInvitation(updates: Partial<InvitationDetails>) {
-    setInvitation((prev) => ({ ...prev, ...updates }));
-    pendingUpdatesRef.current = { ...pendingUpdatesRef.current, ...updates };
-    setSaveErrorMessage(null);
-    setSaveStatus('saving');
+  async function saveDesign() {
+    setDesignSaving(true);
+    resetStatus('Saving…');
+    try {
+      const response = await fetch(`/api/invitations/${savedInvitation.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ templateKey: draftInvitation.templateKey })
+      });
 
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
+      if (!response.ok) {
+        showError('Failed to save design');
+        return;
+      }
+
+      const updated = await response.json();
+      const next = { ...draftInvitation, ...updated } as InvitationDetails;
+      setSavedInvitation((prev) => ({ ...prev, ...next }));
+      setDraftInvitation((prev) => ({ ...prev, ...next }));
+      resetStatus('Saved');
+    } catch (error) {
+      console.error(error);
+      showError('Failed to save design');
+    } finally {
+      setDesignSaving(false);
     }
-
-    debounceRef.current = setTimeout(() => {
-      void flushInvitationUpdates();
-    }, 800);
   }
 
-  async function saveSections(sections: SectionConfig[]) {
-    const response = await fetch(`/api/invitations/${invitation.id}/sections`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sections })
-    });
+  async function saveSections() {
+    setSectionsSaving(true);
+    resetStatus('Saving…');
+    try {
+      const response = await fetch(`/api/invitations/${savedInvitation.id}/sections`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sections: draftSections })
+      });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        showError('Unable to update sections');
+        return;
+      }
+
+      const updated: SectionConfig[] = await response.json();
+      setSavedSections(updated);
+      setDraftSections(updated);
+      setSavedInvitation((prev) => ({ ...prev, sections: updated }));
+      setDraftInvitation((prev) => ({ ...prev, sections: updated }));
+      resetStatus('Saved');
+    } catch (error) {
+      console.error(error);
       showError('Unable to update sections');
-      return;
+    } finally {
+      setSectionsSaving(false);
     }
+  }
 
-    const updated: SectionConfig[] = await response.json();
-    setSaveErrorMessage(null);
-    setSaveStatus('saved');
-    setInvitation((prev) => ({ ...prev, sections: updated }));
+  async function savePublish() {
+    setPublishSaving(true);
+    resetStatus('Saving…');
+
+    try {
+      if (draftInvitation.slug !== savedInvitation.slug) {
+        const slugResponse = await fetch(`/api/invitations/${savedInvitation.id}/slug`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug: draftInvitation.slug.trim() })
+        });
+
+        if (!slugResponse.ok) {
+          const error = await slugResponse.json();
+          setSlugError(Array.isArray(error.error) ? error.error.join(', ') : error.error);
+          showError('Failed to update slug');
+          return;
+        }
+
+        const updated = await slugResponse.json();
+        setDraftInvitation((prev) => ({ ...prev, slug: updated.slug }));
+        setSavedInvitation((prev) => ({ ...prev, slug: updated.slug }));
+        setSlugError(null);
+      }
+
+      if (draftInvitation.status !== savedInvitation.status) {
+        const statusResponse = await fetch(`/api/invitations/${savedInvitation.id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: draftInvitation.status })
+        });
+
+        if (!statusResponse.ok) {
+          showError('Unable to update status');
+          return;
+        }
+
+        const updated = await statusResponse.json();
+        setDraftInvitation((prev) => ({ ...prev, status: updated.status }));
+        setSavedInvitation((prev) => ({ ...prev, status: updated.status }));
+      }
+
+      resetStatus('Saved');
+    } catch (error) {
+      console.error(error);
+      showError('Unable to save publish settings');
+    } finally {
+      setPublishSaving(false);
+    }
   }
 
   const orderedSections = useMemo(() => {
     const merged = DEFAULT_SECTIONS.map((def, index) =>
-      invitation.sections.find((section) => section.key === def.key) ?? {
-        id: `${invitation.id}-${def.key}`,
+      draftSections.find((section) => section.key === def.key) ?? {
+        id: `${draftInvitation.id}-${def.key}`,
         key: def.key,
         enabled: true,
         order: index
@@ -249,12 +317,9 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     );
 
     return merged.sort((a, b) => a.order - b.order);
-  }, [invitation.id, invitation.sections]);
+  }, [draftInvitation.id, draftSections]);
 
-  const activeSections = useMemo(
-    () => orderedSections.filter((section) => section.enabled),
-    [orderedSections]
-  );
+  const activeSections = useMemo(() => orderedSections.filter((section) => section.enabled), [orderedSections]);
 
   function handleDragEnd(event: any) {
     const { active, over } = event;
@@ -267,82 +332,49 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
       order: index
     }));
 
-    setInvitation((prev) => ({ ...prev, sections: newSections }));
-    void saveSections(newSections);
+    setDraftSections(newSections);
   }
 
   function handleToggle(section: SectionConfig) {
-    const updated = orderedSections.map((item) =>
-      item.id === section.id ? { ...item, enabled: !item.enabled } : item
-    );
-    setInvitation((prev) => ({ ...prev, sections: updated }));
-    void saveSections(updated);
-  }
-
-  async function saveSlug() {
-    setSlugError(null);
-    const response = await fetch(`/api/invitations/${invitation.id}/slug`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug: slugInput.trim() })
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      setSlugError(Array.isArray(error.error) ? error.error.join(', ') : error.error);
-      return;
-    }
-
-    const updated = await response.json();
-    setInvitation((prev) => ({ ...prev, slug: updated.slug }));
-  }
-
-  async function updateStatus(status: InvitationDetails['status']) {
-    setStatusSaving(true);
-    const response = await fetch(`/api/invitations/${invitation.id}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status })
-    });
-
-    if (!response.ok) {
-      showError('Unable to update status');
-      setStatusSaving(false);
-      return;
-    }
-
-    const updated = await response.json();
-    setInvitation((prev) => ({ ...prev, status: updated.status }));
-    setSaveErrorMessage(null);
-    setSaveStatus('saved');
-    setStatusSaving(false);
+    const updated = orderedSections.map((item) => (item.id === section.id ? { ...item, enabled: !item.enabled } : item));
+    setDraftSections(updated);
   }
 
   const publishUrl = useMemo(
-    () => `${typeof window === 'undefined' ? '' : window.location.origin}/${invitation.slug}`,
-    [invitation.slug]
+    () => `${typeof window === 'undefined' ? '' : window.location.origin}/${savedInvitation.slug}`,
+    [savedInvitation.slug]
   );
+
+  const unsavedLabel = (tab: TabKey) => {
+    const hasChanges =
+      tab === 'Basic'
+        ? hasBasicChanges
+        : tab === 'Design'
+          ? hasDesignChanges
+          : tab === 'Sections'
+            ? hasSectionsChanges
+            : tab === 'Publish'
+              ? hasPublishChanges
+              : false;
+
+    return hasChanges ? (
+      <span className="text-xs font-medium text-amber-700">Unsaved changes</span>
+    ) : (
+      <span className="text-xs text-slate-500">Saved</span>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
       <Head>
-        <title>Invitation Builder • {invitation.title ?? 'Untitled'}</title>
+        <title>Invitation Builder • {draftInvitation.title ?? 'Untitled'}</title>
       </Head>
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 lg:flex-row">
         <div className="w-full space-y-4 lg:w-1/2">
-          {saveErrorMessage && (
-            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-              <span className="mt-0.5">⚠️</span>
-              <div>
-                <p className="font-medium">{saveErrorMessage}</p>
-                {saveStatus === 'saving' && <p className="text-xs text-red-700">Retrying…</p>}
-              </div>
-            </div>
-          )}
-
-          {saveStatus === 'saving' && !saveErrorMessage && (
-            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-              Saving…
+          {statusMessage && (
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm">
+              <span>ℹ️</span>
+              <span>{statusMessage}</span>
             </div>
           )}
 
@@ -350,9 +382,7 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
             {tabs.map((tab) => (
               <button
                 key={tab}
-                className={`rounded-md px-3 py-2 text-sm font-medium ${
-                  activeTab === tab ? 'bg-slate-900 text-white' : 'text-slate-700'
-                }`}
+                className={`rounded-md px-3 py-2 text-sm font-medium ${activeTab === tab ? 'bg-slate-900 text-white' : 'text-slate-700'}`}
                 onClick={() => setActiveTab(tab)}
               >
                 {tab}
@@ -362,21 +392,31 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
 
           {activeTab === 'Basic' && (
             <div className="space-y-6 rounded-xl bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                {unsavedLabel('Basic')}
+                <button
+                  className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  onClick={saveBasic}
+                  disabled={!hasBasicChanges || basicSaving}
+                >
+                  {basicSaving ? 'Saving…' : 'Save Basic'}
+                </button>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <label className="space-y-1 text-sm font-medium text-slate-700">
                   Groom name
                   <input
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                    value={invitation.groomName}
-                    onChange={(e) => patchInvitation({ groomName: e.target.value })}
+                    value={draftInvitation.groomName}
+                    onChange={(e) => setDraftInvitation((prev) => ({ ...prev, groomName: e.target.value }))}
                   />
                 </label>
                 <label className="space-y-1 text-sm font-medium text-slate-700">
                   Bride name
                   <input
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                    value={invitation.brideName}
-                    onChange={(e) => patchInvitation({ brideName: e.target.value })}
+                    value={draftInvitation.brideName}
+                    onChange={(e) => setDraftInvitation((prev) => ({ ...prev, brideName: e.target.value }))}
                   />
                 </label>
               </div>
@@ -385,8 +425,10 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
                 <input
                   type="datetime-local"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                  value={invitation.dateTime.slice(0, 16)}
-                  onChange={(e) => patchInvitation({ dateTime: new Date(e.target.value).toISOString() })}
+                  value={draftInvitation.dateTime.slice(0, 16)}
+                  onChange={(e) =>
+                    setDraftInvitation((prev) => ({ ...prev, dateTime: new Date(e.target.value).toISOString() }))
+                  }
                 />
               </label>
               <div className="grid grid-cols-2 gap-4">
@@ -394,16 +436,16 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
                   Venue name
                   <input
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                    value={invitation.venueName}
-                    onChange={(e) => patchInvitation({ venueName: e.target.value })}
+                    value={draftInvitation.venueName}
+                    onChange={(e) => setDraftInvitation((prev) => ({ ...prev, venueName: e.target.value }))}
                   />
                 </label>
                 <label className="space-y-1 text-sm font-medium text-slate-700">
                   Address
                   <input
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                    value={invitation.address}
-                    onChange={(e) => patchInvitation({ address: e.target.value })}
+                    value={draftInvitation.address}
+                    onChange={(e) => setDraftInvitation((prev) => ({ ...prev, address: e.target.value }))}
                   />
                 </label>
               </div>
@@ -412,16 +454,16 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
                   Accounts (groom)
                   <input
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                    value={invitation.accountGroom ?? ''}
-                    onChange={(e) => patchInvitation({ accountGroom: e.target.value })}
+                    value={draftInvitation.accountGroom ?? ''}
+                    onChange={(e) => setDraftInvitation((prev) => ({ ...prev, accountGroom: e.target.value }))}
                   />
                 </label>
                 <label className="space-y-1 text-sm font-medium text-slate-700">
                   Accounts (bride)
                   <input
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                    value={invitation.accountBride ?? ''}
-                    onChange={(e) => patchInvitation({ accountBride: e.target.value })}
+                    value={draftInvitation.accountBride ?? ''}
+                    onChange={(e) => setDraftInvitation((prev) => ({ ...prev, accountBride: e.target.value }))}
                   />
                 </label>
               </div>
@@ -430,16 +472,16 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
                   Contacts (groom)
                   <input
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                    value={invitation.contactGroom ?? ''}
-                    onChange={(e) => patchInvitation({ contactGroom: e.target.value })}
+                    value={draftInvitation.contactGroom ?? ''}
+                    onChange={(e) => setDraftInvitation((prev) => ({ ...prev, contactGroom: e.target.value }))}
                   />
                 </label>
                 <label className="space-y-1 text-sm font-medium text-slate-700">
                   Contacts (bride)
                   <input
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                    value={invitation.contactBride ?? ''}
-                    onChange={(e) => patchInvitation({ contactBride: e.target.value })}
+                    value={draftInvitation.contactBride ?? ''}
+                    onChange={(e) => setDraftInvitation((prev) => ({ ...prev, contactBride: e.target.value }))}
                   />
                 </label>
               </div>
@@ -448,14 +490,24 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
 
           {activeTab === 'Design' && (
             <div className="space-y-4 rounded-xl bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                {unsavedLabel('Design')}
+                <button
+                  className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  onClick={saveDesign}
+                  disabled={!hasDesignChanges || designSaving}
+                >
+                  {designSaving ? 'Saving…' : 'Save Design'}
+                </button>
+              </div>
               <p className="text-sm text-slate-700">Choose a template style.</p>
               <div className="flex gap-3">
                 {['mono', 'editorial', 'film'].map((key) => (
                   <button
                     key={key}
-                    onClick={() => patchInvitation({ templateKey: key as any })}
+                    onClick={() => setDraftInvitation((prev) => ({ ...prev, templateKey: key as any }))}
                     className={`rounded-lg border px-4 py-3 text-sm capitalize shadow-sm ${
-                      invitation.templateKey === key ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200'
+                      draftInvitation.templateKey === key ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200'
                     }`}
                   >
                     {key}
@@ -467,6 +519,16 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
 
           {activeTab === 'Sections' && (
             <div className="space-y-4 rounded-xl bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                {unsavedLabel('Sections')}
+                <button
+                  className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  onClick={saveSections}
+                  disabled={!hasSectionsChanges || sectionsSaving}
+                >
+                  {sectionsSaving ? 'Saving…' : 'Save Sections'}
+                </button>
+              </div>
               <p className="text-sm text-slate-700">Drag to reorder sections. Toggle visibility as needed.</p>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={orderedSections.map((section) => section.id)} strategy={verticalListSortingStrategy}>
@@ -486,7 +548,13 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
           )}
 
           {activeTab === 'Games' && (
-            <div className="space-y-3 rounded-xl bg-white p-6 shadow-sm">
+            <div className="space-y-4 rounded-xl bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-500">Coming soon</span>
+                <button className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white" disabled>
+                  Save Games
+                </button>
+              </div>
               <p className="text-sm text-slate-700">Mini-games will arrive soon. Toggle placeholders for now.</p>
               {['Quiz', 'Timeline', 'Food'].map((game) => (
                 <label key={game} className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
@@ -499,16 +567,25 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
 
           {activeTab === 'Publish' && (
             <div className="space-y-4 rounded-xl bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                {unsavedLabel('Publish')}
+                <button
+                  className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  onClick={savePublish}
+                  disabled={!hasPublishChanges || publishSaving}
+                >
+                  {publishSaving ? 'Saving…' : 'Save Publish'}
+                </button>
+              </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium text-slate-800">Status</p>
                 <div className="flex gap-2">
                   {['draft', 'published', 'private'].map((status) => (
                     <button
                       key={status}
-                      onClick={() => updateStatus(status as any)}
-                      disabled={statusSaving}
+                      onClick={() => setDraftInvitation((prev) => ({ ...prev, status: status as any }))}
                       className={`rounded-lg border px-3 py-2 text-sm capitalize shadow-sm ${
-                        invitation.status === status ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200'
+                        draftInvitation.status === status ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200'
                       }`}
                     >
                       {status}
@@ -520,42 +597,36 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
                 <p className="text-sm font-medium text-slate-800">Slug</p>
                 <div className="flex gap-2">
                   <input
+                    value={draftInvitation.slug}
+                    onChange={(e) => setDraftInvitation((prev) => ({ ...prev, slug: e.target.value }))}
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                    value={slugInput}
-                    onChange={(e) => setSlugInput(e.target.value)}
-                    onBlur={() => void saveSlug()}
                   />
                   <button
-                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
-                    onClick={() => void saveSlug()}
+                    onClick={() => setDraftInvitation((prev) => ({ ...prev, slug: savedInvitation.slug }))}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 shadow-sm"
+                    disabled={!hasPublishChanges}
                   >
-                    Save
+                    Reset
                   </button>
                 </div>
-                {slugError && <p className="text-sm text-red-600">{slugError}</p>}
+                {slugError && <p className="text-xs text-red-600">{slugError}</p>}
+                <p className="text-xs text-slate-600">Public URL: {publishUrl}</p>
               </div>
-              {invitation.status === 'published' && (
-                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-                  Public URL: <a href={`/${invitation.slug}`}>{publishUrl}</a>
-                </div>
-              )}
             </div>
           )}
 
           {activeTab === 'Export' && (
-            <div className="space-y-4 rounded-xl bg-white p-6 shadow-sm text-sm text-slate-700">
+            <div className="space-y-4 rounded-xl bg-white p-6 shadow-sm">
+              <p className="text-base font-semibold text-slate-900">RSVP Summary</p>
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">RSVP Summary</p>
-                  <p className="text-base font-semibold text-slate-900">Quick attendance snapshot</p>
-                </div>
-                <a
-                  href={`/api/export/rsvp.csv?invitationId=${invitation.id}`}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 shadow-sm"
-                >
-                  Download CSV
-                </a>
+                <p className="text-sm text-slate-600">Quick attendance snapshot</p>
               </div>
+              <a
+                href={`/api/export/rsvp.csv?invitationId=${savedInvitation.id}`}
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 shadow-sm"
+              >
+                Download CSV
+              </a>
 
               <div className="grid gap-3 md:grid-cols-4">
                 <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
@@ -601,7 +672,7 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
         <div className="w-full lg:w-1/2">
           <div className="sticky top-6 rounded-3xl bg-white p-4 shadow-lg">
             <p className="mb-3 text-sm text-slate-600">Live preview</p>
-            <InvitationPage invitation={invitation} sections={activeSections} photos={photos} />
+            <InvitationPage invitation={draftInvitation} sections={activeSections} photos={photos} />
           </div>
         </div>
       </div>
@@ -625,15 +696,16 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
       return { notFound: true };
     }
 
-    const normalizedSections = (invitation.sections.length
-      ? invitation.sections
-      : DEFAULT_SECTIONS.map((section, index) => ({
-          id: `${invitation.id}-${section.key}`,
-          key: section.key,
-          enabled: true,
-          order: index
-        })))
-      .sort((a, b) => a.order - b.order);
+    const normalizedSections = (
+      invitation.sections.length
+        ? invitation.sections
+        : DEFAULT_SECTIONS.map((section, index) => ({
+            id: `${invitation.id}-${section.key}`,
+            key: section.key,
+            enabled: true,
+            order: index
+          }))
+    ).sort((a, b) => a.order - b.order);
 
     const photos: GalleryPhoto[] = invitation.galleryPhotos
       .map((photo) => ({
