@@ -57,6 +57,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     where: { invitationId },
     orderBy: { createdAt: 'desc' },
     select: {
+      attendeeName: true,
       createdAt: true,
       attendance: true,
       guestsCount: true,
@@ -66,9 +67,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   });
 
   const csv = toCsv([
-    ['createdAt', 'attendance', 'guestsCount', 'kidsCount', 'allergiesText'],
+    ['createdAt', 'attendeeName', 'attendance', 'guestsCount', 'kidsCount', 'allergiesText'],
     ...rows.map((row) => [
       row.createdAt.toISOString(),
+      row.attendeeName,
       row.attendance,
       row.guestsCount.toString(),
       row.kidsCount.toString(),
