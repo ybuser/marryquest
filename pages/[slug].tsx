@@ -77,6 +77,23 @@ export const getServerSideProps: GetServerSideProps<PublicInvitationPageProps> =
     }))
     .sort((a, b) => a.order - b.order);
 
+  const quiz: QuizDto | null = invitation.quiz
+    ? {
+        id: invitation.quiz.id,
+        invitationId: invitation.id,
+        enabled: invitation.quiz.enabled,
+        questions: invitation.quiz.questions
+          .map((question) => ({
+            id: question.id,
+            prompt: question.prompt,
+            options: question.options,
+            correctIndex: question.correctIndex,
+            order: question.order
+          }))
+          .sort((a, b) => a.order - b.order)
+      }
+    : null;
+
   const invitationDetails: InvitationDetails = {
     id: invitation.id,
     slug: invitation.slug,
@@ -92,22 +109,7 @@ export const getServerSideProps: GetServerSideProps<PublicInvitationPageProps> =
     accountBride: invitation.accountBride,
     contactGroom: invitation.contactGroom,
     contactBride: invitation.contactBride,
-    quiz: invitation.quiz
-      ? {
-          id: invitation.quiz.id,
-          invitationId: invitation.id,
-          enabled: invitation.quiz.enabled,
-          questions: invitation.quiz.questions
-            .map((question) => ({
-              id: question.id,
-              prompt: question.prompt,
-              options: question.options,
-              correctIndex: question.correctIndex,
-              order: question.order
-            }))
-            .sort((a, b) => a.order - b.order)
-        }
-      : { id: '', invitationId: invitation.id, enabled: false, questions: [] },
+    quiz,
     sections: normalizedSections
   };
 
@@ -117,7 +119,7 @@ export const getServerSideProps: GetServerSideProps<PublicInvitationPageProps> =
       sections: normalizedSections,
       photos,
       templateKey: invitation.templateKey,
-      quiz: invitationDetails.quiz,
+      quiz,
       baseUrl
     }
   };
