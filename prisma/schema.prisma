@@ -106,6 +106,7 @@ model Invitation {
   galleryPhotos    GalleryPhoto[]
   rsvpResponses    RSVPResponse[]
   guestbookEntries GuestbookEntry[]
+  quiz             Quiz?
 }
 
 model SectionConfig {
@@ -151,4 +152,26 @@ model GuestbookEntry {
   createdAt    DateTime      @default(now())
 
   invitation Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+}
+
+model Quiz {
+  id            String   @id @default(cuid())
+  invitationId  String   @unique
+  enabled       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  invitation Invitation    @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  questions   QuizQuestion[]
+}
+
+model QuizQuestion {
+  id        String @id @default(cuid())
+  quizId    String
+  prompt    String
+  options   String[]
+  correctIndex Int
+  order     Int
+
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
 }

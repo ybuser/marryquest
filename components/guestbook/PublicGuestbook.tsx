@@ -7,9 +7,10 @@ interface PublicGuestbookProps {
   invitationId: string;
   slug: string;
   invitationStatus: InvitationDetails['status'];
+  badgeToken?: string | null;
 }
 
-export function PublicGuestbook({ invitationId, slug, invitationStatus }: PublicGuestbookProps) {
+export function PublicGuestbook({ invitationId, slug, invitationStatus, badgeToken }: PublicGuestbookProps) {
   const [entries, setEntries] = useState<GuestbookEntryDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,10 +56,21 @@ export function PublicGuestbook({ invitationId, slug, invitationStatus }: Public
     setSuccessMessage(null);
 
     try {
+      const payload: Record<string, unknown> = {
+        invitationId,
+        nickname: nickname.trim(),
+        message: message.trim()
+      };
+
+      if (badgeToken) {
+        payload.badge = 'quizPerfect';
+        payload.badgeToken = badgeToken;
+      }
+
       const response = await fetch('/api/guestbook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invitationId, nickname: nickname.trim(), message: message.trim() })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -128,6 +140,11 @@ export function PublicGuestbook({ invitationId, slug, invitationStatus }: Public
             >
               {submitting ? 'Submitting…' : 'Sign guestbook'}
             </button>
+            {badgeToken && (
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-[var(--mq-fg)]">
+                quizPerfect badge ready
+              </span>
+            )}
             {successMessage && <span className="text-sm text-emerald-100">{successMessage}</span>}
             {error && <span className="text-sm text-amber-200">{error}</span>}
           </div>
