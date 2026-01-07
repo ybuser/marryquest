@@ -1,4 +1,5 @@
 import type { InvitationStatus, TemplateKey } from '@prisma/client';
+import type { QuizDto } from './quiz';
 
 export interface SectionConfig {
   id: string;
@@ -22,6 +23,7 @@ export interface InvitationDetails {
   accountBride?: string | null;
   contactGroom?: string | null;
   contactBride?: string | null;
+  quiz?: QuizDto | null;
   sections: SectionConfig[];
 }
 
@@ -38,6 +40,7 @@ export const DEFAULT_SECTIONS: { key: string; label: string }[] = [
   { key: 'maps', label: 'Map Buttons' },
   { key: 'gallery', label: 'Gallery' },
   { key: 'accounts', label: 'Accounts' },
+  { key: 'quiz', label: 'Quiz' },
   { key: 'guestbook', label: 'Guestbook' },
   { key: 'rsvp', label: 'RSVP' }
 ];

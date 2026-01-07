@@ -1,10 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import type { GuestbookBadge } from '@prisma/client';
 import { z } from 'zod';
 import prisma from '@/lib/db';
 import { withRateLimit } from '@/lib/security/rateLimit';
 import { validate } from '@/lib/validate';
 import { containsProfanity } from '@/lib/guestbook';
 import { requireApiAuth } from '@/lib/auth';
+import { verifyBadgeToken } from '@/lib/quizBadge';
 
 const querySchema = z.object({
   slug: z.string().min(1)
@@ -13,7 +15,9 @@ const querySchema = z.object({
 const createSchema = z.object({
   invitationId: z.string().min(1),
   nickname: z.string().trim().min(1).max(20),
-  message: z.string().trim().min(1).max(300)
+  message: z.string().trim().min(1).max(300),
+  badge: z.enum(['quizPerfect']).optional(),
+  badgeToken: z.string().optional()
 });
 
 const patchSchema = z.object({
@@ -60,7 +64,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(400).json({ error: parsed.errors });
     }
 
-    const { invitationId, nickname, message } = parsed.data;
+    const { invitationId, nickname, message, badge, badgeToken } = parsed.data;
 
     if (containsProfanity(nickname) || containsProfanity(message)) {
       return res.status(400).json({ error: 'Inappropriate content detected' });
@@ -75,11 +79,26 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(404).json({ error: 'Invitation not available' });
     }
 
+    let guestbookBadge: GuestbookBadge = 'none';
+
+    if (badge) {
+      if (badge !== 'quizPerfect') {
+        return res.status(400).json({ error: 'Unsupported badge' });
+      }
+
+      const isValid = verifyBadgeToken(badgeToken ?? '', invitationId);
+      if (!isValid) {
+        return res.status(403).json({ error: 'Invalid or expired badge token' });
+      }
+      guestbookBadge = 'quizPerfect';
+    }
+
     const created = await prisma.guestbookEntry.create({
       data: {
         invitationId,
         nickname,
         message,
+        badge: guestbookBadge,
         hidden: false
       }
     });

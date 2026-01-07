@@ -10,6 +10,8 @@ import { InvitationPage } from '@/components/invitation/InvitationPage';
 import type { GalleryPhoto, InvitationDetails, SectionConfig } from '@/types/invitation';
 import { DEFAULT_SECTIONS } from '@/types/invitation';
 import type { GuestbookEntryDto } from '@/types/guestbook';
+import type { QuizDto, QuizQuestionDto } from '@/types/quiz';
+import { EMPTY_QUIZ } from '@/types/quiz';
 
 interface BuilderPageProps {
   invitation: InvitationDetails;
@@ -18,7 +20,7 @@ interface BuilderPageProps {
   guestbookEntries: GuestbookEntryDto[];
 }
 
-const tabs = ['Basic', 'Design', 'Sections', 'Guestbook', 'Games', 'Publish', 'Export'] as const;
+const tabs = ['Basic', 'Design', 'Sections', 'Guestbook', 'Quiz', 'Publish', 'Export'] as const;
 type TabKey = (typeof tabs)[number];
 
 interface SortableItemProps {
@@ -66,6 +68,9 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
   const [draftSections, setDraftSections] = useState<SectionConfig[]>(initialInvitation.sections);
   const [savedGuestbookEntries, setSavedGuestbookEntries] = useState<GuestbookEntryDto[]>(guestbookEntries);
   const [draftGuestbookEntries, setDraftGuestbookEntries] = useState<GuestbookEntryDto[]>(guestbookEntries);
+  const initialQuiz = initialInvitation.quiz ?? { ...EMPTY_QUIZ, invitationId: initialInvitation.id };
+  const [savedQuiz, setSavedQuiz] = useState<QuizDto>(initialQuiz);
+  const [draftQuiz, setDraftQuiz] = useState<QuizDto>(initialQuiz);
   const [activeTab, setActiveTab] = useState<TabKey>('Basic');
   const [slugError, setSlugError] = useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
@@ -80,6 +85,7 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
   const [designSaving, setDesignSaving] = useState(false);
   const [sectionsSaving, setSectionsSaving] = useState(false);
   const [guestbookSaving, setGuestbookSaving] = useState(false);
+  const [quizSaving, setQuizSaving] = useState(false);
   const [publishSaving, setPublishSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -140,13 +146,31 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     });
   }, [draftGuestbookEntries, savedGuestbookEntries]);
 
+  const hasQuizChanges = useMemo(() => {
+    if (draftQuiz.enabled !== savedQuiz.enabled) return true;
+    if (draftQuiz.questions.length !== savedQuiz.questions.length) return true;
+
+    return draftQuiz.questions.some((question, index) => {
+      const saved = savedQuiz.questions[index];
+      if (!saved) return true;
+      if (question.prompt !== saved.prompt || question.correctIndex !== saved.correctIndex) return true;
+      if (question.options.length !== saved.options.length) return true;
+      return question.options.some((option, optionIndex) => option !== saved.options[optionIndex]);
+    });
+  }, [draftQuiz, savedQuiz]);
+
   const hasPublishChanges = useMemo(
     () => draftInvitation.slug !== savedInvitation.slug || draftInvitation.status !== savedInvitation.status,
     [draftInvitation.slug, draftInvitation.status, savedInvitation.slug, savedInvitation.status]
   );
 
   const hasUnsavedChanges =
-    hasBasicChanges || hasDesignChanges || hasSectionsChanges || hasGuestbookChanges || hasPublishChanges;
+    hasBasicChanges ||
+    hasDesignChanges ||
+    hasSectionsChanges ||
+    hasGuestbookChanges ||
+    hasQuizChanges ||
+    hasPublishChanges;
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -313,6 +337,112 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     }
   }
 
+  function addQuizQuestion() {
+    setDraftQuiz((prev) => {
+      if (prev.questions.length >= 5) return prev;
+      return {
+        ...prev,
+        questions: [
+          ...prev.questions,
+          {
+            prompt: '',
+            options: ['', '', '', ''],
+            correctIndex: 0,
+            order: prev.questions.length
+          }
+        ]
+      };
+    });
+  }
+
+  function updateQuizQuestion(index: number, updates: Partial<QuizQuestionDto>) {
+    setDraftQuiz((prev) => ({
+      ...prev,
+      questions: prev.questions.map((question, questionIndex) =>
+        questionIndex === index ? { ...question, ...updates } : question
+      )
+    }));
+  }
+
+  function updateQuizOption(questionIndex: number, optionIndex: number, value: string) {
+    setDraftQuiz((prev) => ({
+      ...prev,
+      questions: prev.questions.map((question, qIndex) => {
+        if (qIndex !== questionIndex) return question;
+        const nextOptions = question.options.map((option, optIndex) =>
+          optIndex === optionIndex ? value : option
+        );
+        return { ...question, options: nextOptions };
+      })
+    }));
+  }
+
+  function removeQuizQuestion(index: number) {
+    setDraftQuiz((prev) => ({
+      ...prev,
+      questions: prev.questions
+        .filter((_, questionIndex) => questionIndex !== index)
+        .map((question, order) => ({ ...question, order }))
+    }));
+  }
+
+  async function saveQuiz() {
+    setQuizSaving(true);
+    resetStatus('Saving…');
+
+    const trimmedQuestions = draftQuiz.questions.map((question) => ({
+      prompt: question.prompt.trim(),
+      options: question.options.map((option) => option.trim()),
+      correctIndex: question.correctIndex
+    }));
+
+    if (draftQuiz.enabled && trimmedQuestions.length === 0) {
+      showError('Add at least one question to enable the quiz');
+      setQuizSaving(false);
+      return;
+    }
+
+    const invalidQuestion = trimmedQuestions.some(
+      (question) => !question.prompt || question.options.some((option) => !option)
+    );
+
+    if (invalidQuestion) {
+      showError('Please fill in all prompts and options');
+      setQuizSaving(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/quiz/${savedInvitation.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: draftQuiz.enabled,
+          questions: trimmedQuestions
+        })
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        showError(payload?.error ?? 'Unable to save quiz');
+        return;
+      }
+
+      const updated: QuizDto | null = await response.json();
+      const normalizedQuiz = updated ?? { ...EMPTY_QUIZ, invitationId: savedInvitation.id };
+      setSavedQuiz(normalizedQuiz);
+      setDraftQuiz(normalizedQuiz);
+      setSavedInvitation((prev) => ({ ...prev, quiz: normalizedQuiz }));
+      setDraftInvitation((prev) => ({ ...prev, quiz: normalizedQuiz }));
+      resetStatus('Saved');
+    } catch (error) {
+      console.error(error);
+      showError('Unable to save quiz');
+    } finally {
+      setQuizSaving(false);
+    }
+  }
+
   async function savePublish() {
     setPublishSaving(true);
     resetStatus('Saving…');
@@ -364,15 +494,15 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     }
   }
 
-  const orderedSections = useMemo(() => {
-    const merged = DEFAULT_SECTIONS.map((def, index) =>
-      draftSections.find((section) => section.key === def.key) ?? {
-        id: `${draftInvitation.id}-${def.key}`,
-        key: def.key,
-        enabled: true,
-        order: index
-      }
-    );
+    const orderedSections = useMemo(() => {
+      const merged = DEFAULT_SECTIONS.map((def, index) =>
+        draftSections.find((section) => section.key === def.key) ?? {
+          id: `${draftInvitation.id}-${def.key}`,
+          key: def.key,
+          enabled: def.key === 'quiz' ? false : true,
+          order: index
+        }
+      );
 
     return merged.sort((a, b) => a.order - b.order);
   }, [draftInvitation.id, draftSections]);
@@ -455,9 +585,11 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
             ? hasSectionsChanges
             : tab === 'Guestbook'
               ? hasGuestbookChanges
-              : tab === 'Publish'
-                ? hasPublishChanges
-                : false;
+              : tab === 'Quiz'
+                ? hasQuizChanges
+                : tab === 'Publish'
+                  ? hasPublishChanges
+                  : false;
 
     return hasChanges ? (
       <span className="text-xs font-medium text-amber-700">Unsaved changes</span>
@@ -700,21 +832,125 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
             </div>
           )}
 
-          {activeTab === 'Games' && (
-            <div className="space-y-4 rounded-xl bg-white p-6 shadow-sm">
+          {activeTab === 'Quiz' && (
+            <div className="space-y-5 rounded-xl bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-500">Coming soon</span>
-                <button className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white" disabled>
-                  Save Games
+                {unsavedLabel('Quiz')}
+                <button
+                  className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  onClick={saveQuiz}
+                  disabled={!hasQuizChanges || quizSaving}
+                >
+                  {quizSaving ? 'Saving…' : 'Save Quiz'}
                 </button>
               </div>
-              <p className="text-sm text-slate-700">Mini-games will arrive soon. Toggle placeholders for now.</p>
-              {['Quiz', 'Timeline', 'Food'].map((game) => (
-                <label key={game} className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
-                  <span className="font-medium text-slate-800">{game}</span>
-                  <input type="checkbox" className="h-4 w-4" defaultChecked />
-                </label>
-              ))}
+
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">Enable quiz</p>
+                  <p className="text-xs text-slate-600">Guests will only see the quiz once this invitation is published.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={draftQuiz.enabled}
+                  onChange={(event) =>
+                    setDraftQuiz((prev) => ({
+                      ...prev,
+                      enabled: event.target.checked
+                    }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-800">Questions</h3>
+                    <p className="text-xs text-slate-600">Add up to 5 questions with exactly 4 options each.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addQuizQuestion}
+                    disabled={draftQuiz.questions.length >= 5 || quizSaving}
+                    className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  >
+                    Add question
+                  </button>
+                </div>
+
+                {draftQuiz.questions.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-700">
+                    Start by adding your first question. Quiz changes are only saved when you click “Save Quiz”.
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {draftQuiz.questions.map((question, questionIndex) => (
+                      <div
+                        key={questionIndex}
+                        className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4"
+                      >
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <label className="flex-1 space-y-1 text-sm font-medium text-slate-700">
+                            <div className="flex items-center justify-between">
+                              <span>Prompt</span>
+                              <span className="text-xs text-slate-500">{question.prompt.length}/120</span>
+                            </div>
+                            <input
+                              maxLength={120}
+                              value={question.prompt}
+                              onChange={(e) =>
+                                updateQuizQuestion(questionIndex, {
+                                  prompt: e.target.value,
+                                  order: questionIndex
+                                })
+                              }
+                              className="w-full rounded-lg border border-slate-200 px-3 py-2"
+                              placeholder="e.g. Who met first?"
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => removeQuizQuestion(questionIndex)}
+                            disabled={quizSaving}
+                            className="self-start rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {question.options.map((option, optionIndex) => (
+                            <label key={optionIndex} className="space-y-1 text-sm font-medium text-slate-700">
+                              <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-500">
+                                <span>Option {optionIndex + 1}</span>
+                                <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-700">
+                                  <input
+                                    type="radio"
+                                    name={`correct-${questionIndex}`}
+                                    checked={question.correctIndex === optionIndex}
+                                    onChange={() =>
+                                      updateQuizQuestion(questionIndex, { correctIndex: optionIndex })
+                                    }
+                                  />
+                                  Correct
+                                </span>
+                              </div>
+                              <input
+                                maxLength={120}
+                                value={option}
+                                onChange={(e) => updateQuizOption(questionIndex, optionIndex, e.target.value)}
+                                className="w-full rounded-lg border border-slate-200 px-3 py-2"
+                                placeholder={`Option ${optionIndex + 1}`}
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -837,7 +1073,7 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
         <div className="w-full lg:w-1/2">
           <div className="sticky top-6 rounded-3xl bg-white p-4 shadow-lg">
             <p className="mb-3 text-sm text-slate-600">Live preview</p>
-            <InvitationPage invitation={draftInvitation} sections={orderedSections} photos={photos} />
+            <InvitationPage invitation={draftInvitation} sections={orderedSections} photos={photos} quiz={draftQuiz} />
           </div>
         </div>
       </div>
@@ -854,7 +1090,11 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
         userId,
         OR: [{ id }, { slug: id }]
       },
-      include: { sections: true, galleryPhotos: true }
+      include: {
+        sections: true,
+        galleryPhotos: true,
+        quiz: { include: { questions: { orderBy: { order: 'asc' } } } }
+      }
     });
 
     if (!invitation) {
@@ -867,7 +1107,7 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
         : DEFAULT_SECTIONS.map((section, index) => ({
             id: `${invitation.id}-${section.key}`,
             key: section.key,
-            enabled: true,
+            enabled: section.key === 'quiz' ? false : true,
             order: index
           }))
     ).sort((a, b) => a.order - b.order);
@@ -898,6 +1138,23 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
         }))
       );
 
+    const quiz: QuizDto | null = invitation.quiz
+      ? {
+          id: invitation.quiz.id,
+          invitationId: invitation.id,
+          enabled: invitation.quiz.enabled,
+          questions: invitation.quiz.questions
+            .map((question) => ({
+              id: question.id,
+              prompt: question.prompt,
+              options: question.options,
+              correctIndex: question.correctIndex,
+              order: question.order
+            }))
+            .sort((a, b) => a.order - b.order)
+        }
+      : { ...EMPTY_QUIZ, invitationId: invitation.id };
+
     const invitationDetails: InvitationDetails = {
       id: invitation.id,
       slug: invitation.slug,
@@ -913,6 +1170,7 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
       accountBride: invitation.accountBride,
       contactGroom: invitation.contactGroom,
       contactBride: invitation.contactBride,
+      quiz,
       sections: normalizedSections
     };
 
