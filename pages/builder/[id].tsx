@@ -626,6 +626,61 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     );
   };
 
+  const tabHasChanges = (tab: TabKey) =>
+    tab === 'Basic'
+      ? hasBasicChanges
+      : tab === 'Design'
+        ? hasDesignChanges
+        : tab === 'Sections'
+          ? hasSectionsChanges
+          : tab === 'Guestbook'
+            ? hasGuestbookChanges
+            : tab === 'Quiz'
+              ? hasQuizChanges
+              : tab === 'Publish'
+                ? hasPublishChanges
+                : false;
+
+  const discardDraftChanges = (tab: TabKey) => {
+    if (tab === 'Basic' || tab === 'Design' || tab === 'Publish') {
+      setDraftInvitation(savedInvitation);
+      setSlugError(null);
+      resetStatus(null);
+      return;
+    }
+
+    if (tab === 'Sections') {
+      setDraftSections(savedSections);
+      setDraftInvitation((prev) => ({ ...prev, sections: savedSections }));
+      resetStatus(null);
+      return;
+    }
+
+    if (tab === 'Guestbook') {
+      setDraftGuestbookEntries(savedGuestbookEntries);
+      resetStatus(null);
+      return;
+    }
+
+    if (tab === 'Quiz') {
+      setDraftQuiz(savedQuiz);
+      resetStatus(null);
+    }
+  };
+
+  const trySwitchTab = (nextTab: TabKey) => {
+    if (nextTab === activeTab) return;
+    if (!tabHasChanges(activeTab)) {
+      setActiveTab(nextTab);
+      return;
+    }
+
+    if (window.confirm('저장하지 않은 변경사항이 있습니다. 저장하지 않고 이동할까요?')) {
+      discardDraftChanges(activeTab);
+      setActiveTab(nextTab);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Head>
@@ -645,7 +700,7 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
               <button
                 key={tab}
                 className={`rounded-md px-3 py-2 text-sm font-medium ${activeTab === tab ? 'bg-slate-900 text-white' : 'text-slate-700'}`}
-                onClick={() => setActiveTab(tab)}
+                onClick={() => trySwitchTab(tab)}
               >
                 {tab}
               </button>
