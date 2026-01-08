@@ -48,14 +48,14 @@ export const getServerSideProps: GetServerSideProps<PublicInvitationPageProps> =
     : protocolHeader ?? (host.includes('localhost') ? 'http' : 'https');
   const baseUrl = `${protocol}://${host}`;
 
-  const invitation = await prisma.invitation.findUnique({
-    where: { slug },
-      include: {
-        sections: true,
-        galleryPhotos: true,
-        quiz: { include: { questions: { orderBy: { order: 'asc' } } } }
-      }
-    });
+  const invitation = await prisma.invitation.findFirst({
+    where: { slug, deletedAt: null },
+    include: {
+      sections: true,
+      galleryPhotos: true,
+      quiz: { include: { questions: { orderBy: { order: 'asc' } } } }
+    }
+  });
 
   if (!invitation || invitation.status !== 'published') {
     return { notFound: true };

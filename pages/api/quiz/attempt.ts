@@ -26,12 +26,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const quiz = await prisma.quiz.findUnique({
     where: { invitationId },
     include: {
-      invitation: { select: { status: true } },
+      invitation: { select: { status: true, deletedAt: true } },
       questions: { orderBy: { order: 'asc' } }
     }
   });
 
-  if (!quiz || !quiz.enabled || quiz.invitation.status !== 'published') {
+  if (!quiz || !quiz.enabled || quiz.invitation.status !== 'published' || quiz.invitation.deletedAt) {
     return res.status(404).json({ error: 'Quiz not available' });
   }
 

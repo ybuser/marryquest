@@ -37,7 +37,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     const invitation = await prisma.invitation.findFirst({
-      where: { slug: parsed.data.slug, status: 'published' },
+      where: { slug: parsed.data.slug, status: 'published', deletedAt: null },
       select: { id: true }
     });
 
@@ -70,8 +70,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'Inappropriate content detected' });
     }
 
-    const invitation = await prisma.invitation.findUnique({
-      where: { id: invitationId },
+    const invitation = await prisma.invitation.findFirst({
+      where: { id: invitationId, deletedAt: null },
       select: { status: true }
     });
 
@@ -128,7 +128,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const existing = await prisma.guestbookEntry.findMany({
       where: { id: { in: ids } },
       include: {
-        invitation: { select: { userId: true } }
+        invitation: { select: { userId: true, deletedAt: true } }
       }
     });
 
@@ -136,7 +136,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(404).json({ error: 'Some entries were not found' });
     }
 
-    const unauthorized = existing.some((entry) => entry.invitation.userId !== userId);
+    const unauthorized = existing.some(
+      (entry) => entry.invitation.userId !== userId || entry.invitation.deletedAt
+    );
     if (unauthorized) {
       return res.status(404).json({ error: 'Entries not found' });
     }
@@ -170,4 +172,3 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 }
 
 export default withRateLimit(handler, { windowMs: 60_000, max: 30 });
-

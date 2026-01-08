@@ -2,15 +2,26 @@ import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import type { GuestbookEntryDto } from '@/types/guestbook';
 import type { InvitationDetails } from '@/types/invitation';
+import type { QuizDto } from '@/types/quiz';
+import { QuizSection } from '@/components/invitation/sections/Quiz';
 
 interface PublicGuestbookProps {
   invitationId: string;
   slug: string;
   invitationStatus: InvitationDetails['status'];
   badgeToken?: string | null;
+  quiz?: QuizDto | null;
+  onBadgeEarned?: (token: string | null) => void;
 }
 
-export function PublicGuestbook({ invitationId, slug, invitationStatus, badgeToken }: PublicGuestbookProps) {
+export function PublicGuestbook({
+  invitationId,
+  slug,
+  invitationStatus,
+  badgeToken,
+  quiz,
+  onBadgeEarned
+}: PublicGuestbookProps) {
   const [entries, setEntries] = useState<GuestbookEntryDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,6 +29,7 @@ export function PublicGuestbook({ invitationId, slug, invitationStatus, badgeTok
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [quizOpen, setQuizOpen] = useState(false);
 
   const characterCounts = useMemo(
     () => ({ nickname: nickname.length, message: message.length }),
@@ -99,8 +111,41 @@ export function PublicGuestbook({ invitationId, slug, invitationStatus, badgeTok
     return label.charAt(0).toUpperCase() + label.slice(1);
   };
 
+  const quizAvailable = Boolean(quiz?.enabled && quiz.questions.length > 0);
+
   return (
     <div className="space-y-6">
+      {quizAvailable && (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-[var(--mq-fg)]">퀴즈 참여</p>
+              <p className="text-xs text-[var(--mq-fg)]/70">
+                결혼 주인공의 퀴즈를 풀고 금색 테두리를 얻으세요
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setQuizOpen((prev) => !prev)}
+              className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-[var(--mq-fg)] transition hover:border-white/40"
+              aria-expanded={quizOpen}
+            >
+              {quizOpen ? '퀴즈 닫기' : '퀴즈 풀기'}
+            </button>
+          </div>
+          {quizOpen && quiz && (
+            <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+              <QuizSection
+                quiz={quiz}
+                invitationId={invitationId}
+                invitationStatus={invitationStatus}
+                onBadgeEarned={onBadgeEarned}
+                badgeToken={badgeToken}
+              />
+            </div>
+          )}
+        </div>
+      )}
       {invitationStatus !== 'published' ? (
         <p className="opacity-80">Guestbook will be available once this invitation is published.</p>
       ) : (
@@ -155,23 +200,32 @@ export function PublicGuestbook({ invitationId, slug, invitationStatus, badgeTok
         {loading && <p className="opacity-80">Loading messages…</p>}
         {!loading && entries.length === 0 && <p className="opacity-70">No guestbook entries yet.</p>}
         <ul className="space-y-3">
-          {entries.map((entry) => (
-            <li key={entry.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-sm opacity-80">
-                <span className="font-semibold text-[var(--mq-fg)]">{entry.nickname}</span>
-                <span>{format(new Date(entry.createdAt), 'PPP')}</span>
-              </div>
-              {badgeLabel(entry.badge) && (
-                <span className="mt-1 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-[var(--mq-fg)]">
-                  {badgeLabel(entry.badge)}
-                </span>
-              )}
-              <p className="mt-2 leading-relaxed text-[var(--mq-fg)]/90">{entry.message}</p>
-            </li>
-          ))}
+          {entries.map((entry) => {
+            const isPerfect = entry.badge === 'quizPerfect';
+            return (
+              <li
+                key={entry.id}
+                className={`rounded-2xl border p-4 shadow-lg ${
+                  isPerfect
+                    ? 'border-amber-300/70 bg-amber-100/10 shadow-amber-200/20'
+                    : 'border-white/10 bg-white/5'
+                }`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm opacity-80">
+                  <span className="font-semibold text-[var(--mq-fg)]">{entry.nickname}</span>
+                  <span>{format(new Date(entry.createdAt), 'PPP')}</span>
+                </div>
+                {badgeLabel(entry.badge) && (
+                  <span className="mt-1 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-[var(--mq-fg)]">
+                    {badgeLabel(entry.badge)}
+                  </span>
+                )}
+                <p className="mt-2 leading-relaxed text-[var(--mq-fg)]/90">{entry.message}</p>
+              </li>
+            );
+          })}
         </ul>
       </div>
     </div>
   );
 }
-

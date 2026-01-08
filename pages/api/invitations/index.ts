@@ -9,7 +9,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (req.method === 'GET') {
     const invitations = await prisma.invitation.findMany({
-      where: { userId: session.user.id },
+      where: { userId: session.user.id, deletedAt: null },
       orderBy: { createdAt: 'desc' }
     });
 
