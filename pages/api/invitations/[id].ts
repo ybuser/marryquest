@@ -23,22 +23,31 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await requireApiAuth(req, res);
   if (!session?.user?.id) return;
 
-  if (req.method !== 'PATCH') {
-    res.setHeader('Allow', 'PATCH');
+  if (req.method !== 'PATCH' && req.method !== 'DELETE') {
+    res.setHeader('Allow', 'PATCH,DELETE');
     return res.status(405).end('Method Not Allowed');
+  }
+
+  const invitation = await prisma.invitation.findFirst({
+    where: { id: req.query.id as string, deletedAt: null }
+  });
+
+  if (!invitation || invitation.userId !== session.user.id) {
+    return res.status(404).json({ error: 'Invitation not found' });
+  }
+
+  if (req.method === 'DELETE') {
+    await prisma.invitation.update({
+      where: { id: invitation.id },
+      data: { deletedAt: new Date(), status: 'private' }
+    });
+
+    return res.status(200).json({ ok: true });
   }
 
   const validation = validate(invitationSchema, req.body);
   if (!validation.success) {
     return res.status(400).json({ error: validation.errors });
-  }
-
-  const invitation = await prisma.invitation.findUnique({
-    where: { id: req.query.id as string }
-  });
-
-  if (!invitation || invitation.userId !== session.user.id) {
-    return res.status(404).json({ error: 'Invitation not found' });
   }
 
   const data: Record<string, unknown> = { ...validation.data };

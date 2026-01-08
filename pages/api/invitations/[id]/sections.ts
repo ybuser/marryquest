@@ -32,8 +32,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(400).json({ error: validation.errors });
   }
 
-  const invitation = await prisma.invitation.findUnique({
-    where: { id: req.query.id as string },
+  const invitation = await prisma.invitation.findFirst({
+    where: { id: req.query.id as string, deletedAt: null },
     include: { sections: true }
   });
 

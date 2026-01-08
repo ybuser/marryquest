@@ -36,7 +36,7 @@ export const getServerSideProps: GetServerSideProps<DashboardProps> = async (con
     };
 
     const invitations = (await prisma.invitation.findMany({
-      where: { userId },
+      where: { userId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,

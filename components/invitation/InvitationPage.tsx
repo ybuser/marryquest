@@ -10,7 +10,6 @@ import { GallerySection } from './sections/Gallery';
 import { AccountsSection } from './sections/Accounts';
 import { SectionCard } from './sections/SectionCard';
 import { RSVPSection } from './sections/RSVPSection';
-import { QuizSection } from './sections/Quiz';
 
 interface InvitationPageProps {
   invitation: InvitationDetails;
@@ -52,14 +51,6 @@ export function InvitationPage({ invitation, sections, photos, quiz }: Invitatio
 
       <main className="relative mx-auto flex min-h-screen max-w-5xl flex-col gap-[var(--mq-spacing-section)] px-4 py-16">
         {orderedSections.map((section) => {
-          if (
-            section.key === 'quiz' &&
-            invitation.status === 'published' &&
-            (!quizData?.enabled || !quizData.questions.length)
-          ) {
-            return null;
-          }
-
           switch (section.key) {
             case 'hero':
               return (
@@ -97,18 +88,6 @@ export function InvitationPage({ invitation, sections, photos, quiz }: Invitatio
                   accountBride={invitation.accountBride}
                 />
               );
-            case 'quiz':
-              return (
-                <SectionCard key={section.key} title="Quiz" eyebrow="Games">
-                  <QuizSection
-                    quiz={quizData}
-                    invitationId={invitation.id}
-                    invitationStatus={invitation.status}
-                    onBadgeEarned={(token) => setQuizBadgeToken(token)}
-                    badgeToken={quizBadgeToken}
-                  />
-                </SectionCard>
-              );
             case 'guestbook':
               return (
                 <SectionCard key={section.key} title="Guestbook" eyebrow="Messages">
@@ -116,6 +95,8 @@ export function InvitationPage({ invitation, sections, photos, quiz }: Invitatio
                     invitationId={invitation.id}
                     slug={invitation.slug}
                     invitationStatus={invitation.status}
+                    quiz={quizData}
+                    onBadgeEarned={(token) => setQuizBadgeToken(token)}
                     badgeToken={quizBadgeToken}
                   />
                 </SectionCard>

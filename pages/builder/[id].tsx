@@ -1,5 +1,6 @@
 import { GetServerSideProps } from 'next';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
@@ -87,7 +88,9 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
   const [guestbookSaving, setGuestbookSaving] = useState(false);
   const [quizSaving, setQuizSaving] = useState(false);
   const [publishSaving, setPublishSaving] = useState(false);
+  const [deleteSaving, setDeleteSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const router = useRouter();
 
   const lastErrorTimeRef = useRef(0);
 
@@ -491,6 +494,31 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
       showError('Unable to save publish settings');
     } finally {
       setPublishSaving(false);
+    }
+  }
+
+  async function deleteInvitation() {
+    if (!window.confirm('Delete this invitation? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeleteSaving(true);
+    try {
+      const response = await fetch(`/api/invitations/${savedInvitation.id}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error ?? 'Failed to delete invitation');
+      }
+
+      await router.push('/dashboard');
+    } catch (error) {
+      console.error(error);
+      alert('Failed to delete invitation');
+    } finally {
+      setDeleteSaving(false);
     }
   }
 
@@ -1013,6 +1041,17 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
                   </div>
                 )}
               </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-slate-800">Danger zone</p>
+                <button
+                  type="button"
+                  onClick={deleteInvitation}
+                  disabled={deleteSaving}
+                  className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:opacity-50"
+                >
+                  {deleteSaving ? 'Deleting…' : 'Delete invitation'}
+                </button>
+              </div>
             </div>
           )}
 
@@ -1088,6 +1127,7 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
     const invitation = await prisma.invitation.findFirst({
       where: {
         userId,
+        deletedAt: null,
         OR: [{ id }, { slug: id }]
       },
       include: {

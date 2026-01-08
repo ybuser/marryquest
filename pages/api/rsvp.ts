@@ -26,8 +26,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const { invitationId, attendance, attendeeName, guestsCount, kidsCount, allergiesText } = parsed.data;
 
-  const invitation = await prisma.invitation.findUnique({
-    where: { id: invitationId },
+  const invitation = await prisma.invitation.findFirst({
+    where: { id: invitationId, deletedAt: null },
     select: { status: true }
   });
 

@@ -31,12 +31,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const invitationId = req.query.invitationId as string;
 
-  const invitation = await prisma.invitation.findUnique({
-    where: { id: invitationId },
+  const invitation = await prisma.invitation.findFirst({
+    where: { id: invitationId, userId: session.user.id, deletedAt: null },
     select: { userId: true }
   });
 
-  if (!invitation || invitation.userId !== session.user.id) {
+  if (!invitation) {
     return res.status(404).json({ error: 'Invitation not found' });
   }
 

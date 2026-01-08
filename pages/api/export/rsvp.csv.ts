@@ -40,8 +40,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const { invitationId } = parsed.data;
 
-  const invitation = await prisma.invitation.findUnique({
-    where: { id: invitationId },
+  const invitation = await prisma.invitation.findFirst({
+    where: { id: invitationId, deletedAt: null },
     select: { id: true, userId: true }
   });
 

@@ -23,6 +23,7 @@ export interface InvitationDetails {
   accountBride?: string | null;
   contactGroom?: string | null;
   contactBride?: string | null;
+  deletedAt?: string | null;
   quiz?: QuizDto | null;
   sections: SectionConfig[];
 }
