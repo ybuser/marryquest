@@ -4,6 +4,7 @@ import { DEFAULT_SECTIONS } from '@/types/invitation';
 import { PublicGuestbook } from '@/components/guestbook/PublicGuestbook';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import type { QuizDto } from '@/types/quiz';
+import type { TimelinePuzzleDto } from '@/types/timeline';
 import { HeroSection } from './sections/Hero';
 import { InfoSection } from './sections/Info';
 import { MapButtons } from './sections/MapButtons';
@@ -11,19 +12,22 @@ import { GallerySection } from './sections/Gallery';
 import { AccountsSection } from './sections/Accounts';
 import { SectionCard } from './sections/SectionCard';
 import { RSVPSection } from './sections/RSVPSection';
+import { TimelineSection } from './sections/TimelineSection';
 
 interface InvitationPageProps {
   invitation: InvitationDetails;
   sections: SectionConfig[];
   photos: GalleryPhoto[];
   quiz?: QuizDto | null;
+  timelinePuzzle?: TimelinePuzzleDto | null;
+  previewMode?: boolean;
 }
 
 function mergeSections(invitationId: string, sections: SectionConfig[]) {
   const defaults = DEFAULT_SECTIONS.map((section, index) => ({
     id: `${invitationId}-${section.key}`,
     key: section.key,
-    enabled: section.key === 'quiz' ? false : true,
+    enabled: section.key === 'quiz' || section.key === 'timeline' ? false : true,
     order: index
   }));
 
@@ -37,7 +41,7 @@ function mergeSections(invitationId: string, sections: SectionConfig[]) {
     .sort((a, b) => a.order - b.order);
 }
 
-export function InvitationPage({ invitation, sections, photos, quiz }: InvitationPageProps) {
+export function InvitationPage({ invitation, sections, photos, quiz, timelinePuzzle, previewMode }: InvitationPageProps) {
   const orderedSections = useMemo(() => mergeSections(invitation.id, sections), [invitation.id, sections]);
   const sortedPhotos = useMemo(() => [...photos].sort((a, b) => a.order - b.order), [photos]);
   const quizData = quiz ?? invitation.quiz ?? null;
@@ -89,6 +93,18 @@ export function InvitationPage({ invitation, sections, photos, quiz }: Invitatio
                     accountGroom={invitation.accountGroom}
                     accountBride={invitation.accountBride}
                   />
+                );
+              case 'timeline':
+                return (
+                  <SectionCard key={section.key} title="Timeline" eyebrow="Moments">
+                    <TimelineSection
+                      invitationId={invitation.id}
+                      slug={invitation.slug}
+                      invitationStatus={invitation.status}
+                      puzzle={timelinePuzzle ?? invitation.timelinePuzzle ?? null}
+                      previewMode={previewMode}
+                    />
+                  </SectionCard>
                 );
               case 'guestbook':
                 return (

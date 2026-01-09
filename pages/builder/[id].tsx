@@ -13,21 +13,30 @@ import { DEFAULT_SECTIONS } from '@/types/invitation';
 import type { GuestbookEntryDto } from '@/types/guestbook';
 import type { QuizDto, QuizQuestionDto } from '@/types/quiz';
 import { EMPTY_QUIZ } from '@/types/quiz';
+import type { TimelineCardDto, TimelinePuzzleDto } from '@/types/timeline';
+import { EMPTY_TIMELINE } from '@/types/timeline';
 
 interface BuilderPageProps {
   invitation: InvitationDetails;
   templateKey: string;
   photos: GalleryPhoto[];
   guestbookEntries: GuestbookEntryDto[];
+  timelinePuzzle: TimelinePuzzleDto | null;
 }
 
-const tabs = ['Basic', 'Design', 'Sections', 'Guestbook', 'Quiz', 'Publish', 'Export'] as const;
+const tabs = ['Basic', 'Design', 'Sections', 'Guestbook', 'Quiz', 'Timeline', 'Publish', 'Export'] as const;
 type TabKey = (typeof tabs)[number];
 
 interface SortableItemProps {
   section: SectionConfig;
   label: string;
   onToggle: (section: SectionConfig) => void;
+}
+
+interface SortableTimelineCardProps {
+  card: TimelineCardDto;
+  onChange: (id: string, value: string) => void;
+  onRemove: (id: string) => void;
 }
 
 function SortableItem({ section, label, onToggle }: SortableItemProps) {
@@ -62,7 +71,48 @@ function SortableItem({ section, label, onToggle }: SortableItemProps) {
   );
 }
 
-export default function InvitationBuilder({ invitation: initialInvitation, photos, guestbookEntries }: BuilderPageProps) {
+function SortableTimelineCard({ card, onChange, onRemove }: SortableTimelineCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm"
+    >
+      <div className="flex items-center gap-3" {...attributes} {...listeners}>
+        <span className="cursor-grab text-slate-400">⋮⋮</span>
+      </div>
+      <input
+        value={card.text}
+        maxLength={120}
+        onChange={(event) => onChange(card.id, event.target.value)}
+        className="flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm"
+        placeholder="Moment"
+      />
+      <button
+        type="button"
+        onClick={() => onRemove(card.id)}
+        className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+      >
+        Remove
+      </button>
+    </div>
+  );
+}
+
+export default function InvitationBuilder({
+  invitation: initialInvitation,
+  photos,
+  guestbookEntries,
+  timelinePuzzle
+}: BuilderPageProps) {
   const [savedInvitation, setSavedInvitation] = useState<InvitationDetails>(initialInvitation);
   const [draftInvitation, setDraftInvitation] = useState<InvitationDetails>(initialInvitation);
   const [savedSections, setSavedSections] = useState<SectionConfig[]>(initialInvitation.sections);
@@ -70,8 +120,11 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
   const [savedGuestbookEntries, setSavedGuestbookEntries] = useState<GuestbookEntryDto[]>(guestbookEntries);
   const [draftGuestbookEntries, setDraftGuestbookEntries] = useState<GuestbookEntryDto[]>(guestbookEntries);
   const initialQuiz = initialInvitation.quiz ?? { ...EMPTY_QUIZ, invitationId: initialInvitation.id };
+  const initialTimeline = timelinePuzzle ?? { ...EMPTY_TIMELINE, invitationId: initialInvitation.id };
   const [savedQuiz, setSavedQuiz] = useState<QuizDto>(initialQuiz);
   const [draftQuiz, setDraftQuiz] = useState<QuizDto>(initialQuiz);
+  const [savedTimeline, setSavedTimeline] = useState<TimelinePuzzleDto>(initialTimeline);
+  const [draftTimeline, setDraftTimeline] = useState<TimelinePuzzleDto>(initialTimeline);
   const [activeTab, setActiveTab] = useState<TabKey>('Basic');
   const [slugError, setSlugError] = useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
@@ -87,6 +140,7 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
   const [sectionsSaving, setSectionsSaving] = useState(false);
   const [guestbookSaving, setGuestbookSaving] = useState(false);
   const [quizSaving, setQuizSaving] = useState(false);
+  const [timelineSaving, setTimelineSaving] = useState(false);
   const [publishSaving, setPublishSaving] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -158,9 +212,19 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
       if (!saved) return true;
       if (question.prompt !== saved.prompt || question.correctIndex !== saved.correctIndex) return true;
       if (question.options.length !== saved.options.length) return true;
-      return question.options.some((option, optionIndex) => option !== saved.options[optionIndex]);
+    return question.options.some((option, optionIndex) => option !== saved.options[optionIndex]);
     });
   }, [draftQuiz, savedQuiz]);
+
+  const hasTimelineChanges = useMemo(() => {
+    if (draftTimeline.enabled !== savedTimeline.enabled) return true;
+    if (draftTimeline.cards.length !== savedTimeline.cards.length) return true;
+    return draftTimeline.cards.some((card, index) => {
+      const saved = savedTimeline.cards[index];
+      if (!saved) return true;
+      return card.text !== saved.text || card.order !== saved.order;
+    });
+  }, [draftTimeline, savedTimeline]);
 
   const hasPublishChanges = useMemo(
     () => draftInvitation.slug !== savedInvitation.slug || draftInvitation.status !== savedInvitation.status,
@@ -173,6 +237,7 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     hasSectionsChanges ||
     hasGuestbookChanges ||
     hasQuizChanges ||
+    hasTimelineChanges ||
     hasPublishChanges;
 
   useEffect(() => {
@@ -389,6 +454,40 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     }));
   }
 
+  function createTimelineCard(order: number): TimelineCardDto {
+    return {
+      id: `temp-${Math.random().toString(36).slice(2, 9)}`,
+      text: '',
+      order
+    };
+  }
+
+  function addTimelineCard() {
+    setDraftTimeline((prev) => {
+      if (prev.cards.length >= 7) return prev;
+      return {
+        ...prev,
+        cards: [...prev.cards, createTimelineCard(prev.cards.length)]
+      };
+    });
+  }
+
+  function updateTimelineCard(id: string, text: string) {
+    setDraftTimeline((prev) => ({
+      ...prev,
+      cards: prev.cards.map((card) => (card.id === id ? { ...card, text } : card))
+    }));
+  }
+
+  function removeTimelineCard(id: string) {
+    setDraftTimeline((prev) => ({
+      ...prev,
+      cards: prev.cards
+        .filter((card) => card.id !== id)
+        .map((card, order) => ({ ...card, order }))
+    }));
+  }
+
   async function saveQuiz() {
     setQuizSaving(true);
     resetStatus('Saving…');
@@ -443,6 +542,56 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
       showError('Unable to save quiz');
     } finally {
       setQuizSaving(false);
+    }
+  }
+
+  async function saveTimeline() {
+    setTimelineSaving(true);
+    resetStatus('Saving…');
+
+    const trimmedCards = draftTimeline.cards.map((card) => ({ ...card, text: card.text.trim() }));
+
+    if (draftTimeline.enabled) {
+      if (trimmedCards.length < 5 || trimmedCards.length > 7) {
+        showError('Timeline needs 5 to 7 cards');
+        setTimelineSaving(false);
+        return;
+      }
+
+      if (trimmedCards.some((card) => !card.text)) {
+        showError('Please fill in all timeline cards');
+        setTimelineSaving(false);
+        return;
+      }
+    }
+
+    try {
+      const response = await fetch(`/api/timeline/${savedInvitation.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: draftTimeline.enabled,
+          cards: trimmedCards.map((card) => ({ text: card.text }))
+        })
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        showError(payload?.error ?? 'Unable to save timeline');
+        return;
+      }
+
+      const updated: TimelinePuzzleDto = await response.json();
+      setSavedTimeline(updated);
+      setDraftTimeline(updated);
+      setSavedInvitation((prev) => ({ ...prev, timelinePuzzle: updated }));
+      setDraftInvitation((prev) => ({ ...prev, timelinePuzzle: updated }));
+      resetStatus('Saved');
+    } catch (error) {
+      console.error(error);
+      showError('Unable to save timeline');
+    } finally {
+      setTimelineSaving(false);
     }
   }
 
@@ -522,18 +671,23 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     }
   }
 
-    const orderedSections = useMemo(() => {
-      const merged = DEFAULT_SECTIONS.map((def, index) =>
-        draftSections.find((section) => section.key === def.key) ?? {
-          id: `${draftInvitation.id}-${def.key}`,
-          key: def.key,
-          enabled: def.key === 'quiz' ? false : true,
-          order: index
-        }
-      );
+  const orderedSections = useMemo(() => {
+    const merged = DEFAULT_SECTIONS.map((def, index) =>
+      draftSections.find((section) => section.key === def.key) ?? {
+        id: `${draftInvitation.id}-${def.key}`,
+        key: def.key,
+        enabled: def.key === 'quiz' || def.key === 'timeline' ? false : true,
+        order: index
+      }
+    );
 
     return merged.sort((a, b) => a.order - b.order);
   }, [draftInvitation.id, draftSections]);
+
+  const orderedTimelineCards = useMemo(
+    () => [...draftTimeline.cards].sort((a, b) => a.order - b.order),
+    [draftTimeline.cards]
+  );
 
   function handleDragEnd(event: any) {
     const { active, over } = event;
@@ -547,6 +701,20 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     }));
 
     setDraftSections(newSections);
+  }
+
+  function handleTimelineDragEnd(event: any) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const currentIndex = orderedTimelineCards.findIndex((item) => item.id === active.id);
+    const overIndex = orderedTimelineCards.findIndex((item) => item.id === over.id);
+    const nextCards = arrayMove(orderedTimelineCards, currentIndex, overIndex).map((card, index) => ({
+      ...card,
+      order: index
+    }));
+
+    setDraftTimeline((prev) => ({ ...prev, cards: nextCards }));
   }
 
   function handleToggle(section: SectionConfig) {
@@ -615,6 +783,8 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
               ? hasGuestbookChanges
               : tab === 'Quiz'
                 ? hasQuizChanges
+                : tab === 'Timeline'
+                  ? hasTimelineChanges
                 : tab === 'Publish'
                   ? hasPublishChanges
                   : false;
@@ -637,6 +807,8 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
             ? hasGuestbookChanges
             : tab === 'Quiz'
               ? hasQuizChanges
+              : tab === 'Timeline'
+                ? hasTimelineChanges
               : tab === 'Publish'
                 ? hasPublishChanges
                 : false;
@@ -664,6 +836,11 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
 
     if (tab === 'Quiz') {
       setDraftQuiz(savedQuiz);
+      resetStatus(null);
+    }
+
+    if (tab === 'Timeline') {
+      setDraftTimeline(savedTimeline);
       resetStatus(null);
     }
   };
@@ -1037,6 +1214,70 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
             </div>
           )}
 
+          {activeTab === 'Timeline' && (
+            <div className="space-y-6 rounded-xl bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                {unsavedLabel('Timeline')}
+                <button
+                  className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  onClick={saveTimeline}
+                  disabled={!hasTimelineChanges || timelineSaving}
+                >
+                  {timelineSaving ? 'Saving…' : 'Save Timeline'}
+                </button>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">Enable timeline puzzle</p>
+                  <p className="text-xs text-slate-600">Guests will only see the timeline after publishing.</p>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={draftTimeline.enabled}
+                    onChange={() => setDraftTimeline((prev) => ({ ...prev, enabled: !prev.enabled }))}
+                    className="h-4 w-4 rounded border-slate-300"
+                  />
+                  Enabled
+                </label>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-800">Timeline cards</h3>
+                    <p className="text-xs text-slate-600">Add 5-7 moments for guests to reorder.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addTimelineCard}
+                    disabled={draftTimeline.cards.length >= 7}
+                    className="rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                  >
+                    Add card
+                  </button>
+                </div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleTimelineDragEnd}>
+                  <SortableContext items={orderedTimelineCards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-2">
+                      {orderedTimelineCards.map((card) => (
+                        <SortableTimelineCard
+                          key={card.id}
+                          card={card}
+                          onChange={updateTimelineCard}
+                          onRemove={removeTimelineCard}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+                {draftTimeline.enabled && draftTimeline.cards.length < 5 && (
+                  <p className="text-xs text-amber-600">Add at least 5 cards to enable the puzzle.</p>
+                )}
+              </div>
+            </div>
+          )}
+
           {activeTab === 'Publish' && (
             <div className="space-y-4 rounded-xl bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between">
@@ -1167,7 +1408,14 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
         <div className="w-full lg:w-1/2">
           <div className="sticky top-6 rounded-3xl bg-white p-4 shadow-lg">
             <p className="mb-3 text-sm text-slate-600">Live preview</p>
-            <InvitationPage invitation={draftInvitation} sections={orderedSections} photos={photos} quiz={draftQuiz} />
+            <InvitationPage
+              invitation={draftInvitation}
+              sections={orderedSections}
+              photos={photos}
+              quiz={draftQuiz}
+              timelinePuzzle={draftTimeline}
+              previewMode
+            />
           </div>
         </div>
       </div>
@@ -1188,7 +1436,8 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
       include: {
         sections: true,
         galleryPhotos: true,
-        quiz: { include: { questions: { orderBy: { order: 'asc' } } } }
+        quiz: { include: { questions: { orderBy: { order: 'asc' } } } },
+        timelinePuzzle: { include: { cards: { orderBy: { order: 'asc' } } } }
       }
     });
 
@@ -1202,7 +1451,7 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
         : DEFAULT_SECTIONS.map((section, index) => ({
             id: `${invitation.id}-${section.key}`,
             key: section.key,
-            enabled: section.key === 'quiz' ? false : true,
+            enabled: section.key === 'quiz' || section.key === 'timeline' ? false : true,
             order: index
           }))
     ).sort((a, b) => a.order - b.order);
@@ -1250,6 +1499,21 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
         }
       : { ...EMPTY_QUIZ, invitationId: invitation.id };
 
+    const timelinePuzzle: TimelinePuzzleDto | null = invitation.timelinePuzzle
+      ? {
+          id: invitation.timelinePuzzle.id,
+          invitationId: invitation.id,
+          enabled: invitation.timelinePuzzle.enabled,
+          cards: invitation.timelinePuzzle.cards
+            .map((card) => ({
+              id: card.id,
+              text: card.text,
+              order: card.order
+            }))
+            .sort((a, b) => a.order - b.order)
+        }
+      : { ...EMPTY_TIMELINE, invitationId: invitation.id };
+
     const invitationDetails: InvitationDetails = {
       id: invitation.id,
       slug: invitation.slug,
@@ -1266,6 +1530,7 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
       contactGroom: invitation.contactGroom,
       contactBride: invitation.contactBride,
       quiz,
+      timelinePuzzle,
       sections: normalizedSections
     };
 
@@ -1274,7 +1539,8 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
         invitation: invitationDetails,
         templateKey: invitation.templateKey,
         photos,
-        guestbookEntries
+        guestbookEntries,
+        timelinePuzzle
       }
     };
   });
