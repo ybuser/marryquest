@@ -105,7 +105,7 @@ export function InvitationView({ invitation }: InvitationViewProps) {
       keyed[def.key] ?? {
         id: def.key,
         key: def.key,
-        enabled: def.key === 'quiz' ? false : true,
+        enabled: def.key === 'quiz' || def.key === 'timeline' ? false : true,
         order: index
       }
     )

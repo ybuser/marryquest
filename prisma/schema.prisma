@@ -108,6 +108,9 @@ model Invitation {
   rsvpResponses    RSVPResponse[]
   guestbookEntries GuestbookEntry[]
   quiz             Quiz?
+  timelinePuzzle   TimelinePuzzle?
+  musicTracks      MusicTrack[]
+  musicVotes       MusicVote[]
 }
 
 model SectionConfig {
@@ -175,4 +178,62 @@ model QuizQuestion {
   order     Int
 
   quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+}
+
+model TimelinePuzzle {
+  id           String   @id @default(cuid())
+  invitationId String   @unique
+  enabled      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  invitation Invitation    @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  cards      TimelineCard[]
+
+  @@map("TimelinePuzzle")
+}
+
+model TimelineCard {
+  id           String  @id @default(cuid())
+  puzzleId     String
+  text         String  @map("title")
+  description  String? @map("shortDescription")
+  photoUrl     String?
+  order        Int     @default(0)
+  correctOrder Int     @default(0)
+
+  puzzle TimelinePuzzle @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
+
+  @@index([puzzleId])
+  @@index([puzzleId, order])
+  @@map("TimelineCard")
+}
+
+model MusicTrack {
+  id           String   @id @default(cuid())
+  invitationId String
+  title        String
+  artist       String?
+  url          String?
+  createdByKey String?
+  createdAt    DateTime @default(now())
+
+  invitation Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  votes      MusicVote[]
+
+  @@index([invitationId])
+}
+
+model MusicVote {
+  id           String   @id @default(cuid())
+  invitationId String
+  trackId      String
+  voterKey     String
+  createdAt    DateTime @default(now())
+
+  invitation Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  track      MusicTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([invitationId, voterKey])
+  @@index([trackId])
 }

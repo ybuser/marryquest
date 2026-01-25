@@ -3,6 +3,7 @@ import type { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
 interface RateLimitOptions {
   windowMs: number;
   max: number;
+  keyFn?: (req: NextApiRequest) => string;
 }
 
 interface RateEntry {
@@ -12,7 +13,7 @@ interface RateEntry {
 
 const rateStore = new Map<string, RateEntry>();
 
-function getClientKey(req: NextApiRequest): string {
+export function getClientKey(req: NextApiRequest): string {
   const forwarded = req.headers['x-forwarded-for'];
   if (typeof forwarded === 'string') {
     return forwarded.split(',')[0]?.trim() ?? req.socket.remoteAddress ?? 'unknown';
@@ -24,10 +25,10 @@ function getClientKey(req: NextApiRequest): string {
 }
 
 export function withRateLimit(handler: NextApiHandler, options: RateLimitOptions = { windowMs: 60_000, max: 30 }): NextApiHandler {
-  const { windowMs, max } = options;
+  const { windowMs, max, keyFn } = options;
 
   return async function rateLimitedHandler(req: NextApiRequest, res: NextApiResponse) {
-    const key = getClientKey(req);
+    const key = keyFn ? keyFn(req) : getClientKey(req);
     const now = Date.now();
     const entry = rateStore.get(key);
 

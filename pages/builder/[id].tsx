@@ -13,21 +13,36 @@ import { DEFAULT_SECTIONS } from '@/types/invitation';
 import type { GuestbookEntryDto } from '@/types/guestbook';
 import type { QuizDto, QuizQuestionDto } from '@/types/quiz';
 import { EMPTY_QUIZ } from '@/types/quiz';
+import type { TimelineCardDto, TimelinePuzzleDto } from '@/types/timeline';
+import { EMPTY_TIMELINE } from '@/types/timeline';
 
 interface BuilderPageProps {
   invitation: InvitationDetails;
   templateKey: string;
   photos: GalleryPhoto[];
   guestbookEntries: GuestbookEntryDto[];
+  timelinePuzzle: TimelinePuzzleDto | null;
 }
 
-const tabs = ['Basic', 'Design', 'Sections', 'Guestbook', 'Quiz', 'Publish', 'Export'] as const;
+const tabs = ['Basic', 'Sections', 'Guestbook', 'Quiz', 'Timeline', 'Publish', 'Export'] as const;
 type TabKey = (typeof tabs)[number];
 
 interface SortableItemProps {
   section: SectionConfig;
   label: string;
   onToggle: (section: SectionConfig) => void;
+}
+
+interface SortableTimelineCardProps {
+  card: TimelineCardDto;
+  onChange: (id: string, updates: Partial<TimelineCardDto>) => void;
+  onPhotoUpload: (id: string, file: File) => void;
+  uploading: boolean;
+  onRemove: (id: string) => void;
+}
+
+interface SortableTimelineOrderItemProps {
+  card: TimelineCardDto;
 }
 
 function SortableItem({ section, label, onToggle }: SortableItemProps) {
@@ -62,7 +77,118 @@ function SortableItem({ section, label, onToggle }: SortableItemProps) {
   );
 }
 
-export default function InvitationBuilder({ invitation: initialInvitation, photos, guestbookEntries }: BuilderPageProps) {
+function SortableTimelineCard({ card, onChange, onPhotoUpload, uploading, onRemove }: SortableTimelineCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm"
+    >
+      <div className="flex items-center gap-3" {...attributes} {...listeners}>
+        <span className="cursor-grab text-slate-400">⋮⋮</span>
+      </div>
+      <div className="flex-1 space-y-2">
+        <input
+          value={card.text}
+          maxLength={120}
+          onChange={(event) => onChange(card.id, { text: event.target.value })}
+          className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+          placeholder="Title"
+        />
+        <textarea
+          value={card.description ?? ''}
+          maxLength={240}
+          rows={2}
+          onChange={(event) => onChange(card.id, { description: event.target.value })}
+          className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+          placeholder="Short description"
+        />
+        <div className="flex items-center gap-3">
+          {card.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={card.photoUrl} alt="" className="h-16 w-16 rounded-md object-cover" />
+          ) : (
+            <div className="flex h-16 w-16 items-center justify-center rounded-md border border-dashed border-slate-200 text-xs text-slate-400">
+              No photo
+            </div>
+          )}
+          <label className="text-xs font-semibold text-slate-600">
+            <span className="rounded-md border border-slate-200 px-3 py-2 shadow-sm hover:bg-slate-50">
+              {uploading ? 'Uploading…' : card.photoUrl ? 'Replace photo' : 'Upload photo'}
+            </span>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                  onPhotoUpload(card.id, file);
+                }
+                event.target.value = '';
+              }}
+              disabled={uploading}
+            />
+          </label>
+          {card.photoUrl && (
+            <button
+              type="button"
+              onClick={() => onChange(card.id, { photoUrl: null })}
+              className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+            >
+              Remove photo
+            </button>
+          )}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => onRemove(card.id)}
+        className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+      >
+        Remove
+      </button>
+    </div>
+  );
+}
+
+function SortableTimelineOrderItem({ card }: SortableTimelineOrderItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm"
+      {...attributes}
+      {...listeners}
+    >
+      <span className="cursor-grab text-slate-400">⋮⋮</span>
+      <span className="font-medium">{card.text || 'Untitled'}</span>
+    </div>
+  );
+}
+
+export default function InvitationBuilder({
+  invitation: initialInvitation,
+  photos,
+  guestbookEntries,
+  timelinePuzzle
+}: BuilderPageProps) {
   const [savedInvitation, setSavedInvitation] = useState<InvitationDetails>(initialInvitation);
   const [draftInvitation, setDraftInvitation] = useState<InvitationDetails>(initialInvitation);
   const [savedSections, setSavedSections] = useState<SectionConfig[]>(initialInvitation.sections);
@@ -70,8 +196,11 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
   const [savedGuestbookEntries, setSavedGuestbookEntries] = useState<GuestbookEntryDto[]>(guestbookEntries);
   const [draftGuestbookEntries, setDraftGuestbookEntries] = useState<GuestbookEntryDto[]>(guestbookEntries);
   const initialQuiz = initialInvitation.quiz ?? { ...EMPTY_QUIZ, invitationId: initialInvitation.id };
+  const initialTimeline = timelinePuzzle ?? { ...EMPTY_TIMELINE, invitationId: initialInvitation.id };
   const [savedQuiz, setSavedQuiz] = useState<QuizDto>(initialQuiz);
   const [draftQuiz, setDraftQuiz] = useState<QuizDto>(initialQuiz);
+  const [savedTimeline, setSavedTimeline] = useState<TimelinePuzzleDto>(initialTimeline);
+  const [draftTimeline, setDraftTimeline] = useState<TimelinePuzzleDto>(initialTimeline);
   const [activeTab, setActiveTab] = useState<TabKey>('Basic');
   const [slugError, setSlugError] = useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
@@ -83,10 +212,12 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
   } | null>(null);
   const [rsvpLoading, setRsvpLoading] = useState(false);
   const [basicSaving, setBasicSaving] = useState(false);
-  const [designSaving, setDesignSaving] = useState(false);
   const [sectionsSaving, setSectionsSaving] = useState(false);
   const [guestbookSaving, setGuestbookSaving] = useState(false);
   const [quizSaving, setQuizSaving] = useState(false);
+  const [timelineSaving, setTimelineSaving] = useState(false);
+  const [timelineUploadingId, setTimelineUploadingId] = useState<string | null>(null);
+  const [timelineUploadError, setTimelineUploadError] = useState<string | null>(null);
   const [publishSaving, setPublishSaving] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -125,13 +256,11 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
       'contactBride'
     ];
 
-    return fields.some((field) => draftInvitation[field] !== savedInvitation[field]);
+    return (
+      fields.some((field) => draftInvitation[field] !== savedInvitation[field]) ||
+      draftInvitation.templateKey !== savedInvitation.templateKey
+    );
   }, [draftInvitation, savedInvitation]);
-
-  const hasDesignChanges = useMemo(
-    () => draftInvitation.templateKey !== savedInvitation.templateKey,
-    [draftInvitation.templateKey, savedInvitation.templateKey]
-  );
 
   const hasSectionsChanges = useMemo(() => {
     if (draftSections.length !== savedSections.length) return true;
@@ -158,9 +287,25 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
       if (!saved) return true;
       if (question.prompt !== saved.prompt || question.correctIndex !== saved.correctIndex) return true;
       if (question.options.length !== saved.options.length) return true;
-      return question.options.some((option, optionIndex) => option !== saved.options[optionIndex]);
+    return question.options.some((option, optionIndex) => option !== saved.options[optionIndex]);
     });
   }, [draftQuiz, savedQuiz]);
+
+  const hasTimelineChanges = useMemo(() => {
+    if (draftTimeline.enabled !== savedTimeline.enabled) return true;
+    if (draftTimeline.cards.length !== savedTimeline.cards.length) return true;
+    return draftTimeline.cards.some((card, index) => {
+      const saved = savedTimeline.cards[index];
+      if (!saved) return true;
+      return (
+        card.text !== saved.text ||
+        card.description !== saved.description ||
+        card.photoUrl !== saved.photoUrl ||
+        card.order !== saved.order ||
+        card.correctOrder !== saved.correctOrder
+      );
+    });
+  }, [draftTimeline, savedTimeline]);
 
   const hasPublishChanges = useMemo(
     () => draftInvitation.slug !== savedInvitation.slug || draftInvitation.status !== savedInvitation.status,
@@ -169,10 +314,10 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
 
   const hasUnsavedChanges =
     hasBasicChanges ||
-    hasDesignChanges ||
     hasSectionsChanges ||
     hasGuestbookChanges ||
     hasQuizChanges ||
+    hasTimelineChanges ||
     hasPublishChanges;
 
   useEffect(() => {
@@ -221,7 +366,7 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
           accountBride: draftInvitation.accountBride,
           contactGroom: draftInvitation.contactGroom,
           contactBride: draftInvitation.contactBride,
-          templateKey: savedInvitation.templateKey,
+          templateKey: draftInvitation.templateKey,
           slug: savedInvitation.slug
         })
       });
@@ -242,34 +387,6 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
       showError('Failed to save basic details');
     } finally {
       setBasicSaving(false);
-    }
-  }
-
-  async function saveDesign() {
-    setDesignSaving(true);
-    resetStatus('Saving…');
-    try {
-      const response = await fetch(`/api/invitations/${savedInvitation.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateKey: draftInvitation.templateKey })
-      });
-
-      if (!response.ok) {
-        showError('Failed to save design');
-        return;
-      }
-
-      const updated = await response.json();
-      const next = { ...draftInvitation, ...updated } as InvitationDetails;
-      setSavedInvitation((prev) => ({ ...prev, ...next }));
-      setDraftInvitation((prev) => ({ ...prev, ...next }));
-      resetStatus('Saved');
-    } catch (error) {
-      console.error(error);
-      showError('Failed to save design');
-    } finally {
-      setDesignSaving(false);
     }
   }
 
@@ -389,6 +506,49 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     }));
   }
 
+  function createTimelineCard(order: number): TimelineCardDto {
+    return {
+      id: `temp-${Math.random().toString(36).slice(2, 9)}`,
+      text: '',
+      description: '',
+      photoUrl: null,
+      order,
+      correctOrder: order
+    };
+  }
+
+  function addTimelineCard() {
+    setDraftTimeline((prev) => {
+      if (prev.cards.length >= 7) return prev;
+      return {
+        ...prev,
+        cards: [...prev.cards, createTimelineCard(prev.cards.length)]
+      };
+    });
+  }
+
+  function updateTimelineCard(id: string, updates: Partial<TimelineCardDto>) {
+    setDraftTimeline((prev) => ({
+      ...prev,
+      cards: prev.cards.map((card) => (card.id === id ? { ...card, ...updates } : card))
+    }));
+  }
+
+  function removeTimelineCard(id: string) {
+    setDraftTimeline((prev) => {
+      const remaining = prev.cards
+        .filter((card) => card.id !== id)
+        .map((card, order) => ({ ...card, order }));
+      const correctOrderMap = new Map(
+        [...remaining].sort((a, b) => a.correctOrder - b.correctOrder).map((card, index) => [card.id, index])
+      );
+      return {
+        ...prev,
+        cards: remaining.map((card) => ({ ...card, correctOrder: correctOrderMap.get(card.id) ?? card.correctOrder }))
+      };
+    });
+  }
+
   async function saveQuiz() {
     setQuizSaving(true);
     resetStatus('Saving…');
@@ -443,6 +603,109 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
       showError('Unable to save quiz');
     } finally {
       setQuizSaving(false);
+    }
+  }
+
+  async function saveTimeline() {
+    setTimelineSaving(true);
+    resetStatus('Saving…');
+
+    const trimmedCards = draftTimeline.cards.map((card) => ({
+      ...card,
+      text: card.text.trim(),
+      description: card.description?.trim() || null
+    }));
+
+    if (draftTimeline.enabled) {
+      if (trimmedCards.length < 5 || trimmedCards.length > 7) {
+        showError('Timeline needs 5 to 7 cards');
+        setTimelineSaving(false);
+        return;
+      }
+
+      if (trimmedCards.some((card) => !card.text)) {
+        showError('Please fill in all timeline cards');
+        setTimelineSaving(false);
+        return;
+      }
+
+      const correctOrders = trimmedCards.map((card) => card.correctOrder);
+      const uniqueOrders = new Set(correctOrders);
+      if (uniqueOrders.size !== trimmedCards.length) {
+        showError('Correct order values must be unique');
+        setTimelineSaving(false);
+        return;
+      }
+      const maxOrder = Math.max(...correctOrders);
+      if (maxOrder >= trimmedCards.length) {
+        showError('Correct order values must be within card range');
+        setTimelineSaving(false);
+        return;
+      }
+    }
+
+    try {
+      const response = await fetch(`/api/timeline/${savedInvitation.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: draftTimeline.enabled,
+          cards: trimmedCards.map((card) => ({
+            text: card.text,
+            description: card.description,
+            photoUrl: card.photoUrl,
+            correctOrder: card.correctOrder
+          }))
+        })
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        showError(payload?.error ?? 'Unable to save timeline');
+        return;
+      }
+
+      const updated: TimelinePuzzleDto = await response.json();
+      setSavedTimeline(updated);
+      setDraftTimeline(updated);
+      setSavedInvitation((prev) => ({ ...prev, timelinePuzzle: updated }));
+      setDraftInvitation((prev) => ({ ...prev, timelinePuzzle: updated }));
+      resetStatus('Saved');
+    } catch (error) {
+      console.error(error);
+      showError('Unable to save timeline');
+    } finally {
+      setTimelineSaving(false);
+    }
+  }
+
+  async function uploadTimelineCardPhoto(cardId: string, file: File) {
+    setTimelineUploadingId(cardId);
+    setTimelineUploadError(null);
+    try {
+      const formData = new FormData();
+      formData.append('invitationId', savedInvitation.id);
+      formData.append('cardId', cardId);
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload/timeline-card', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        setTimelineUploadError(payload?.error ?? 'Unable to upload photo');
+        return;
+      }
+
+      const payload: { url: string } = await response.json();
+      updateTimelineCard(cardId, { photoUrl: payload.url });
+    } catch (error) {
+      console.error(error);
+      setTimelineUploadError('Unable to upload photo');
+    } finally {
+      setTimelineUploadingId(null);
     }
   }
 
@@ -522,18 +785,27 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     }
   }
 
-    const orderedSections = useMemo(() => {
-      const merged = DEFAULT_SECTIONS.map((def, index) =>
-        draftSections.find((section) => section.key === def.key) ?? {
-          id: `${draftInvitation.id}-${def.key}`,
-          key: def.key,
-          enabled: def.key === 'quiz' ? false : true,
-          order: index
-        }
-      );
+  const orderedSections = useMemo(() => {
+    const merged = DEFAULT_SECTIONS.map((def, index) =>
+      draftSections.find((section) => section.key === def.key) ?? {
+        id: `${draftInvitation.id}-${def.key}`,
+        key: def.key,
+        enabled: def.key === 'quiz' || def.key === 'timeline' ? false : true,
+        order: index
+      }
+    );
 
     return merged.sort((a, b) => a.order - b.order);
   }, [draftInvitation.id, draftSections]);
+
+  const orderedTimelineCards = useMemo(
+    () => [...draftTimeline.cards].sort((a, b) => a.order - b.order),
+    [draftTimeline.cards]
+  );
+  const orderedCorrectCards = useMemo(
+    () => [...draftTimeline.cards].sort((a, b) => a.correctOrder - b.correctOrder),
+    [draftTimeline.cards]
+  );
 
   function handleDragEnd(event: any) {
     const { active, over } = event;
@@ -547,6 +819,37 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     }));
 
     setDraftSections(newSections);
+  }
+
+  function handleTimelineDragEnd(event: any) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const currentIndex = orderedTimelineCards.findIndex((item) => item.id === active.id);
+    const overIndex = orderedTimelineCards.findIndex((item) => item.id === over.id);
+    const nextCards = arrayMove(orderedTimelineCards, currentIndex, overIndex).map((card, index) => ({
+      ...card,
+      order: index
+    }));
+
+    setDraftTimeline((prev) => ({ ...prev, cards: nextCards }));
+  }
+
+  function handleCorrectOrderDragEnd(event: any) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const currentIndex = orderedCorrectCards.findIndex((item) => item.id === active.id);
+    const overIndex = orderedCorrectCards.findIndex((item) => item.id === over.id);
+    const nextCards = arrayMove(orderedCorrectCards, currentIndex, overIndex).map((card, index) => ({
+      ...card,
+      correctOrder: index
+    }));
+
+    setDraftTimeline((prev) => ({
+      ...prev,
+      cards: prev.cards.map((card) => nextCards.find((next) => next.id === card.id) ?? card)
+    }));
   }
 
   function handleToggle(section: SectionConfig) {
@@ -607,14 +910,14 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
     const hasChanges =
       tab === 'Basic'
         ? hasBasicChanges
-        : tab === 'Design'
-          ? hasDesignChanges
-          : tab === 'Sections'
-            ? hasSectionsChanges
-            : tab === 'Guestbook'
-              ? hasGuestbookChanges
+        : tab === 'Sections'
+          ? hasSectionsChanges
+          : tab === 'Guestbook'
+            ? hasGuestbookChanges
               : tab === 'Quiz'
                 ? hasQuizChanges
+                : tab === 'Timeline'
+                  ? hasTimelineChanges
                 : tab === 'Publish'
                   ? hasPublishChanges
                   : false;
@@ -629,20 +932,20 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
   const tabHasChanges = (tab: TabKey) =>
     tab === 'Basic'
       ? hasBasicChanges
-      : tab === 'Design'
-        ? hasDesignChanges
-        : tab === 'Sections'
-          ? hasSectionsChanges
-          : tab === 'Guestbook'
-            ? hasGuestbookChanges
+      : tab === 'Sections'
+        ? hasSectionsChanges
+        : tab === 'Guestbook'
+          ? hasGuestbookChanges
             : tab === 'Quiz'
               ? hasQuizChanges
+              : tab === 'Timeline'
+                ? hasTimelineChanges
               : tab === 'Publish'
                 ? hasPublishChanges
                 : false;
 
   const discardDraftChanges = (tab: TabKey) => {
-    if (tab === 'Basic' || tab === 'Design' || tab === 'Publish') {
+    if (tab === 'Basic' || tab === 'Publish') {
       setDraftInvitation(savedInvitation);
       setSlugError(null);
       resetStatus(null);
@@ -664,6 +967,11 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
 
     if (tab === 'Quiz') {
       setDraftQuiz(savedQuiz);
+      resetStatus(null);
+    }
+
+    if (tab === 'Timeline') {
+      setDraftTimeline(savedTimeline);
       resetStatus(null);
     }
   };
@@ -802,34 +1110,22 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
                   />
                 </label>
               </div>
-            </div>
-          )}
-
-          {activeTab === 'Design' && (
-            <div className="space-y-4 rounded-xl bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between">
-                {unsavedLabel('Design')}
-                <button
-                  className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-                  onClick={saveDesign}
-                  disabled={!hasDesignChanges || designSaving}
-                >
-                  {designSaving ? 'Saving…' : 'Save Design'}
-                </button>
-              </div>
-              <p className="text-sm text-slate-700">Choose a template style.</p>
-              <div className="flex gap-3">
-                {['mono', 'editorial', 'film'].map((key) => (
-                  <button
-                    key={key}
-                    onClick={() => setDraftInvitation((prev) => ({ ...prev, templateKey: key as any }))}
-                    className={`rounded-lg border px-4 py-3 text-sm capitalize shadow-sm ${
-                      draftInvitation.templateKey === key ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200'
-                    }`}
-                  >
-                    {key}
-                  </button>
-                ))}
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-slate-700">Template</p>
+                <div className="flex flex-wrap gap-3">
+                  {['mono', 'editorial', 'film'].map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setDraftInvitation((prev) => ({ ...prev, templateKey: key as any }))}
+                      className={`rounded-lg border px-4 py-3 text-sm capitalize shadow-sm ${
+                        draftInvitation.templateKey === key ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200'
+                      }`}
+                    >
+                      {key}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -1037,6 +1333,89 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
             </div>
           )}
 
+          {activeTab === 'Timeline' && (
+            <div className="space-y-6 rounded-xl bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                {unsavedLabel('Timeline')}
+                <button
+                  className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  onClick={saveTimeline}
+                  disabled={!hasTimelineChanges || timelineSaving}
+                >
+                  {timelineSaving ? 'Saving…' : 'Save Timeline'}
+                </button>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">Enable timeline puzzle</p>
+                  <p className="text-xs text-slate-600">Guests will only see the timeline after publishing.</p>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={draftTimeline.enabled}
+                    onChange={() => setDraftTimeline((prev) => ({ ...prev, enabled: !prev.enabled }))}
+                    className="h-4 w-4 rounded border-slate-300"
+                  />
+                  Enabled
+                </label>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-800">Timeline cards</h3>
+                    <p className="text-xs text-slate-600">Add 5-7 moments for guests to reorder.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addTimelineCard}
+                    disabled={draftTimeline.cards.length >= 7}
+                    className="rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                  >
+                    Add card
+                  </button>
+                </div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleTimelineDragEnd}>
+                  <SortableContext items={orderedTimelineCards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-2">
+                      {orderedTimelineCards.map((card) => (
+                        <SortableTimelineCard
+                          key={card.id}
+                          card={card}
+                          onChange={updateTimelineCard}
+                          onPhotoUpload={uploadTimelineCardPhoto}
+                          uploading={timelineUploadingId === card.id}
+                          onRemove={removeTimelineCard}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+                {timelineUploadError && <p className="text-xs text-red-600">{timelineUploadError}</p>}
+                {draftTimeline.enabled && draftTimeline.cards.length < 5 && (
+                  <p className="text-xs text-amber-600">Add at least 5 cards to enable the puzzle.</p>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-800">Correct order</h3>
+                  <p className="text-xs text-slate-600">Drag cards into the correct timeline sequence.</p>
+                </div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCorrectOrderDragEnd}>
+                  <SortableContext items={orderedCorrectCards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-2">
+                      {orderedCorrectCards.map((card) => (
+                        <SortableTimelineOrderItem key={card.id} card={card} />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'Publish' && (
             <div className="space-y-4 rounded-xl bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between">
@@ -1167,7 +1546,15 @@ export default function InvitationBuilder({ invitation: initialInvitation, photo
         <div className="w-full lg:w-1/2">
           <div className="sticky top-6 rounded-3xl bg-white p-4 shadow-lg">
             <p className="mb-3 text-sm text-slate-600">Live preview</p>
-            <InvitationPage invitation={draftInvitation} sections={orderedSections} photos={photos} quiz={draftQuiz} />
+            <InvitationPage
+              invitation={draftInvitation}
+              sections={orderedSections}
+              photos={photos}
+              quiz={draftQuiz}
+              timelinePuzzle={draftTimeline}
+              previewGuestbookEntries={draftGuestbookEntries}
+              previewMode
+            />
           </div>
         </div>
       </div>
@@ -1188,7 +1575,8 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
       include: {
         sections: true,
         galleryPhotos: true,
-        quiz: { include: { questions: { orderBy: { order: 'asc' } } } }
+        quiz: { include: { questions: { orderBy: { order: 'asc' } } } },
+        timelinePuzzle: { include: { cards: { orderBy: { order: 'asc' } } } }
       }
     });
 
@@ -1202,7 +1590,7 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
         : DEFAULT_SECTIONS.map((section, index) => ({
             id: `${invitation.id}-${section.key}`,
             key: section.key,
-            enabled: section.key === 'quiz' ? false : true,
+            enabled: section.key === 'quiz' || section.key === 'timeline' ? false : true,
             order: index
           }))
     ).sort((a, b) => a.order - b.order);
@@ -1250,6 +1638,24 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
         }
       : { ...EMPTY_QUIZ, invitationId: invitation.id };
 
+    const timelinePuzzle: TimelinePuzzleDto | null = invitation.timelinePuzzle
+      ? {
+          id: invitation.timelinePuzzle.id,
+          invitationId: invitation.id,
+          enabled: invitation.timelinePuzzle.enabled,
+          cards: invitation.timelinePuzzle.cards
+            .map((card) => ({
+              id: card.id,
+              text: card.text,
+              description: card.description,
+              photoUrl: card.photoUrl,
+              order: card.order,
+              correctOrder: card.correctOrder
+            }))
+            .sort((a, b) => a.order - b.order)
+        }
+      : { ...EMPTY_TIMELINE, invitationId: invitation.id };
+
     const invitationDetails: InvitationDetails = {
       id: invitation.id,
       slug: invitation.slug,
@@ -1266,6 +1672,7 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
       contactGroom: invitation.contactGroom,
       contactBride: invitation.contactBride,
       quiz,
+      timelinePuzzle,
       sections: normalizedSections
     };
 
@@ -1274,7 +1681,8 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
         invitation: invitationDetails,
         templateKey: invitation.templateKey,
         photos,
-        guestbookEntries
+        guestbookEntries,
+        timelinePuzzle
       }
     };
   });
