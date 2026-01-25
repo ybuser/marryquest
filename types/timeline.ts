@@ -1,7 +1,10 @@
 export interface TimelineCardDto {
   id: string;
   text: string;
+  description?: string | null;
+  photoUrl?: string | null;
   order: number;
+  correctOrder: number;
 }
 
 export interface TimelinePuzzleDto {

@@ -6,7 +6,10 @@ import { validate } from '@/lib/validate';
 import { withRateLimit } from '@/lib/security/rateLimit';
 
 const cardSchema = z.object({
-  text: z.string().trim().min(1).max(120)
+  text: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(240).optional().nullable(),
+  photoUrl: z.string().url().optional().nullable(),
+  correctOrder: z.number().int().min(0)
 });
 
 const timelineSchema = z.object({
@@ -45,6 +48,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(400).json({ error: 'Timeline needs 5 to 7 cards' });
   }
 
+  if (payload.enabled) {
+    const correctOrders = payload.cards.map((card) => card.correctOrder);
+    const uniqueOrders = new Set(correctOrders);
+    if (uniqueOrders.size !== payload.cards.length) {
+      return res.status(400).json({ error: 'Correct order values must be unique' });
+    }
+    const maxOrder = Math.max(...correctOrders);
+    if (maxOrder >= payload.cards.length) {
+      return res.status(400).json({ error: 'Correct order values must be within card range' });
+    }
+  }
+
   const refreshed = await prisma.$transaction(async (tx) => {
     const puzzle = await tx.timelinePuzzle.upsert({
       where: { invitationId },
@@ -59,7 +74,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         data: payload.cards.map((card, index) => ({
           puzzleId: puzzle.id,
           text: card.text.trim(),
-          order: index
+          description: card.description?.trim() || null,
+          photoUrl: card.photoUrl ?? null,
+          order: index,
+          correctOrder: card.correctOrder
         }))
       });
     }
@@ -82,7 +100,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       refreshed.cards.map((card) => ({
         id: card.id,
         text: card.text,
-        order: card.order
+        description: card.description,
+        photoUrl: card.photoUrl,
+        order: card.order,
+        correctOrder: card.correctOrder
       }))
   });
 }

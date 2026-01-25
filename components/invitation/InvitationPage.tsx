@@ -5,6 +5,7 @@ import { PublicGuestbook } from '@/components/guestbook/PublicGuestbook';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import type { QuizDto } from '@/types/quiz';
 import type { TimelinePuzzleDto } from '@/types/timeline';
+import type { GuestbookEntryDto } from '@/types/guestbook';
 import { HeroSection } from './sections/Hero';
 import { InfoSection } from './sections/Info';
 import { MapButtons } from './sections/MapButtons';
@@ -20,6 +21,7 @@ interface InvitationPageProps {
   photos: GalleryPhoto[];
   quiz?: QuizDto | null;
   timelinePuzzle?: TimelinePuzzleDto | null;
+  previewGuestbookEntries?: GuestbookEntryDto[];
   previewMode?: boolean;
 }
 
@@ -41,7 +43,15 @@ function mergeSections(invitationId: string, sections: SectionConfig[]) {
     .sort((a, b) => a.order - b.order);
 }
 
-export function InvitationPage({ invitation, sections, photos, quiz, timelinePuzzle, previewMode }: InvitationPageProps) {
+export function InvitationPage({
+  invitation,
+  sections,
+  photos,
+  quiz,
+  timelinePuzzle,
+  previewGuestbookEntries,
+  previewMode
+}: InvitationPageProps) {
   const orderedSections = useMemo(() => mergeSections(invitation.id, sections), [invitation.id, sections]);
   const sortedPhotos = useMemo(() => [...photos].sort((a, b) => a.order - b.order), [photos]);
   const quizData = quiz ?? invitation.quiz ?? null;
@@ -116,6 +126,8 @@ export function InvitationPage({ invitation, sections, photos, quiz, timelinePuz
                       quiz={quizData}
                       onBadgeEarned={(token) => setQuizBadgeToken(token)}
                       badgeToken={quizBadgeToken}
+                      previewEntries={previewGuestbookEntries}
+                      previewMode={previewMode}
                     />
                   </SectionCard>
                 );

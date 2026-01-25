@@ -106,7 +106,10 @@ export const getServerSideProps: GetServerSideProps<PublicInvitationPageProps> =
           .map((card) => ({
             id: card.id,
             text: card.text,
-            order: card.order
+            description: card.description,
+            photoUrl: card.photoUrl,
+            order: card.order,
+            correctOrder: card.correctOrder
           }))
           .sort((a, b) => a.order - b.order)
       }

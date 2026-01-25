@@ -52,6 +52,11 @@ Templates are defined in `/components/theme/tokens.ts`:
 ## Environment variables
 No required environment variables for the baseline. Add as needed for APIs or analytics.
 
+Timeline card uploads (builder-only) use Supabase Storage. Configure:
+- `SUPABASE_URL` – Supabase project URL.
+- `SUPABASE_SERVICE_ROLE_KEY` – service role key for server-side uploads.
+- `SUPABASE_STORAGE_BUCKET` – optional bucket name (defaults to `timeline`).
+
 ## Notes
 - The project intentionally omits the `/app` directory. Pages Router only.
 - Upgrade the in-memory rate limiter before deploying behind multiple instances.

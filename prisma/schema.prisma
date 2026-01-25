@@ -195,7 +195,10 @@ model TimelineCard {
   id       String @id @default(cuid())
   puzzleId String
   text     String
+  description String?
+  photoUrl String?
   order    Int
+  correctOrder Int @default(0)
 
   puzzle TimelinePuzzle @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
 

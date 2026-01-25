@@ -12,6 +12,8 @@ interface PublicGuestbookProps {
   badgeToken?: string | null;
   quiz?: QuizDto | null;
   onBadgeEarned?: (token: string | null) => void;
+  previewEntries?: GuestbookEntryDto[];
+  previewMode?: boolean;
 }
 
 export function PublicGuestbook({
@@ -20,9 +22,11 @@ export function PublicGuestbook({
   invitationStatus,
   badgeToken,
   quiz,
-  onBadgeEarned
+  onBadgeEarned,
+  previewEntries = [],
+  previewMode = false
 }: PublicGuestbookProps) {
-  const [entries, setEntries] = useState<GuestbookEntryDto[]>([]);
+  const [entries, setEntries] = useState<GuestbookEntryDto[]>(previewEntries);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nickname, setNickname] = useState('');
@@ -37,6 +41,10 @@ export function PublicGuestbook({
   );
 
   useEffect(() => {
+    if (previewMode) {
+      setEntries(previewEntries.filter((entry) => !entry.hidden));
+      return;
+    }
     if (invitationStatus !== 'published') return;
 
     async function fetchEntries() {
@@ -59,10 +67,14 @@ export function PublicGuestbook({
     }
 
     void fetchEntries();
-  }, [invitationStatus, slug]);
+  }, [invitationStatus, previewEntries, previewMode, slug]);
 
   async function submitEntry(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (previewMode) {
+      setSuccessMessage('Preview mode: guestbook submission disabled.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     setSuccessMessage(null);
@@ -146,10 +158,15 @@ export function PublicGuestbook({
           )}
         </div>
       )}
-      {invitationStatus !== 'published' ? (
+      {invitationStatus !== 'published' && !previewMode ? (
         <p className="opacity-80">Guestbook will be available once this invitation is published.</p>
       ) : (
         <form onSubmit={submitEntry} className="space-y-4">
+          {previewMode && (
+            <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[var(--mq-fg)]/80">
+              Preview mode: guestbook submissions are disabled.
+            </p>
+          )}
           <div className="grid gap-3 md:grid-cols-2">
             <label className="space-y-1 text-sm font-medium">
               <span className="opacity-80">Nickname</span>
@@ -160,6 +177,7 @@ export function PublicGuestbook({
                 onChange={(event) => setNickname(event.target.value)}
                 placeholder="Your nickname"
                 className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-base text-[var(--mq-fg)] placeholder:text-white/70 focus:border-white/40 focus:outline-none"
+                disabled={previewMode}
               />
               <span className="block text-xs opacity-70">{characterCounts.nickname}/20</span>
             </label>
@@ -173,6 +191,7 @@ export function PublicGuestbook({
                 onChange={(event) => setMessage(event.target.value)}
                 placeholder="Share your wishes"
                 className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-base text-[var(--mq-fg)] placeholder:text-white/70 focus:border-white/40 focus:outline-none"
+                disabled={previewMode}
               />
               <span className="block text-xs opacity-70">{characterCounts.message}/300</span>
             </label>
@@ -180,7 +199,7 @@ export function PublicGuestbook({
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="submit"
-              disabled={submitting || !nickname.trim() || !message.trim()}
+              disabled={previewMode || submitting || !nickname.trim() || !message.trim()}
               className="rounded-full bg-[var(--mq-fg)] px-5 py-2 text-sm font-semibold text-[var(--mq-bg)] transition hover:opacity-90 disabled:opacity-50"
             >
               {submitting ? 'Submitting…' : 'Sign guestbook'}

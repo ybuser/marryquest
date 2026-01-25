@@ -36,7 +36,18 @@ function SortableCard({ card }: SortableCardProps) {
       {...listeners}
     >
       <span className="cursor-grab text-slate-400">⋮⋮</span>
-      <span>{card.text}</span>
+      {card.photoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={card.photoUrl} alt="" className="h-12 w-12 rounded-md object-cover" />
+      ) : (
+        <div className="flex h-12 w-12 items-center justify-center rounded-md border border-dashed border-slate-200 text-[10px] text-slate-400">
+          No photo
+        </div>
+      )}
+      <div>
+        <p className="text-sm font-semibold text-slate-800">{card.text}</p>
+        {card.description && <p className="text-xs text-slate-500">{card.description}</p>}
+      </div>
     </div>
   );
 }
@@ -199,17 +210,48 @@ export function TimelineSection({ invitationId, slug, invitationStatus, puzzle, 
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<'idle' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
+  const [guestKey, setGuestKey] = useState<string | null>(null);
+  const [randomSeed] = useState(() => Math.random().toString(36).slice(2));
+
+  const shuffleCards = useCallback((items: TimelineCardDto[], seedSource: string) => {
+    const seed = Array.from(seedSource).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const result = [...items];
+    let currentSeed = seed;
+    for (let i = result.length - 1; i > 0; i -= 1) {
+      currentSeed = (currentSeed * 9301 + 49297) % 233280;
+      const j = Math.floor((currentSeed / 233280) * (i + 1));
+      [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+  }, []);
 
   useEffect(() => {
-    setCards(puzzle?.cards ?? []);
+    const baseCards = [...(puzzle?.cards ?? [])].sort((a, b) => a.order - b.order);
+    if (previewMode) {
+      setCards(baseCards);
+    } else {
+      const seedSource = guestKey ?? randomSeed ?? `${puzzle?.id ?? 'timeline'}-${baseCards.length}`;
+      setCards(shuffleCards(baseCards, seedSource));
+    }
     setResult('idle');
     setMessage(null);
-  }, [puzzle]);
+  }, [guestKey, previewMode, puzzle, randomSeed, shuffleCards]);
 
-  const sortedCards = useMemo(() => [...cards].sort((a, b) => a.order - b.order), [cards]);
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const cookieValue = document.cookie
+      .split('; ')
+      .find((row) => row.startsWith('mq_guest='))
+      ?.split('=')[1];
+    if (cookieValue) {
+      setGuestKey(cookieValue);
+    }
+  }, []);
+
+  const displayCards = useMemo(() => cards, [cards]);
   const sensors = useSensors(useSensor(PointerSensor));
 
-  if (!puzzle || !puzzle.enabled || sortedCards.length === 0) {
+  if (!puzzle || !puzzle.enabled || displayCards.length === 0) {
     return <p className="text-sm text-slate-600">Timeline puzzle is not available.</p>;
   }
 
@@ -217,9 +259,9 @@ export function TimelineSection({ invitationId, slug, invitationStatus, puzzle, 
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const currentIndex = sortedCards.findIndex((item) => item.id === active.id);
-    const overIndex = sortedCards.findIndex((item) => item.id === over.id);
-    const nextCards = arrayMove(sortedCards, currentIndex, overIndex).map((card, index) => ({
+    const currentIndex = displayCards.findIndex((item) => item.id === active.id);
+    const overIndex = displayCards.findIndex((item) => item.id === over.id);
+    const nextCards = arrayMove(displayCards, currentIndex, overIndex).map((card, index) => ({
       ...card,
       order: index
     }));
@@ -235,7 +277,7 @@ export function TimelineSection({ invitationId, slug, invitationStatus, puzzle, 
       const response = await fetch('/api/timeline/attempt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invitationId, cardIds: sortedCards.map((card) => card.id) })
+        body: JSON.stringify({ invitationId, cardIds: displayCards.map((card) => card.id) })
       });
 
       if (!response.ok) {
@@ -267,8 +309,8 @@ export function TimelineSection({ invitationId, slug, invitationStatus, puzzle, 
       {previewing && <p className="mt-2 text-xs text-slate-500">Preview mode: publish to play.</p>}
       <div className="mt-4 space-y-2">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={sortedCards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
-            {sortedCards.map((card) => (
+          <SortableContext items={displayCards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
+            {displayCards.map((card) => (
               <SortableCard key={card.id} card={card} />
             ))}
           </SortableContext>

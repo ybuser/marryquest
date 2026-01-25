@@ -24,7 +24,7 @@ interface BuilderPageProps {
   timelinePuzzle: TimelinePuzzleDto | null;
 }
 
-const tabs = ['Basic', 'Design', 'Sections', 'Guestbook', 'Quiz', 'Timeline', 'Publish', 'Export'] as const;
+const tabs = ['Basic', 'Sections', 'Guestbook', 'Quiz', 'Timeline', 'Publish', 'Export'] as const;
 type TabKey = (typeof tabs)[number];
 
 interface SortableItemProps {
@@ -35,8 +35,14 @@ interface SortableItemProps {
 
 interface SortableTimelineCardProps {
   card: TimelineCardDto;
-  onChange: (id: string, value: string) => void;
+  onChange: (id: string, updates: Partial<TimelineCardDto>) => void;
+  onPhotoUpload: (id: string, file: File) => void;
+  uploading: boolean;
   onRemove: (id: string) => void;
+}
+
+interface SortableTimelineOrderItemProps {
+  card: TimelineCardDto;
 }
 
 function SortableItem({ section, label, onToggle }: SortableItemProps) {
@@ -71,7 +77,7 @@ function SortableItem({ section, label, onToggle }: SortableItemProps) {
   );
 }
 
-function SortableTimelineCard({ card, onChange, onRemove }: SortableTimelineCardProps) {
+function SortableTimelineCard({ card, onChange, onPhotoUpload, uploading, onRemove }: SortableTimelineCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
 
   const style = {
@@ -89,13 +95,60 @@ function SortableTimelineCard({ card, onChange, onRemove }: SortableTimelineCard
       <div className="flex items-center gap-3" {...attributes} {...listeners}>
         <span className="cursor-grab text-slate-400">⋮⋮</span>
       </div>
-      <input
-        value={card.text}
-        maxLength={120}
-        onChange={(event) => onChange(card.id, event.target.value)}
-        className="flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm"
-        placeholder="Moment"
-      />
+      <div className="flex-1 space-y-2">
+        <input
+          value={card.text}
+          maxLength={120}
+          onChange={(event) => onChange(card.id, { text: event.target.value })}
+          className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+          placeholder="Title"
+        />
+        <textarea
+          value={card.description ?? ''}
+          maxLength={240}
+          rows={2}
+          onChange={(event) => onChange(card.id, { description: event.target.value })}
+          className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+          placeholder="Short description"
+        />
+        <div className="flex items-center gap-3">
+          {card.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={card.photoUrl} alt="" className="h-16 w-16 rounded-md object-cover" />
+          ) : (
+            <div className="flex h-16 w-16 items-center justify-center rounded-md border border-dashed border-slate-200 text-xs text-slate-400">
+              No photo
+            </div>
+          )}
+          <label className="text-xs font-semibold text-slate-600">
+            <span className="rounded-md border border-slate-200 px-3 py-2 shadow-sm hover:bg-slate-50">
+              {uploading ? 'Uploading…' : card.photoUrl ? 'Replace photo' : 'Upload photo'}
+            </span>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                  onPhotoUpload(card.id, file);
+                }
+                event.target.value = '';
+              }}
+              disabled={uploading}
+            />
+          </label>
+          {card.photoUrl && (
+            <button
+              type="button"
+              onClick={() => onChange(card.id, { photoUrl: null })}
+              className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+            >
+              Remove photo
+            </button>
+          )}
+        </div>
+      </div>
       <button
         type="button"
         onClick={() => onRemove(card.id)}
@@ -103,6 +156,29 @@ function SortableTimelineCard({ card, onChange, onRemove }: SortableTimelineCard
       >
         Remove
       </button>
+    </div>
+  );
+}
+
+function SortableTimelineOrderItem({ card }: SortableTimelineOrderItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm"
+      {...attributes}
+      {...listeners}
+    >
+      <span className="cursor-grab text-slate-400">⋮⋮</span>
+      <span className="font-medium">{card.text || 'Untitled'}</span>
     </div>
   );
 }
@@ -136,11 +212,12 @@ export default function InvitationBuilder({
   } | null>(null);
   const [rsvpLoading, setRsvpLoading] = useState(false);
   const [basicSaving, setBasicSaving] = useState(false);
-  const [designSaving, setDesignSaving] = useState(false);
   const [sectionsSaving, setSectionsSaving] = useState(false);
   const [guestbookSaving, setGuestbookSaving] = useState(false);
   const [quizSaving, setQuizSaving] = useState(false);
   const [timelineSaving, setTimelineSaving] = useState(false);
+  const [timelineUploadingId, setTimelineUploadingId] = useState<string | null>(null);
+  const [timelineUploadError, setTimelineUploadError] = useState<string | null>(null);
   const [publishSaving, setPublishSaving] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -179,13 +256,11 @@ export default function InvitationBuilder({
       'contactBride'
     ];
 
-    return fields.some((field) => draftInvitation[field] !== savedInvitation[field]);
+    return (
+      fields.some((field) => draftInvitation[field] !== savedInvitation[field]) ||
+      draftInvitation.templateKey !== savedInvitation.templateKey
+    );
   }, [draftInvitation, savedInvitation]);
-
-  const hasDesignChanges = useMemo(
-    () => draftInvitation.templateKey !== savedInvitation.templateKey,
-    [draftInvitation.templateKey, savedInvitation.templateKey]
-  );
 
   const hasSectionsChanges = useMemo(() => {
     if (draftSections.length !== savedSections.length) return true;
@@ -222,7 +297,13 @@ export default function InvitationBuilder({
     return draftTimeline.cards.some((card, index) => {
       const saved = savedTimeline.cards[index];
       if (!saved) return true;
-      return card.text !== saved.text || card.order !== saved.order;
+      return (
+        card.text !== saved.text ||
+        card.description !== saved.description ||
+        card.photoUrl !== saved.photoUrl ||
+        card.order !== saved.order ||
+        card.correctOrder !== saved.correctOrder
+      );
     });
   }, [draftTimeline, savedTimeline]);
 
@@ -233,7 +314,6 @@ export default function InvitationBuilder({
 
   const hasUnsavedChanges =
     hasBasicChanges ||
-    hasDesignChanges ||
     hasSectionsChanges ||
     hasGuestbookChanges ||
     hasQuizChanges ||
@@ -286,7 +366,7 @@ export default function InvitationBuilder({
           accountBride: draftInvitation.accountBride,
           contactGroom: draftInvitation.contactGroom,
           contactBride: draftInvitation.contactBride,
-          templateKey: savedInvitation.templateKey,
+          templateKey: draftInvitation.templateKey,
           slug: savedInvitation.slug
         })
       });
@@ -307,34 +387,6 @@ export default function InvitationBuilder({
       showError('Failed to save basic details');
     } finally {
       setBasicSaving(false);
-    }
-  }
-
-  async function saveDesign() {
-    setDesignSaving(true);
-    resetStatus('Saving…');
-    try {
-      const response = await fetch(`/api/invitations/${savedInvitation.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateKey: draftInvitation.templateKey })
-      });
-
-      if (!response.ok) {
-        showError('Failed to save design');
-        return;
-      }
-
-      const updated = await response.json();
-      const next = { ...draftInvitation, ...updated } as InvitationDetails;
-      setSavedInvitation((prev) => ({ ...prev, ...next }));
-      setDraftInvitation((prev) => ({ ...prev, ...next }));
-      resetStatus('Saved');
-    } catch (error) {
-      console.error(error);
-      showError('Failed to save design');
-    } finally {
-      setDesignSaving(false);
     }
   }
 
@@ -458,7 +510,10 @@ export default function InvitationBuilder({
     return {
       id: `temp-${Math.random().toString(36).slice(2, 9)}`,
       text: '',
-      order
+      description: '',
+      photoUrl: null,
+      order,
+      correctOrder: order
     };
   }
 
@@ -472,20 +527,26 @@ export default function InvitationBuilder({
     });
   }
 
-  function updateTimelineCard(id: string, text: string) {
+  function updateTimelineCard(id: string, updates: Partial<TimelineCardDto>) {
     setDraftTimeline((prev) => ({
       ...prev,
-      cards: prev.cards.map((card) => (card.id === id ? { ...card, text } : card))
+      cards: prev.cards.map((card) => (card.id === id ? { ...card, ...updates } : card))
     }));
   }
 
   function removeTimelineCard(id: string) {
-    setDraftTimeline((prev) => ({
-      ...prev,
-      cards: prev.cards
+    setDraftTimeline((prev) => {
+      const remaining = prev.cards
         .filter((card) => card.id !== id)
-        .map((card, order) => ({ ...card, order }))
-    }));
+        .map((card, order) => ({ ...card, order }));
+      const correctOrderMap = new Map(
+        [...remaining].sort((a, b) => a.correctOrder - b.correctOrder).map((card, index) => [card.id, index])
+      );
+      return {
+        ...prev,
+        cards: remaining.map((card) => ({ ...card, correctOrder: correctOrderMap.get(card.id) ?? card.correctOrder }))
+      };
+    });
   }
 
   async function saveQuiz() {
@@ -549,7 +610,11 @@ export default function InvitationBuilder({
     setTimelineSaving(true);
     resetStatus('Saving…');
 
-    const trimmedCards = draftTimeline.cards.map((card) => ({ ...card, text: card.text.trim() }));
+    const trimmedCards = draftTimeline.cards.map((card) => ({
+      ...card,
+      text: card.text.trim(),
+      description: card.description?.trim() || null
+    }));
 
     if (draftTimeline.enabled) {
       if (trimmedCards.length < 5 || trimmedCards.length > 7) {
@@ -563,6 +628,20 @@ export default function InvitationBuilder({
         setTimelineSaving(false);
         return;
       }
+
+      const correctOrders = trimmedCards.map((card) => card.correctOrder);
+      const uniqueOrders = new Set(correctOrders);
+      if (uniqueOrders.size !== trimmedCards.length) {
+        showError('Correct order values must be unique');
+        setTimelineSaving(false);
+        return;
+      }
+      const maxOrder = Math.max(...correctOrders);
+      if (maxOrder >= trimmedCards.length) {
+        showError('Correct order values must be within card range');
+        setTimelineSaving(false);
+        return;
+      }
     }
 
     try {
@@ -571,7 +650,12 @@ export default function InvitationBuilder({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           enabled: draftTimeline.enabled,
-          cards: trimmedCards.map((card) => ({ text: card.text }))
+          cards: trimmedCards.map((card) => ({
+            text: card.text,
+            description: card.description,
+            photoUrl: card.photoUrl,
+            correctOrder: card.correctOrder
+          }))
         })
       });
 
@@ -592,6 +676,36 @@ export default function InvitationBuilder({
       showError('Unable to save timeline');
     } finally {
       setTimelineSaving(false);
+    }
+  }
+
+  async function uploadTimelineCardPhoto(cardId: string, file: File) {
+    setTimelineUploadingId(cardId);
+    setTimelineUploadError(null);
+    try {
+      const formData = new FormData();
+      formData.append('invitationId', savedInvitation.id);
+      formData.append('cardId', cardId);
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload/timeline-card', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        setTimelineUploadError(payload?.error ?? 'Unable to upload photo');
+        return;
+      }
+
+      const payload: { url: string } = await response.json();
+      updateTimelineCard(cardId, { photoUrl: payload.url });
+    } catch (error) {
+      console.error(error);
+      setTimelineUploadError('Unable to upload photo');
+    } finally {
+      setTimelineUploadingId(null);
     }
   }
 
@@ -688,6 +802,10 @@ export default function InvitationBuilder({
     () => [...draftTimeline.cards].sort((a, b) => a.order - b.order),
     [draftTimeline.cards]
   );
+  const orderedCorrectCards = useMemo(
+    () => [...draftTimeline.cards].sort((a, b) => a.correctOrder - b.correctOrder),
+    [draftTimeline.cards]
+  );
 
   function handleDragEnd(event: any) {
     const { active, over } = event;
@@ -715,6 +833,23 @@ export default function InvitationBuilder({
     }));
 
     setDraftTimeline((prev) => ({ ...prev, cards: nextCards }));
+  }
+
+  function handleCorrectOrderDragEnd(event: any) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const currentIndex = orderedCorrectCards.findIndex((item) => item.id === active.id);
+    const overIndex = orderedCorrectCards.findIndex((item) => item.id === over.id);
+    const nextCards = arrayMove(orderedCorrectCards, currentIndex, overIndex).map((card, index) => ({
+      ...card,
+      correctOrder: index
+    }));
+
+    setDraftTimeline((prev) => ({
+      ...prev,
+      cards: prev.cards.map((card) => nextCards.find((next) => next.id === card.id) ?? card)
+    }));
   }
 
   function handleToggle(section: SectionConfig) {
@@ -775,12 +910,10 @@ export default function InvitationBuilder({
     const hasChanges =
       tab === 'Basic'
         ? hasBasicChanges
-        : tab === 'Design'
-          ? hasDesignChanges
-          : tab === 'Sections'
-            ? hasSectionsChanges
-            : tab === 'Guestbook'
-              ? hasGuestbookChanges
+        : tab === 'Sections'
+          ? hasSectionsChanges
+          : tab === 'Guestbook'
+            ? hasGuestbookChanges
               : tab === 'Quiz'
                 ? hasQuizChanges
                 : tab === 'Timeline'
@@ -799,12 +932,10 @@ export default function InvitationBuilder({
   const tabHasChanges = (tab: TabKey) =>
     tab === 'Basic'
       ? hasBasicChanges
-      : tab === 'Design'
-        ? hasDesignChanges
-        : tab === 'Sections'
-          ? hasSectionsChanges
-          : tab === 'Guestbook'
-            ? hasGuestbookChanges
+      : tab === 'Sections'
+        ? hasSectionsChanges
+        : tab === 'Guestbook'
+          ? hasGuestbookChanges
             : tab === 'Quiz'
               ? hasQuizChanges
               : tab === 'Timeline'
@@ -814,7 +945,7 @@ export default function InvitationBuilder({
                 : false;
 
   const discardDraftChanges = (tab: TabKey) => {
-    if (tab === 'Basic' || tab === 'Design' || tab === 'Publish') {
+    if (tab === 'Basic' || tab === 'Publish') {
       setDraftInvitation(savedInvitation);
       setSlugError(null);
       resetStatus(null);
@@ -979,34 +1110,22 @@ export default function InvitationBuilder({
                   />
                 </label>
               </div>
-            </div>
-          )}
-
-          {activeTab === 'Design' && (
-            <div className="space-y-4 rounded-xl bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between">
-                {unsavedLabel('Design')}
-                <button
-                  className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-                  onClick={saveDesign}
-                  disabled={!hasDesignChanges || designSaving}
-                >
-                  {designSaving ? 'Saving…' : 'Save Design'}
-                </button>
-              </div>
-              <p className="text-sm text-slate-700">Choose a template style.</p>
-              <div className="flex gap-3">
-                {['mono', 'editorial', 'film'].map((key) => (
-                  <button
-                    key={key}
-                    onClick={() => setDraftInvitation((prev) => ({ ...prev, templateKey: key as any }))}
-                    className={`rounded-lg border px-4 py-3 text-sm capitalize shadow-sm ${
-                      draftInvitation.templateKey === key ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200'
-                    }`}
-                  >
-                    {key}
-                  </button>
-                ))}
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-slate-700">Template</p>
+                <div className="flex flex-wrap gap-3">
+                  {['mono', 'editorial', 'film'].map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setDraftInvitation((prev) => ({ ...prev, templateKey: key as any }))}
+                      className={`rounded-lg border px-4 py-3 text-sm capitalize shadow-sm ${
+                        draftInvitation.templateKey === key ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200'
+                      }`}
+                    >
+                      {key}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -1265,15 +1384,34 @@ export default function InvitationBuilder({
                           key={card.id}
                           card={card}
                           onChange={updateTimelineCard}
+                          onPhotoUpload={uploadTimelineCardPhoto}
+                          uploading={timelineUploadingId === card.id}
                           onRemove={removeTimelineCard}
                         />
                       ))}
                     </div>
                   </SortableContext>
                 </DndContext>
+                {timelineUploadError && <p className="text-xs text-red-600">{timelineUploadError}</p>}
                 {draftTimeline.enabled && draftTimeline.cards.length < 5 && (
                   <p className="text-xs text-amber-600">Add at least 5 cards to enable the puzzle.</p>
                 )}
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-800">Correct order</h3>
+                  <p className="text-xs text-slate-600">Drag cards into the correct timeline sequence.</p>
+                </div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCorrectOrderDragEnd}>
+                  <SortableContext items={orderedCorrectCards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-2">
+                      {orderedCorrectCards.map((card) => (
+                        <SortableTimelineOrderItem key={card.id} card={card} />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               </div>
             </div>
           )}
@@ -1414,6 +1552,7 @@ export default function InvitationBuilder({
               photos={photos}
               quiz={draftQuiz}
               timelinePuzzle={draftTimeline}
+              previewGuestbookEntries={draftGuestbookEntries}
               previewMode
             />
           </div>
@@ -1508,7 +1647,10 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
             .map((card) => ({
               id: card.id,
               text: card.text,
-              order: card.order
+              description: card.description,
+              photoUrl: card.photoUrl,
+              order: card.order,
+              correctOrder: card.correctOrder
             }))
             .sort((a, b) => a.order - b.order)
         }

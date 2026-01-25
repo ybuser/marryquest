@@ -29,7 +29,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     where: { invitationId },
     include: {
       invitation: { select: { status: true, deletedAt: true } },
-      cards: { orderBy: { order: 'asc' } }
+      cards: { orderBy: { correctOrder: 'asc' } }
     }
   });
 
