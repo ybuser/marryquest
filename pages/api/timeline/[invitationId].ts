@@ -74,7 +74,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         data: payload.cards.map((card, index) => ({
           puzzleId: puzzle.id,
           text: card.text.trim(),
-          description: card.description?.trim() || null,
+          description: card.description?.trim() || "",
           photoUrl: card.photoUrl ?? null,
           order: index,
           correctOrder: card.correctOrder
