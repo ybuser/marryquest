@@ -189,20 +189,24 @@ model TimelinePuzzle {
 
   invitation Invitation    @relation(fields: [invitationId], references: [id], onDelete: Cascade)
   cards      TimelineCard[]
+
+  @@map("TimelinePuzzle")
 }
 
 model TimelineCard {
-  id       String @id @default(cuid())
-  puzzleId String
-  text     String
-  description String?
-  photoUrl String?
-  order    Int
-  correctOrder Int @default(0)
+  id           String  @id @default(cuid())
+  puzzleId     String
+  text         String  @map("title")
+  description  String? @map("shortDescription")
+  photoUrl     String?
+  order        Int     @default(0)
+  correctOrder Int     @default(0)
 
   puzzle TimelinePuzzle @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
 
   @@index([puzzleId])
+  @@index([puzzleId, order])
+  @@map("TimelineCard")
 }
 
 model MusicTrack {
