@@ -136,6 +136,7 @@ model GalleryPhoto {
 model RSVPResponse {
   id           String           @id @default(cuid())
   invitationId String
+  voterKey     String?
   attendeeName String
   attendance   AttendanceStatus
   guestsCount  Int
@@ -144,11 +145,14 @@ model RSVPResponse {
   createdAt    DateTime         @default(now())
 
   invitation Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  @@index([invitationId, voterKey, createdAt])
 }
 
 model GuestbookEntry {
   id           String        @id @default(cuid())
   invitationId String
+  voterKey     String?
   nickname     String
   message      String
   badge        GuestbookBadge @default(none)
@@ -156,6 +160,8 @@ model GuestbookEntry {
   createdAt    DateTime      @default(now())
 
   invitation Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  @@index([invitationId, voterKey, createdAt])
 }
 
 model Quiz {

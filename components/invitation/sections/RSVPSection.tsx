@@ -41,6 +41,8 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
 
     if (response.ok) {
       setMessage('Thanks! Your RSVP has been recorded.');
+    } else if (response.status === 429) {
+      setMessage('이 기기에서는 RSVP를 최대 2번까지 보낼 수 있어요.');
     } else {
       setMessage('Unable to save RSVP. Please try again.');
     }
