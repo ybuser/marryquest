@@ -2,7 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import type { GuestbookBadge } from '@prisma/client';
 import { z } from 'zod';
 import prisma from '@/lib/db';
-import { withRateLimit } from '@/lib/security/rateLimit';
+import { getOrSetGuestKey } from '@/lib/guestKey';
+import { getClientKey, withRateLimit } from '@/lib/security/rateLimit';
 import { validate } from '@/lib/validate';
 import { containsProfanity } from '@/lib/guestbook';
 import { requireApiAuth } from '@/lib/auth';
@@ -65,6 +66,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     const { invitationId, nickname, message, badge, badgeToken } = parsed.data;
+    const guestKey = getOrSetGuestKey(req, res);
 
     if (containsProfanity(nickname) || containsProfanity(message)) {
       return res.status(400).json({ error: 'Inappropriate content detected' });
@@ -80,6 +82,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     let guestbookBadge: GuestbookBadge = 'none';
+    let allowedMax = 1;
 
     if (badge) {
       if (badge !== 'quizPerfect') {
@@ -91,11 +94,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return res.status(403).json({ error: 'Invalid or expired badge token' });
       }
       guestbookBadge = 'quizPerfect';
+      allowedMax = 2;
+    }
+
+    const existingCount = await prisma.guestbookEntry.count({
+      where: { invitationId, voterKey: guestKey }
+    });
+
+    if (existingCount >= allowedMax) {
+      return res.status(429).json({ error: 'GUESTBOOK_LIMIT_REACHED' });
     }
 
     const created = await prisma.guestbookEntry.create({
       data: {
         invitationId,
+        voterKey: guestKey,
         nickname,
         message,
         badge: guestbookBadge,
@@ -171,4 +184,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   return res.status(405).end('Method Not Allowed');
 }
 
-export default withRateLimit(handler, { windowMs: 60_000, max: 30 });
+export default withRateLimit(handler, {
+  windowMs: 60_000,
+  max: 30,
+  keyFn: (req) => req.cookies['mq_guest'] ?? getClientKey(req)
+});

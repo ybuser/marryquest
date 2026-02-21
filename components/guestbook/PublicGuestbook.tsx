@@ -80,26 +80,36 @@ export function PublicGuestbook({
     setSuccessMessage(null);
 
     try {
-      const payload: Record<string, unknown> = {
+      const requestPayload: Record<string, unknown> = {
         invitationId,
         nickname: nickname.trim(),
         message: message.trim()
       };
 
       if (badgeToken) {
-        payload.badge = 'quizPerfect';
-        payload.badgeToken = badgeToken;
+        requestPayload.badge = 'quizPerfect';
+        requestPayload.badgeToken = badgeToken;
       }
 
       const response = await fetch('/api/guestbook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(requestPayload)
       });
 
       if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        const messageText = payload?.error ?? 'Unable to sign the guestbook.';
+        if (response.status === 429) {
+          const attemptedBonus = Boolean(requestPayload.badgeToken || requestPayload.badge === 'quizPerfect');
+          setError(
+            attemptedBonus
+              ? '이 기기에서는 방명록을 더 이상 작성할 수 없어요.'
+              : '이 기기에서는 방명록을 1회만 작성할 수 있어요. (퀴즈 정답 시 1회 추가)'
+          );
+          return;
+        }
+
+        const errorPayload = await response.json().catch(() => null);
+        const messageText = errorPayload?.error ?? 'Unable to sign the guestbook.';
         setError(Array.isArray(messageText) ? messageText.join(', ') : messageText);
         return;
       }
