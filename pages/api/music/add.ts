@@ -5,6 +5,7 @@ import prisma from '@/lib/db';
 import { withRateLimit, getClientKey } from '@/lib/security/rateLimit';
 import { validate } from '@/lib/validate';
 import { getOrSetGuestKey } from '@/lib/guestKey';
+import { apiError, methodNotAllowed } from '@/lib/apiError';
 
 const addSchema = z.object({
   invitationId: z.string().min(1),
@@ -14,13 +15,12 @@ const addSchema = z.object({
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return res.status(405).end('Method Not Allowed');
+    return methodNotAllowed(res, 'POST');
   }
 
   const parsed = validate(addSchema, req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: parsed.errors });
+    return apiError(res, 400, 'BAD_REQUEST', parsed.errors.join(', '));
   }
 
   const { invitationId, title, artist } = parsed.data;
@@ -32,7 +32,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   });
 
   if (!invitation) {
-    return res.status(404).json({ error: 'Invitation not found' });
+    return apiError(res, 404, 'NOT_FOUND', 'Invitation not found');
   }
 
   try {
@@ -56,7 +56,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return res.status(409).json({ error: 'Already used your vote' });
+      return apiError(res, 409, 'CONFLICT', 'Already used your vote');
     }
     throw error;
   }
@@ -66,6 +66,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
 export default withRateLimit(handler, {
   windowMs: 60_000,
-  max: 20,
+  max: 15,
   keyFn: (req) => req.cookies?.mq_guest ?? getClientKey(req)
 });

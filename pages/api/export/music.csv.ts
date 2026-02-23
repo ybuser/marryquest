@@ -4,7 +4,7 @@ import prisma from '@/lib/db';
 import { requireApiAuth } from '@/lib/auth';
 import { validate } from '@/lib/validate';
 import { apiError, methodNotAllowed, toYmd } from '@/lib/apiError';
-import { toCsv, withBom } from '@/lib/csv';
+import { maskKey, toCsv, withBom } from '@/lib/csv';
 
 const querySchema = z.object({
   invitationId: z.string().min(1)
@@ -36,33 +36,26 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiError(res, 401, 'UNAUTHORIZED');
   }
 
-  const rows = await prisma.rSVPResponse.findMany({
+  const tracks = await prisma.musicTrack.findMany({
     where: { invitationId: invitation.id },
-    orderBy: { createdAt: 'desc' },
-    select: {
-      attendeeName: true,
-      createdAt: true,
-      attendance: true,
-      guestsCount: true,
-      kidsCount: true,
-      allergiesText: true
-    }
+    include: { _count: { select: { votes: true } } },
+    orderBy: { createdAt: 'asc' }
   });
 
   const csv = toCsv([
-    ['createdAt', 'attendeeName', 'attendance', 'guestsCount', 'kidsCount', 'allergiesText'],
-    ...rows.map((row) => [
-      row.createdAt.toISOString(),
-      row.attendeeName,
-      row.attendance,
-      row.guestsCount.toString(),
-      row.kidsCount.toString(),
-      row.allergiesText ?? ''
+    ['createdAt', 'title', 'artist', 'url', 'voteCount', 'createdByKeyMasked'],
+    ...tracks.map((track) => [
+      track.createdAt.toISOString(),
+      track.title,
+      track.artist ?? '',
+      track.url ?? '',
+      String(track._count.votes),
+      maskKey(track.createdByKey)
     ])
   ]);
 
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="rsvp_${invitation.slug}_${toYmd()}.csv"`);
+  res.setHeader('Content-Disposition', `attachment; filename="music_${invitation.slug}_${toYmd()}.csv"`);
 
   return res.status(200).send(withBom(csv));
 }

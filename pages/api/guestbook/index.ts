@@ -8,6 +8,7 @@ import { validate } from '@/lib/validate';
 import { containsProfanity } from '@/lib/guestbook';
 import { requireApiAuth } from '@/lib/auth';
 import { verifyBadgeToken } from '@/lib/quizBadge';
+import { apiError, methodNotAllowed } from '@/lib/apiError';
 
 const querySchema = z.object({
   slug: z.string().min(1)
@@ -34,7 +35,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     const parsed = validate(querySchema, req.query);
     if (!parsed.success) {
-      return res.status(400).json({ error: parsed.errors });
+      return apiError(res, 400, 'BAD_REQUEST', parsed.errors.join(', '));
     }
 
     const invitation = await prisma.invitation.findFirst({
@@ -43,7 +44,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
     if (!invitation) {
-      return res.status(404).json({ error: 'Invitation not found' });
+      return apiError(res, 404, 'NOT_FOUND', 'Invitation not found');
     }
 
     const entries = await prisma.guestbookEntry.findMany({
@@ -62,14 +63,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
     const parsed = validate(createSchema, req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: parsed.errors });
+      return apiError(res, 400, 'BAD_REQUEST', parsed.errors.join(', '));
     }
 
     const { invitationId, nickname, message, badge, badgeToken } = parsed.data;
     const guestKey = getOrSetGuestKey(req, res);
 
     if (containsProfanity(nickname) || containsProfanity(message)) {
-      return res.status(400).json({ error: 'Inappropriate content detected' });
+      return apiError(res, 400, 'BAD_REQUEST', 'Inappropriate content detected');
     }
 
     const invitation = await prisma.invitation.findFirst({
@@ -78,7 +79,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
     if (!invitation || invitation.status !== 'published') {
-      return res.status(404).json({ error: 'Invitation not available' });
+      return apiError(res, 404, 'NOT_FOUND', 'Invitation not available');
     }
 
     let guestbookBadge: GuestbookBadge = 'none';
@@ -86,12 +87,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     if (badge) {
       if (badge !== 'quizPerfect') {
-        return res.status(400).json({ error: 'Unsupported badge' });
+        return apiError(res, 400, 'BAD_REQUEST', 'Unsupported badge');
       }
 
       const isValid = verifyBadgeToken(badgeToken ?? '', invitationId);
       if (!isValid) {
-        return res.status(403).json({ error: 'Invalid or expired badge token' });
+        return apiError(res, 401, 'UNAUTHORIZED', 'Invalid or expired badge token');
       }
       guestbookBadge = 'quizPerfect';
       allowedMax = 2;
@@ -102,7 +103,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
     if (existingCount >= allowedMax) {
-      return res.status(429).json({ error: 'GUESTBOOK_LIMIT_REACHED' });
+      return apiError(res, 429, 'RATE_LIMITED', 'GUESTBOOK_LIMIT_REACHED');
     }
 
     const created = await prisma.guestbookEntry.create({
@@ -129,7 +130,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const parsed = validate(patchSchema, req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: parsed.errors });
+      return apiError(res, 400, 'BAD_REQUEST', parsed.errors.join(', '));
     }
 
     const updates = parsed.data.updates;
@@ -146,14 +147,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
     if (existing.length !== updates.length) {
-      return res.status(404).json({ error: 'Some entries were not found' });
+      return apiError(res, 404, 'NOT_FOUND', 'Some entries were not found');
     }
 
     const unauthorized = existing.some(
       (entry) => entry.invitation.userId !== userId || entry.invitation.deletedAt
     );
     if (unauthorized) {
-      return res.status(404).json({ error: 'Entries not found' });
+      return apiError(res, 404, 'NOT_FOUND', 'Entries not found');
     }
 
     const updateOperations = updates.map((update) =>
@@ -180,8 +181,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     );
   }
 
-  res.setHeader('Allow', 'GET,POST,PATCH');
-  return res.status(405).end('Method Not Allowed');
+  return methodNotAllowed(res, 'GET,POST,PATCH');
 }
 
 export default withRateLimit(handler, {

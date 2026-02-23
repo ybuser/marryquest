@@ -36,33 +36,25 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiError(res, 401, 'UNAUTHORIZED');
   }
 
-  const rows = await prisma.rSVPResponse.findMany({
+  const entries = await prisma.guestbookEntry.findMany({
     where: { invitationId: invitation.id },
     orderBy: { createdAt: 'desc' },
-    select: {
-      attendeeName: true,
-      createdAt: true,
-      attendance: true,
-      guestsCount: true,
-      kidsCount: true,
-      allergiesText: true
-    }
+    select: { createdAt: true, nickname: true, message: true, badge: true, hidden: true }
   });
 
   const csv = toCsv([
-    ['createdAt', 'attendeeName', 'attendance', 'guestsCount', 'kidsCount', 'allergiesText'],
-    ...rows.map((row) => [
-      row.createdAt.toISOString(),
-      row.attendeeName,
-      row.attendance,
-      row.guestsCount.toString(),
-      row.kidsCount.toString(),
-      row.allergiesText ?? ''
+    ['createdAt', 'nickname', 'message', 'badge', 'hidden'],
+    ...entries.map((entry) => [
+      entry.createdAt.toISOString(),
+      entry.nickname,
+      entry.message,
+      entry.badge,
+      String(entry.hidden)
     ])
   ]);
 
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="rsvp_${invitation.slug}_${toYmd()}.csv"`);
+  res.setHeader('Content-Disposition', `attachment; filename="guestbook_${invitation.slug}_${toYmd()}.csv"`);
 
   return res.status(200).send(withBom(csv));
 }
