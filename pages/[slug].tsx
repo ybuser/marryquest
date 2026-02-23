@@ -36,7 +36,7 @@ export default function PublicInvitationPage({ invitation, sections, photos, bas
         <meta property="og:type" content="website" />
         <meta property="og:image" content={ogImage} />
       </Head>
-      <InvitationPage invitation={invitation} sections={sections} photos={photos} quiz={quiz} timelinePuzzle={timelinePuzzle} />
+      <InvitationPage invitation={invitation} sections={sections} photos={photos} quiz={quiz} timelinePuzzle={timelinePuzzle} foodVoteOptions={invitation.foodVoteOptions ?? []} />
     </>
   );
 }
@@ -56,7 +56,8 @@ export const getServerSideProps: GetServerSideProps<PublicInvitationPageProps> =
       sections: true,
       galleryPhotos: true,
       quiz: { include: { questions: { orderBy: { order: 'asc' } } } },
-      timelinePuzzle: { include: { cards: { orderBy: { order: 'asc' } } } }
+      timelinePuzzle: { include: { cards: { orderBy: { order: 'asc' } } } },
+      foodVoteOptions: { orderBy: { order: 'asc' } }
     }
   });
 
@@ -67,7 +68,7 @@ export const getServerSideProps: GetServerSideProps<PublicInvitationPageProps> =
   const normalizedSections: SectionConfig[] = (invitation.sections.length ? invitation.sections : DEFAULT_SECTIONS.map((section, index) => ({
     id: `${invitation.id}-${section.key}`,
     key: section.key,
-    enabled: section.key === 'quiz' || section.key === 'timeline' ? false : true,
+    enabled: section.key === 'quiz' || section.key === 'timeline' || section.key === 'foodVote' ? false : true,
     order: index
   }))).sort((a, b) => a.order - b.order);
 
@@ -132,6 +133,14 @@ export const getServerSideProps: GetServerSideProps<PublicInvitationPageProps> =
     contactBride: invitation.contactBride,
     quiz,
     timelinePuzzle,
+    foodVoteOptions: invitation.foodVoteOptions.map((option) => ({
+      id: option.id,
+      invitationId: option.invitationId,
+      label: option.label,
+      description: option.description,
+      order: option.order,
+      isActive: option.isActive
+    })),
     sections: normalizedSections
   };
 

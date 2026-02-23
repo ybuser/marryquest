@@ -15,6 +15,7 @@ import type { QuizDto, QuizQuestionDto } from '@/types/quiz';
 import { EMPTY_QUIZ } from '@/types/quiz';
 import type { TimelineCardDto, TimelinePuzzleDto } from '@/types/timeline';
 import { EMPTY_TIMELINE } from '@/types/timeline';
+import type { FoodVoteOptionDto } from '@/types/foodvote';
 
 interface BuilderPageProps {
   invitation: InvitationDetails;
@@ -43,6 +44,12 @@ interface SortableTimelineCardProps {
 
 interface SortableTimelineOrderItemProps {
   card: TimelineCardDto;
+}
+
+interface SortableFoodOptionProps {
+  option: FoodVoteOptionDto;
+  onChange: (id: string, updates: Partial<FoodVoteOptionDto>) => void;
+  onRemove: (id: string) => void;
 }
 
 function SortableItem({ section, label, onToggle }: SortableItemProps) {
@@ -183,6 +190,39 @@ function SortableTimelineOrderItem({ card }: SortableTimelineOrderItemProps) {
   );
 }
 
+
+function SortableFoodOption({ option, onChange, onRemove }: SortableFoodOptionProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: option.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1 };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      <div className="pt-2" {...attributes} {...listeners}>
+        <span className="cursor-grab text-slate-400">⋮⋮</span>
+      </div>
+      <div className="flex-1 space-y-2">
+        <input
+          value={option.label}
+          onChange={(event) => onChange(option.id, { label: event.target.value })}
+          maxLength={80}
+          className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+          placeholder="메뉴 이름"
+        />
+        <input
+          value={option.description ?? ''}
+          onChange={(event) => onChange(option.id, { description: event.target.value })}
+          maxLength={200}
+          className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+          placeholder="설명 (선택)"
+        />
+      </div>
+      <button type="button" onClick={() => onRemove(option.id)} className="text-xs font-semibold text-slate-500 hover:text-slate-700">
+        Remove
+      </button>
+    </div>
+  );
+}
+
 export default function InvitationBuilder({
   invitation: initialInvitation,
   photos,
@@ -201,6 +241,8 @@ export default function InvitationBuilder({
   const [draftQuiz, setDraftQuiz] = useState<QuizDto>(initialQuiz);
   const [savedTimeline, setSavedTimeline] = useState<TimelinePuzzleDto>(initialTimeline);
   const [draftTimeline, setDraftTimeline] = useState<TimelinePuzzleDto>(initialTimeline);
+  const [savedFoodVoteOptions, setSavedFoodVoteOptions] = useState<FoodVoteOptionDto[]>(initialInvitation.foodVoteOptions ?? []);
+  const [draftFoodVoteOptions, setDraftFoodVoteOptions] = useState<FoodVoteOptionDto[]>(initialInvitation.foodVoteOptions ?? []);
   const [activeTab, setActiveTab] = useState<TabKey>('Basic');
   const [slugError, setSlugError] = useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
@@ -216,6 +258,7 @@ export default function InvitationBuilder({
   const [guestbookSaving, setGuestbookSaving] = useState(false);
   const [quizSaving, setQuizSaving] = useState(false);
   const [timelineSaving, setTimelineSaving] = useState(false);
+  const [foodVoteSaving, setFoodVoteSaving] = useState(false);
   const [timelineUploadingId, setTimelineUploadingId] = useState<string | null>(null);
   const [timelineUploadError, setTimelineUploadError] = useState<string | null>(null);
   const [publishSaving, setPublishSaving] = useState(false);
@@ -291,6 +334,15 @@ export default function InvitationBuilder({
     });
   }, [draftQuiz, savedQuiz]);
 
+  const hasFoodVoteChanges = useMemo(() => {
+    if (draftFoodVoteOptions.length !== savedFoodVoteOptions.length) return true;
+    return draftFoodVoteOptions.some((option, index) => {
+      const saved = savedFoodVoteOptions[index];
+      if (!saved) return true;
+      return option.label !== saved.label || option.description !== saved.description || option.order !== saved.order;
+    });
+  }, [draftFoodVoteOptions, savedFoodVoteOptions]);
+
   const hasTimelineChanges = useMemo(() => {
     if (draftTimeline.enabled !== savedTimeline.enabled) return true;
     if (draftTimeline.cards.length !== savedTimeline.cards.length) return true;
@@ -317,6 +369,7 @@ export default function InvitationBuilder({
     hasSectionsChanges ||
     hasGuestbookChanges ||
     hasQuizChanges ||
+    hasFoodVoteChanges ||
     hasTimelineChanges ||
     hasPublishChanges;
 
@@ -857,6 +910,83 @@ export default function InvitationBuilder({
     setDraftSections(updated);
   }
 
+
+  const orderedFoodVoteOptions = useMemo(
+    () => [...draftFoodVoteOptions].sort((a, b) => a.order - b.order),
+    [draftFoodVoteOptions]
+  );
+
+  function handleFoodVoteDragEnd(event: any) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const currentIndex = orderedFoodVoteOptions.findIndex((item) => item.id === active.id);
+    const overIndex = orderedFoodVoteOptions.findIndex((item) => item.id === over.id);
+    const next = arrayMove(orderedFoodVoteOptions, currentIndex, overIndex).map((item, index) => ({ ...item, order: index }));
+    setDraftFoodVoteOptions(next);
+  }
+
+  function updateFoodVoteOption(id: string, updates: Partial<FoodVoteOptionDto>) {
+    setDraftFoodVoteOptions((prev) => prev.map((option) => (option.id === id ? { ...option, ...updates } : option)));
+  }
+
+  function addFoodVoteOption() {
+    setDraftFoodVoteOptions((prev) => {
+      if (prev.length >= 6) return prev;
+      return [...prev, { id: `draft-food-${Date.now()}`, invitationId: savedInvitation.id, label: '', description: null, order: prev.length, isActive: true }];
+    });
+  }
+
+  function removeFoodVoteOption(id: string) {
+    setDraftFoodVoteOptions((prev) => prev.filter((option) => option.id !== id).map((option, index) => ({ ...option, order: index })));
+  }
+
+  async function saveFoodVoteOptions() {
+    setFoodVoteSaving(true);
+    resetStatus('Saving…');
+    const cleaned = orderedFoodVoteOptions.map((option) => ({
+      label: option.label.trim(),
+      description: option.description?.trim() || null,
+      isActive: true
+    }));
+
+    if (cleaned.length < 2 || cleaned.length > 6) {
+      showError('Food vote options must be between 2 and 6');
+      setFoodVoteSaving(false);
+      return;
+    }
+
+    if (cleaned.some((option) => !option.label)) {
+      showError('Please fill in all food vote labels');
+      setFoodVoteSaving(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/food-vote/${savedInvitation.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ options: cleaned })
+      });
+
+      if (!response.ok) {
+        showError('Unable to save food vote options');
+        return;
+      }
+
+      const updated: FoodVoteOptionDto[] = await response.json();
+      setSavedFoodVoteOptions(updated);
+      setDraftFoodVoteOptions(updated);
+      setSavedInvitation((prev) => ({ ...prev, foodVoteOptions: updated }));
+      setDraftInvitation((prev) => ({ ...prev, foodVoteOptions: updated }));
+      resetStatus('Saved');
+    } catch (error) {
+      console.error(error);
+      showError('Unable to save food vote options');
+    } finally {
+      setFoodVoteSaving(false);
+    }
+  }
+
   function handleGuestbookToggle(entryId: string) {
     setDraftGuestbookEntries((prev) =>
       prev.map((entry) => (entry.id === entryId ? { ...entry, hidden: !entry.hidden } : entry))
@@ -1157,6 +1287,28 @@ export default function InvitationBuilder({
                   </div>
                 </SortableContext>
               </DndContext>
+
+              <div className="mt-6 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">FoodVote options</p>
+                    <p className="text-xs text-slate-600">2~6개 옵션을 관리하고 드래그로 순서를 조정하세요.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={addFoodVoteOption} disabled={orderedFoodVoteOptions.length >= 6} className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-50">Add option</button>
+                    <button type="button" onClick={saveFoodVoteOptions} disabled={!hasFoodVoteChanges || foodVoteSaving} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{foodVoteSaving ? 'Saving…' : 'Save FoodVote'}</button>
+                  </div>
+                </div>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleFoodVoteDragEnd}>
+                  <SortableContext items={orderedFoodVoteOptions.map((option) => option.id)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-3">
+                      {orderedFoodVoteOptions.map((option) => (
+                        <SortableFoodOption key={option.id} option={option} onChange={updateFoodVoteOption} onRemove={removeFoodVoteOption} />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              </div>
             </div>
           )}
 
@@ -1554,6 +1706,7 @@ export default function InvitationBuilder({
               timelinePuzzle={draftTimeline}
               previewGuestbookEntries={draftGuestbookEntries}
               previewMode
+              foodVoteOptions={draftFoodVoteOptions}
             />
           </div>
         </div>
@@ -1576,7 +1729,8 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
         sections: true,
         galleryPhotos: true,
         quiz: { include: { questions: { orderBy: { order: 'asc' } } } },
-        timelinePuzzle: { include: { cards: { orderBy: { order: 'asc' } } } }
+        timelinePuzzle: { include: { cards: { orderBy: { order: 'asc' } } } },
+        foodVoteOptions: { orderBy: { order: 'asc' } }
       }
     });
 
@@ -1590,7 +1744,7 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
         : DEFAULT_SECTIONS.map((section, index) => ({
             id: `${invitation.id}-${section.key}`,
             key: section.key,
-            enabled: section.key === 'quiz' || section.key === 'timeline' ? false : true,
+            enabled: section.key === 'quiz' || section.key === 'timeline' || section.key === 'foodVote' ? false : true,
             order: index
           }))
     ).sort((a, b) => a.order - b.order);
@@ -1673,6 +1827,14 @@ export const getServerSideProps: GetServerSideProps<BuilderPageProps> = async (c
       contactBride: invitation.contactBride,
       quiz,
       timelinePuzzle,
+      foodVoteOptions: invitation.foodVoteOptions.map((option) => ({
+        id: option.id,
+        invitationId: option.invitationId,
+        label: option.label,
+        description: option.description,
+        order: option.order,
+        isActive: option.isActive
+      })),
       sections: normalizedSections
     };
 
