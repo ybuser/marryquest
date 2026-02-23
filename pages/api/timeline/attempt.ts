@@ -4,6 +4,7 @@ import prisma from '@/lib/db';
 import { withRateLimit, getClientKey } from '@/lib/security/rateLimit';
 import { validate } from '@/lib/validate';
 import { getOrSetGuestKey } from '@/lib/guestKey';
+import { apiError, methodNotAllowed } from '@/lib/apiError';
 
 const attemptSchema = z.object({
   invitationId: z.string().min(1),
@@ -12,15 +13,14 @@ const attemptSchema = z.object({
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return res.status(405).end('Method Not Allowed');
+    return methodNotAllowed(res, 'POST');
   }
 
   getOrSetGuestKey(req, res);
 
   const parsed = validate(attemptSchema, req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: parsed.errors });
+    return apiError(res, 400, 'BAD_REQUEST', parsed.errors.join(', '));
   }
 
   const { invitationId, cardIds } = parsed.data;
@@ -34,11 +34,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   });
 
   if (!puzzle || !puzzle.enabled || puzzle.invitation.status !== 'published' || puzzle.invitation.deletedAt) {
-    return res.status(404).json({ error: 'Timeline not available' });
+    return apiError(res, 404, 'NOT_FOUND', 'Timeline not available');
   }
 
   if (puzzle.cards.length === 0) {
-    return res.status(400).json({ error: 'Timeline is not configured' });
+    return apiError(res, 400, 'BAD_REQUEST', 'Timeline is not configured');
   }
 
   const correctOrder = puzzle.cards.map((card) => card.id);

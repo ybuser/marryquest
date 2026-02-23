@@ -37,7 +37,7 @@ export function withRateLimit(handler: NextApiHandler, options: RateLimitOptions
       if (delta < windowMs) {
         entry.count += 1;
         if (entry.count > max) {
-          res.status(429).json({ error: 'Rate limit exceeded. Please try again soon.' });
+          res.status(429).json({ error: 'RATE_LIMITED', message: 'Rate limit exceeded. Please try again soon.' });
           return;
         }
       } else {

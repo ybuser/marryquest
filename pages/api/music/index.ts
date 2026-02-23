@@ -1,26 +1,32 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { z } from 'zod';
 import prisma from '@/lib/db';
 import { withRateLimit, getClientKey } from '@/lib/security/rateLimit';
 import { getOrSetGuestKey } from '@/lib/guestKey';
+import { validate } from '@/lib/validate';
+import { apiError, methodNotAllowed } from '@/lib/apiError';
+
+const querySchema = z.object({
+  slug: z.string().min(1)
+});
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET');
-    return res.status(405).end('Method Not Allowed');
+    return methodNotAllowed(res, 'GET');
   }
 
-  const slug = req.query.slug as string | undefined;
-  if (!slug) {
-    return res.status(400).json({ error: 'Missing slug' });
+  const parsed = validate(querySchema, req.query);
+  if (!parsed.success) {
+    return apiError(res, 400, 'BAD_REQUEST', parsed.errors.join(', '));
   }
 
   const invitation = await prisma.invitation.findFirst({
-    where: { slug, status: 'published', deletedAt: null },
+    where: { slug: parsed.data.slug, status: 'published', deletedAt: null },
     select: { id: true }
   });
 
   if (!invitation) {
-    return res.status(404).json({ error: 'Invitation not found' });
+    return apiError(res, 404, 'NOT_FOUND', 'Invitation not found');
   }
 
   const guestKey = getOrSetGuestKey(req, res);
