@@ -14,6 +14,7 @@ import { AccountsSection } from './sections/Accounts';
 import { SectionCard } from './sections/SectionCard';
 import { RSVPSection } from './sections/RSVPSection';
 import { TimelineSection } from './sections/TimelineSection';
+import { FoodVoteSection } from './sections/FoodVoteSection';
 
 interface InvitationPageProps {
   invitation: InvitationDetails;
@@ -23,13 +24,14 @@ interface InvitationPageProps {
   timelinePuzzle?: TimelinePuzzleDto | null;
   previewGuestbookEntries?: GuestbookEntryDto[];
   previewMode?: boolean;
+  foodVoteOptions?: import('@/types/foodvote').FoodVoteOptionDto[];
 }
 
 function mergeSections(invitationId: string, sections: SectionConfig[]) {
   const defaults = DEFAULT_SECTIONS.map((section, index) => ({
     id: `${invitationId}-${section.key}`,
     key: section.key,
-    enabled: section.key === 'quiz' || section.key === 'timeline' ? false : true,
+    enabled: section.key === 'quiz' || section.key === 'timeline' || section.key === 'foodVote' ? false : true,
     order: index
   }));
 
@@ -50,7 +52,8 @@ export function InvitationPage({
   quiz,
   timelinePuzzle,
   previewGuestbookEntries,
-  previewMode
+  previewMode,
+  foodVoteOptions = []
 }: InvitationPageProps) {
   const orderedSections = useMemo(() => mergeSections(invitation.id, sections), [invitation.id, sections]);
   const sortedPhotos = useMemo(() => [...photos].sort((a, b) => a.order - b.order), [photos]);
@@ -113,6 +116,17 @@ export function InvitationPage({
                       invitationStatus={invitation.status}
                       puzzle={timelinePuzzle ?? invitation.timelinePuzzle ?? null}
                       previewMode={previewMode}
+                    />
+                  </SectionCard>
+                );
+              case 'foodVote':
+                return (
+                  <SectionCard key={section.key} title="Food Vote" eyebrow="Menu">
+                    <FoodVoteSection
+                      slug={invitation.slug}
+                      invitationStatus={invitation.status}
+                      previewMode={previewMode}
+                      initialOptions={foodVoteOptions}
                     />
                   </SectionCard>
                 );
