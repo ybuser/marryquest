@@ -54,7 +54,7 @@ export default function Home({ templateKey }: HomeProps) {
               </h1>
               <p style={{ fontSize: 'var(--mq-body)' }} className="max-w-2xl text-white/80 lg:text-lg">
                 Create cinematic wedding invitations with interactive games, personal galleries, and effortless sharing.
-                Pick from curated templates without changing your content or flow.
+                Pick from curated templates and individualize your content or flow.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
