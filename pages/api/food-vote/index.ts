@@ -1,14 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 import prisma from '@/lib/db';
-import { withRateLimit, getClientKey } from '@/lib/security/rateLimit';
 import { getOrSetGuestKey } from '@/lib/guestKey';
+import { withRateLimit, getClientKey } from '@/lib/security/rateLimit';
 import { validate } from '@/lib/validate';
 import { apiError, methodNotAllowed } from '@/lib/apiError';
 
-const querySchema = z.object({
-  slug: z.string().min(1)
-});
+const querySchema = z.object({ slug: z.string().min(1) });
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -31,26 +29,29 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const guestKey = getOrSetGuestKey(req, res);
 
-  const tracks = await prisma.musicTrack.findMany({
-    where: { invitationId: invitation.id },
-    include: { _count: { select: { votes: true } } },
-    orderBy: { createdAt: 'asc' }
+  const options = await prisma.foodVoteOption.findMany({
+    where: { invitationId: invitation.id, isActive: true },
+    orderBy: { order: 'asc' },
+    select: { id: true, label: true, description: true, order: true }
   });
 
-  const alreadyUsed = await prisma.musicVote.findFirst({
+  const grouped = await prisma.foodVote.groupBy({
+    by: ['optionId'],
+    where: { invitationId: invitation.id },
+    _count: { _all: true }
+  });
+
+  const voteMap = new Map(grouped.map((row) => [row.optionId, row._count._all]));
+
+  const existingVote = await prisma.foodVote.findFirst({
     where: { invitationId: invitation.id, voterKey: guestKey },
-    select: { id: true }
+    select: { optionId: true }
   });
 
   return res.status(200).json({
-    tracks: tracks.map((track) => ({
-      id: track.id,
-      title: track.title,
-      artist: track.artist,
-      url: track.url,
-      voteCount: track._count.votes
-    })),
-    alreadyUsed: Boolean(alreadyUsed)
+    options: options.map((option) => ({ ...option, votes: voteMap.get(option.id) ?? 0 })),
+    alreadyVoted: Boolean(existingVote),
+    votedOptionId: existingVote?.optionId
   });
 }
 

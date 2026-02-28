@@ -1,6 +1,7 @@
 import type { InvitationStatus, TemplateKey } from '@prisma/client';
 import type { QuizDto } from './quiz';
 import type { TimelinePuzzleDto } from './timeline';
+import type { FoodVoteOptionDto } from './foodvote';
 
 export interface SectionConfig {
   id: string;
@@ -27,6 +28,7 @@ export interface InvitationDetails {
   deletedAt?: string | null;
   quiz?: QuizDto | null;
   timelinePuzzle?: TimelinePuzzleDto | null;
+  foodVoteOptions?: FoodVoteOptionDto[];
   sections: SectionConfig[];
 }
 
@@ -45,6 +47,7 @@ export const DEFAULT_SECTIONS: { key: string; label: string }[] = [
   { key: 'accounts', label: 'Accounts' },
   { key: 'quiz', label: 'Quiz' },
   { key: 'timeline', label: 'Timeline' },
+  { key: 'foodVote', label: 'Food Vote' },
   { key: 'guestbook', label: 'Guestbook' },
   { key: 'rsvp', label: 'RSVP' }
 ];

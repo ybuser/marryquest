@@ -4,6 +4,7 @@ import prisma from '@/lib/db';
 import { getOrSetGuestKey } from '@/lib/guestKey';
 import { getClientKey, withRateLimit } from '@/lib/security/rateLimit';
 import { validate } from '@/lib/validate';
+import { apiError, methodNotAllowed } from '@/lib/apiError';
 
 const rsvpSchema = z.object({
   invitationId: z.string().min(1),
@@ -16,25 +17,24 @@ const rsvpSchema = z.object({
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return res.status(405).end('Method Not Allowed');
+    return methodNotAllowed(res, 'POST');
   }
 
   const parsed = validate(rsvpSchema, req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: parsed.errors });
+    return apiError(res, 400, 'BAD_REQUEST', parsed.errors.join(', '));
   }
 
   const { invitationId, attendance, attendeeName, guestsCount, kidsCount, allergiesText } = parsed.data;
   const guestKey = getOrSetGuestKey(req, res);
 
   const invitation = await prisma.invitation.findFirst({
-    where: { id: invitationId, deletedAt: null },
-    select: { status: true }
+    where: { id: invitationId, deletedAt: null, status: 'published' },
+    select: { id: true }
   });
 
-  if (!invitation || invitation.status !== 'published') {
-    return res.status(404).json({ error: 'Invitation not available' });
+  if (!invitation) {
+    return apiError(res, 404, 'NOT_FOUND', 'Invitation not available');
   }
 
   const existingCount = await prisma.rSVPResponse.count({
@@ -42,7 +42,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   });
 
   if (existingCount >= 2) {
-    return res.status(429).json({ error: 'RSVP_LIMIT_REACHED' });
+    return apiError(res, 429, 'RATE_LIMITED', 'RSVP_LIMIT_REACHED');
   }
 
   await prisma.rSVPResponse.create({

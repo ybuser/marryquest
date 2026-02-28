@@ -2,15 +2,14 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import prisma from '@/lib/db';
+import { getOrSetGuestKey } from '@/lib/guestKey';
 import { withRateLimit, getClientKey } from '@/lib/security/rateLimit';
 import { validate } from '@/lib/validate';
-import { getOrSetGuestKey } from '@/lib/guestKey';
 import { apiError, methodNotAllowed } from '@/lib/apiError';
 
-const addSchema = z.object({
-  invitationId: z.string().min(1),
-  title: z.string().trim().min(1).max(120),
-  artist: z.string().trim().max(120).optional().nullable()
+const bodySchema = z.object({
+  slug: z.string().min(1),
+  optionId: z.string().min(1)
 });
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -18,16 +17,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return methodNotAllowed(res, 'POST');
   }
 
-  const parsed = validate(addSchema, req.body);
+  const parsed = validate(bodySchema, req.body);
   if (!parsed.success) {
     return apiError(res, 400, 'BAD_REQUEST', parsed.errors.join(', '));
   }
 
-  const { invitationId, title, artist } = parsed.data;
-  const guestKey = getOrSetGuestKey(req, res);
-
   const invitation = await prisma.invitation.findFirst({
-    where: { id: invitationId, status: 'published', deletedAt: null },
+    where: { slug: parsed.data.slug, status: 'published', deletedAt: null },
     select: { id: true }
   });
 
@@ -35,28 +31,28 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return apiError(res, 404, 'NOT_FOUND', 'Invitation not found');
   }
 
-  try {
-    await prisma.$transaction(async (tx) => {
-      const track = await tx.musicTrack.create({
-        data: {
-          invitationId,
-          title: title.trim(),
-          artist: artist?.trim() || null,
-          createdByKey: guestKey
-        }
-      });
+  const option = await prisma.foodVoteOption.findFirst({
+    where: { id: parsed.data.optionId, invitationId: invitation.id, isActive: true },
+    select: { id: true }
+  });
 
-      await tx.musicVote.create({
-        data: {
-          invitationId,
-          trackId: track.id,
-          voterKey: guestKey
-        }
-      });
+  if (!option) {
+    return apiError(res, 404, 'NOT_FOUND', 'Option not found');
+  }
+
+  const guestKey = getOrSetGuestKey(req, res);
+
+  try {
+    await prisma.foodVote.create({
+      data: {
+        invitationId: invitation.id,
+        optionId: option.id,
+        voterKey: guestKey
+      }
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      return apiError(res, 409, 'CONFLICT', 'Already used your vote');
+      return res.status(409).json({ error: 'ALREADY_VOTED' });
     }
     throw error;
   }
@@ -66,6 +62,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
 export default withRateLimit(handler, {
   windowMs: 60_000,
-  max: 15,
+  max: 20,
   keyFn: (req) => req.cookies?.mq_guest ?? getClientKey(req)
 });

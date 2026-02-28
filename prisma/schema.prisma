@@ -111,6 +111,8 @@ model Invitation {
   timelinePuzzle   TimelinePuzzle?
   musicTracks      MusicTrack[]
   musicVotes       MusicVote[]
+  foodVoteOptions  FoodVoteOption[]
+  foodVotes        FoodVote[]
 }
 
 model SectionConfig {
@@ -242,4 +244,35 @@ model MusicVote {
 
   @@unique([invitationId, voterKey])
   @@index([trackId])
+}
+
+
+model FoodVoteOption {
+  id           String   @id @default(cuid())
+  invitationId String
+  label        String
+  description  String?
+  order        Int
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  invitation Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  votes      FoodVote[]
+
+  @@index([invitationId, order])
+}
+
+model FoodVote {
+  id           String   @id @default(cuid())
+  invitationId String
+  optionId     String
+  voterKey     String
+  createdAt    DateTime @default(now())
+
+  invitation Invitation     @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  option     FoodVoteOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@unique([invitationId, voterKey])
+  @@index([invitationId, optionId, createdAt])
 }
