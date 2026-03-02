@@ -41,7 +41,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         data: {
           invitationId,
           title: title.trim(),
-          artist: artist?.trim() || null,
+          artist: artist?.trim() || '',
           createdByKey: guestKey
         }
       });

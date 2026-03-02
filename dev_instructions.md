@@ -517,3 +517,116 @@ unique는 반드시 실제 DB에도 존재해야 함
 
 * `npx tsc --noEmit` 성공
 * `npm run build` 성공 (Next.js 14.2.35, 타입/빌드 통과)
+
+## 2026-03-03: 템플릿 확장 (K-웨딩 선호 반영, 진행 완료)
+
+배경:
+
+* 기존 템플릿이 `mono / editorial / film` 3종으로 선택 폭이 좁음
+* 한국 모바일 청첩장 시장의 실제 선호(심플/러블리/고급/유니크)에 맞춘 다양한 무드가 필요
+
+사전 조사(온라인 청첩장 서비스 레퍼런스 기반):
+
+* 국내 서비스에서 실제로 많이 노출되는 스타일 키워드 확인:
+  * 심플, 플라워, 핑크, 유니크, 골드/레이저, 럭셔리 계열
+* 기능 기대치 확인:
+  * 모바일 중심 커스터마이징, 빠른 제작, 공유/방명록/상태관리 등
+* MarryQuest 방향에 맞게 “보기 좋은 카드” + “참여형 UX” 결합 템플릿 구성으로 정의
+
+적용 내용:
+
+* 템플릿 키 확장 (기존 3 + 신규 4)
+  * 기존: `mono`, `editorial`, `film`
+  * 신규: `bloom`(러블리/큐트), `luxe`(하이엔드), `modern`(심플/클린), `hanok`(한국적 모던)
+* 토큰 시스템 확장:
+  * `components/theme/tokens.ts`
+  * 템플릿별 `name/description/concept/recommendedFor` 및 타이포/간격/갤러리/팔레트 세분화
+* Builder 템플릿 선택 UX 개선:
+  * `pages/builder/[id].tsx`
+  * 단순 버튼 나열 -> 카드형 선택 UI
+  * 각 템플릿별 콘셉트/설명/추천 사용 시나리오 표시
+* 템플릿별 시각 차별화(Invitation 렌더):
+  * `components/invitation/InvitationPage.tsx`
+  * `components/invitation/sections/Hero.tsx`
+  * `components/invitation/sections/SectionCard.tsx`
+  * `styles/globals.css`
+  * `bloom`: 파스텔+팝업 데코(플로팅 배지)
+  * `luxe`: 골드 포인트+딥 톤
+  * `modern`: 밝고 절제된 클린 카드
+  * `hanok`: 뉴트럴/한지톤 감성
+* 폰트 확장:
+  * `styles/globals.css`에 `Nunito`, `Cormorant Garamond`, `Noto Sans KR`, `Noto Serif KR` 추가
+
+DB/API 동기화:
+
+* Prisma enum 확장:
+  * `prisma/schema.prisma`의 `TemplateKey`에 신규 4개 추가
+* Migration 추가:
+  * `prisma/migrations/009_add_template_keys/migration.sql`
+* Supabase 수동 동기화 스크립트 추가:
+  * `docs/sql/pr13_template_keys_supabase.sql`
+* API validation 확장:
+  * `pages/api/invitations/[id].ts`의 `templateKey` zod enum에 신규 템플릿 추가
+
+변경 파일:
+
+* `components/theme/tokens.ts`
+* `components/invitation/InvitationPage.tsx`
+* `components/invitation/sections/Hero.tsx`
+* `components/invitation/sections/SectionCard.tsx`
+* `styles/globals.css`
+* `pages/builder/[id].tsx`
+* `pages/api/invitations/[id].ts`
+* `prisma/schema.prisma`
+* `prisma/migrations/009_add_template_keys/migration.sql`
+* `docs/sql/pr13_template_keys_supabase.sql`
+
+실행 검증(2026-03-03):
+
+* `npx prisma generate` 성공
+* `npx tsc --noEmit` 성공
+* `npm run build` 성공 (Next.js 14.2.35, 타입/빌드 통과)
+
+## 2026-03-03: Supabase Drift 동기화 (앱 관리 전환, 진행 완료)
+
+배경:
+
+* Supabase SQL Editor 수동 변경으로 인해 Prisma migration history와 실제 DB 상태 간 drift 존재
+* 운영 DB의 현재 상태를 코드(`schema + migration`)로 관리 전환 필요
+
+적용 내용:
+
+* `prisma/schema.prisma`를 Supabase 현재 상태 기준으로 동기화
+  * Invitation: `@@index([deletedAt])` 추가
+  * RSVPResponse: `attendeeName @default("")`
+  * QuizQuestion: `@@index([quizId, order])`
+  * TimelineCard:
+    * `description String @map("shortDescription")` (NOT NULL 반영)
+    * `@@index([puzzleId, correctOrder])` 추가
+    * 단일 `@@index([puzzleId])` 제거
+  * MusicTrack:
+    * `artist String` (NOT NULL 반영)
+    * `@@index([invitationId, createdAt])` 추가
+    * 단일 `@@index([invitationId])` 제거
+  * MusicVote:
+    * `@@index([invitationId, trackId])`로 변경
+    * `@@index([trackId])` 제거
+  * FoodVoteOption/FoodVote:
+    * `createdAt/updatedAt`를 `@db.Timestamptz(6)`로 정렬
+    * FoodVoteOption `updatedAt`에 `@default(now())` 추가
+    * FoodVote 계열 FK `onUpdate: NoAction` 반영
+    * FoodVote unique 인덱스명 map: `"FoodVote_invitationId_voterKey_uniq"` 반영
+* 관련 코드 정합성 수정:
+  * `pages/api/music/add.ts`에서 `artist` 저장 시 null 대신 `''` 저장
+  * `types/music.ts`의 `artist`를 non-null string으로 정렬
+
+Migration/문서 추가:
+
+* `prisma/migrations/010_align_supabase_drift/migration.sql`
+* `docs/sql/pr14_supabase_drift_alignment.sql` (Supabase SQL Editor 수동 동기화용)
+
+실행 검증(2026-03-03):
+
+* `npx prisma generate` 성공
+* `npx tsc --noEmit` 성공
+* `npm run build` 성공

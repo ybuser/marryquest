@@ -1,0 +1,4 @@
+ALTER TYPE "TemplateKey" ADD VALUE IF NOT EXISTS 'bloom';
+ALTER TYPE "TemplateKey" ADD VALUE IF NOT EXISTS 'luxe';
+ALTER TYPE "TemplateKey" ADD VALUE IF NOT EXISTS 'modern';
+ALTER TYPE "TemplateKey" ADD VALUE IF NOT EXISTS 'hanok';

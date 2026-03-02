@@ -16,7 +16,7 @@ const invitationSchema = z.object({
   accountBride: z.string().max(120).nullable().optional(),
   contactGroom: z.string().max(120).nullable().optional(),
   contactBride: z.string().max(120).nullable().optional(),
-  templateKey: z.enum(['mono', 'editorial', 'film']).optional()
+  templateKey: z.enum(['mono', 'editorial', 'film', 'bloom', 'luxe', 'modern', 'hanok']).optional()
 });
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {

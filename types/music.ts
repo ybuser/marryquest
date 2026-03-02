@@ -1,7 +1,7 @@
 export interface MusicTrackDto {
   id: string;
   title: string;
-  artist?: string | null;
+  artist: string;
   url?: string | null;
   voteCount: number;
 }

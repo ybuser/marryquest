@@ -59,14 +59,34 @@ export function InvitationPage({
   const sortedPhotos = useMemo(() => [...photos].sort((a, b) => a.order - b.order), [photos]);
   const quizData = quiz ?? invitation.quiz ?? null;
   const [quizBadgeToken, setQuizBadgeToken] = useState<string | null>(null);
+  const showBloomDecor = invitation.templateKey === 'bloom';
+  const showLuxeDecor = invitation.templateKey === 'luxe';
+  const showModernDecor = invitation.templateKey === 'modern';
+  const showHanokDecor = invitation.templateKey === 'hanok';
 
   return (
     <ThemeProvider templateKey={invitation.templateKey}>
-      <div className="relative isolate overflow-hidden bg-[var(--mq-bg)]" style={{ color: 'var(--mq-fg)' }}>
+      <div className="mq-invitation-shell relative isolate overflow-hidden bg-[var(--mq-bg)]" style={{ color: 'var(--mq-fg)' }}>
         <div className="pointer-events-none absolute inset-0 opacity-50" aria-hidden>
           <div className="absolute left-10 top-[-120px] h-64 w-64 rounded-full bg-[var(--mq-accent)]/20 blur-3xl" />
           <div className="absolute right-4 bottom-[-140px] h-72 w-72 rounded-full bg-[var(--mq-muted)]/40 blur-3xl" />
         </div>
+        {showBloomDecor && (
+          <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+            <span className="mq-bloom-popup left-5 top-12">❤</span>
+            <span className="mq-bloom-popup right-6 top-24">✦</span>
+            <span className="mq-bloom-popup left-10 bottom-24">♡</span>
+          </div>
+        )}
+        {showLuxeDecor && (
+          <div className="pointer-events-none absolute inset-5 rounded-[36px] border border-[var(--mq-accent)]/25" aria-hidden />
+        )}
+        {showModernDecor && (
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[length:42px_42px]" aria-hidden />
+        )}
+        {showHanokDecor && (
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_100%_0,rgba(139,94,52,0.12),transparent_42%)]" aria-hidden />
+        )}
 
         <main className="relative mx-auto flex min-h-screen max-w-5xl flex-col gap-[var(--mq-spacing-section)] px-4 py-16">
           {orderedSections.map((section) => {

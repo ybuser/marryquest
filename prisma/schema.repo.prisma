@@ -117,8 +117,6 @@ model Invitation {
   musicVotes       MusicVote[]
   foodVoteOptions  FoodVoteOption[]
   foodVotes        FoodVote[]
-
-  @@index([deletedAt])
 }
 
 model SectionConfig {
@@ -145,7 +143,7 @@ model RSVPResponse {
   id           String           @id @default(cuid())
   invitationId String
   voterKey     String?
-  attendeeName String           @default("")
+  attendeeName String
   attendance   AttendanceStatus
   guestsCount  Int
   kidsCount    Int
@@ -192,8 +190,6 @@ model QuizQuestion {
   order     Int
 
   quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
-
-  @@index([quizId, order])
 }
 
 model TimelinePuzzle {
@@ -213,15 +209,15 @@ model TimelineCard {
   id           String  @id @default(cuid())
   puzzleId     String
   text         String  @map("title")
-  description  String  @map("shortDescription")
+  description  String? @map("shortDescription")
   photoUrl     String?
   order        Int     @default(0)
   correctOrder Int     @default(0)
 
   puzzle TimelinePuzzle @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
 
+  @@index([puzzleId])
   @@index([puzzleId, order])
-  @@index([puzzleId, correctOrder])
   @@map("TimelineCard")
 }
 
@@ -229,7 +225,7 @@ model MusicTrack {
   id           String   @id @default(cuid())
   invitationId String
   title        String
-  artist       String
+  artist       String?
   url          String?
   createdByKey String?
   createdAt    DateTime @default(now())
@@ -237,7 +233,7 @@ model MusicTrack {
   invitation Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
   votes      MusicVote[]
 
-  @@index([invitationId, createdAt])
+  @@index([invitationId])
 }
 
 model MusicVote {
@@ -251,7 +247,7 @@ model MusicVote {
   track      MusicTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@unique([invitationId, voterKey])
-  @@index([invitationId, trackId])
+  @@index([trackId])
 }
 
 
@@ -262,10 +258,10 @@ model FoodVoteOption {
   description  String?
   order        Int
   isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt    DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  invitation Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  invitation Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
   votes      FoodVote[]
 
   @@index([invitationId, order])
@@ -276,11 +272,11 @@ model FoodVote {
   invitationId String
   optionId     String
   voterKey     String
-  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  createdAt    DateTime @default(now())
 
-  invitation Invitation     @relation(fields: [invitationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  option     FoodVoteOption @relation(fields: [optionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  invitation Invitation     @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  option     FoodVoteOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
 
-  @@unique([invitationId, voterKey], map: "FoodVote_invitationId_voterKey_uniq")
+  @@unique([invitationId, voterKey])
   @@index([invitationId, optionId, createdAt])
 }

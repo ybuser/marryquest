@@ -12,6 +12,7 @@ export function SectionCard({ title, eyebrow, actions, children, className }: Se
   return (
     <div
       className={cn(
+        'mq-section-card',
         'relative overflow-hidden rounded-3xl border shadow-[0_25px_80px_rgba(15,23,42,0.28)] backdrop-blur-xl',
         'border-white/10 bg-[rgba(255,255,255,0.08)]',
         'transition duration-300',

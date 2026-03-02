@@ -8,6 +8,7 @@ import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } 
 import { CSS } from '@dnd-kit/utilities';
 import prisma from '@/lib/db';
 import { requirePageAuth } from '@/lib/auth';
+import { themeTokens } from '@/components/theme/tokens';
 import { InvitationPage } from '@/components/invitation/InvitationPage';
 import type { GalleryPhoto, InvitationDetails, SectionConfig } from '@/types/invitation';
 import { DEFAULT_SECTIONS } from '@/types/invitation';
@@ -38,6 +39,8 @@ const tabDescriptions: Record<TabKey, string> = {
   Publish: 'Manage status, slug, and public URL.',
   Export: 'Check RSVP summary and download CSV.'
 };
+
+const templateOptions = Object.values(themeTokens);
 
 interface SortableItemProps {
   section: SectionConfig;
@@ -1444,17 +1447,36 @@ export default function InvitationBuilder({
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium text-slate-700">Template</p>
-                <div className="flex flex-wrap gap-3">
-                  {['mono', 'editorial', 'film'].map((key) => (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {templateOptions.map((template) => (
                     <button
-                      key={key}
+                      key={template.key}
                       type="button"
-                      onClick={() => setDraftInvitation((prev) => ({ ...prev, templateKey: key as any }))}
-                      className={`rounded-lg border px-4 py-3 text-sm capitalize shadow-sm ${
-                        draftInvitation.templateKey === key ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200'
+                      onClick={() => setDraftInvitation((prev) => ({ ...prev, templateKey: template.key as any }))}
+                      className={`rounded-xl border p-4 text-left shadow-sm transition ${
+                        draftInvitation.templateKey === template.key
+                          ? 'border-slate-900 bg-slate-900 text-white'
+                          : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50'
                       }`}
                     >
-                      {key}
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold">{template.name}</p>
+                        <span
+                          className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+                            draftInvitation.templateKey === template.key
+                              ? 'bg-white/20 text-white'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {template.concept}
+                        </span>
+                      </div>
+                      <p className={`mt-2 text-xs leading-relaxed ${draftInvitation.templateKey === template.key ? 'text-slate-100/90' : 'text-slate-600'}`}>
+                        {template.description}
+                      </p>
+                      <p className={`mt-2 text-xs ${draftInvitation.templateKey === template.key ? 'text-slate-200/90' : 'text-slate-500'}`}>
+                        추천: {template.recommendedFor}
+                      </p>
                     </button>
                   ))}
                 </div>

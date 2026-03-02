@@ -1,0 +1,265 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "wasm"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String       @id @default(cuid())
+  name        String?
+  email       String       @unique
+  image       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  accounts    Account[]
+  invitations Invitation[]
+  sessions    Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Invitation {
+  id               String           @id @default(cuid())
+  userId           String
+  slug             String           @unique
+  status           InvitationStatus
+  templateKey      TemplateKey
+  title            String?
+  groomName        String
+  brideName        String
+  dateTime         DateTime
+  venueName        String
+  address          String
+  accountGroom     String?
+  accountBride     String?
+  contactGroom     String?
+  contactBride     String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+  foodVotes        FoodVote[]
+  foodVoteOptions  FoodVoteOption[]
+  galleryPhotos    GalleryPhoto[]
+  guestbookEntries GuestbookEntry[]
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  musicTracks      MusicTrack[]
+  musicVotes       MusicVote[]
+  quiz             Quiz?
+  rsvpResponses    RSVPResponse[]
+  sections         SectionConfig[]
+  timelinePuzzle   TimelinePuzzle?
+
+  @@index([deletedAt])
+}
+
+model SectionConfig {
+  id           String     @id @default(cuid())
+  invitationId String
+  key          String
+  enabled      Boolean    @default(true)
+  order        Int        @default(0)
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+}
+
+model GalleryPhoto {
+  id           String     @id @default(cuid())
+  invitationId String
+  url          String
+  caption      String?
+  order        Int        @default(0)
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+}
+
+model RSVPResponse {
+  id            String           @id @default(cuid())
+  invitationId  String
+  attendance    AttendanceStatus
+  guestsCount   Int
+  kidsCount     Int
+  allergiesText String?
+  createdAt     DateTime         @default(now())
+  attendeeName  String           @default("")
+  voterKey      String?
+  invitation    Invitation       @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  @@index([invitationId, voterKey, createdAt])
+}
+
+model GuestbookEntry {
+  id           String         @id @default(cuid())
+  invitationId String
+  nickname     String
+  message      String
+  badge        GuestbookBadge @default(none)
+  hidden       Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  voterKey     String?
+  invitation   Invitation     @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  @@index([invitationId, voterKey, createdAt])
+}
+
+model Quiz {
+  id           String         @id @default(cuid())
+  invitationId String         @unique
+  enabled      Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  invitation   Invitation     @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  questions    QuizQuestion[]
+}
+
+model QuizQuestion {
+  id           String   @id @default(cuid())
+  quizId       String
+  prompt       String
+  options      String[]
+  correctIndex Int
+  order        Int
+  quiz         Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([quizId, order])
+}
+
+model TimelinePuzzle {
+  id           String         @id @default(cuid())
+  invitationId String         @unique
+  enabled      Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  cards        TimelineCard[]
+  invitation   Invitation     @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  @@map("TimelinePuzzle")
+}
+
+model TimelineCard {
+  id           String         @id @default(cuid())
+  puzzleId     String
+  text         String         @map("title")
+  description  String         @map("shortDescription")
+  photoUrl     String?
+  order        Int            @default(0)
+  correctOrder Int            @default(0)
+  puzzle       TimelinePuzzle @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
+
+  @@index([puzzleId, order])
+  @@index([puzzleId, correctOrder])
+  @@map("TimelineCard")
+}
+
+model MusicTrack {
+  id           String      @id @default(cuid())
+  invitationId String
+  title        String
+  artist       String
+  url          String?
+  createdByKey String?
+  createdAt    DateTime    @default(now())
+  invitation   Invitation  @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  votes        MusicVote[]
+
+  @@index([invitationId, createdAt])
+}
+
+model MusicVote {
+  id           String     @id @default(cuid())
+  invitationId String
+  trackId      String
+  voterKey     String
+  createdAt    DateTime   @default(now())
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  track        MusicTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@unique([invitationId, voterKey])
+  @@index([invitationId, trackId])
+}
+
+model FoodVoteOption {
+  id           String     @id @default(cuid())
+  invitationId String
+  label        String
+  description  String?
+  order        Int
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime   @default(now()) @updatedAt @db.Timestamptz(6)
+  votes        FoodVote[]
+  invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([invitationId, order])
+}
+
+model FoodVote {
+  id           String         @id @default(cuid())
+  invitationId String
+  optionId     String
+  voterKey     String
+  createdAt    DateTime       @default(now()) @db.Timestamptz(6)
+  invitation   Invitation     @relation(fields: [invitationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  option       FoodVoteOption @relation(fields: [optionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([invitationId, voterKey], map: "FoodVote_invitationId_voterKey_uniq")
+  @@index([invitationId, optionId, createdAt])
+}
+
+enum InvitationStatus {
+  draft
+  published
+  private
+}
+
+enum TemplateKey {
+  mono
+  editorial
+  film
+}
+
+enum AttendanceStatus {
+  yes
+  no
+  maybe
+}
+
+enum GuestbookBadge {
+  none
+  quizPerfect
+  timelinePerfect
+  foodWinner
+}
