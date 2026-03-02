@@ -76,7 +76,7 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
                 type="button"
                 onClick={() => setAttendance(option)}
                 disabled={disabled || submitting}
-                className={`flex-1 rounded-lg border px-3 py-2 capitalize shadow-sm transition ${
+                className={`mq-rsvp-option flex-1 rounded-lg border px-3 py-2 capitalize shadow-sm transition ${
                   attendance === option ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white'
                 } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
               >
@@ -134,7 +134,7 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
         <button
           type="submit"
           disabled={disabled || submitting}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-400"
+          className="mq-rsvp-submit rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-400"
         >
           {submitting ? 'Saving…' : 'Send RSVP'}
         </button>

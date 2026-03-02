@@ -25,7 +25,7 @@ export function GallerySection({ photos }: GallerySectionProps) {
         }}
       >
         {photos.map((photo) => (
-          <div key={photo.id} className="group relative overflow-hidden rounded-2xl shadow-md" style={{ aspectRatio: 'var(--mq-gallery-aspect)' }}>
+          <div key={photo.id} className="mq-gallery-tile group relative overflow-hidden rounded-2xl shadow-md" style={{ aspectRatio: 'var(--mq-gallery-aspect)' }}>
             <Image
               src={photo.url}
               alt={photo.caption ?? 'Gallery photo'}

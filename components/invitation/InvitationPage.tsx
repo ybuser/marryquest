@@ -89,46 +89,49 @@ export function InvitationPage({
         )}
 
         <main className="relative mx-auto flex min-h-screen max-w-5xl flex-col gap-[var(--mq-spacing-section)] px-4 py-16">
-          {orderedSections.map((section) => {
+          {orderedSections.map((section, index) => {
+            let sectionNode: React.ReactNode = null;
             switch (section.key) {
               case 'hero':
-                return (
+                sectionNode = (
                   <HeroSection
-                    key={section.key}
                     groomName={invitation.groomName}
                     brideName={invitation.brideName}
                     dateTime={invitation.dateTime}
                     venueName={invitation.venueName}
                   />
                 );
+                break;
               case 'info':
               case 'details':
-                return (
+                sectionNode = (
                   <InfoSection
-                    key={section.key}
                     dateTime={invitation.dateTime}
                     venueName={invitation.venueName}
                     address={invitation.address}
                   />
                 );
+                break;
               case 'maps':
-                return (
+                sectionNode = (
                   <MapButtons key={section.key} venueName={invitation.venueName} address={invitation.address} />
                 );
+                break;
               case 'gallery':
-                return <GallerySection key={section.key} photos={sortedPhotos} />;
+                sectionNode = <GallerySection key={section.key} photos={sortedPhotos} />;
+                break;
               case 'accounts':
-                return (
+                sectionNode = (
                   <AccountsSection
-                    key={section.key}
                     groomName={invitation.groomName}
                     brideName={invitation.brideName}
                     accountGroom={invitation.accountGroom}
                     accountBride={invitation.accountBride}
                   />
                 );
+                break;
               case 'timeline':
-                return (
+                sectionNode = (
                   <SectionCard key={section.key} title="Timeline" eyebrow="Moments">
                     <TimelineSection
                       invitationId={invitation.id}
@@ -139,8 +142,9 @@ export function InvitationPage({
                     />
                   </SectionCard>
                 );
+                break;
               case 'foodVote':
-                return (
+                sectionNode = (
                   <SectionCard key={section.key} title="Food Vote" eyebrow="Menu">
                     <FoodVoteSection
                       slug={invitation.slug}
@@ -150,8 +154,9 @@ export function InvitationPage({
                     />
                   </SectionCard>
                 );
+                break;
               case 'guestbook':
-                return (
+                sectionNode = (
                   <SectionCard key={section.key} title="Guestbook" eyebrow="Messages">
                     <PublicGuestbook
                       invitationId={invitation.id}
@@ -165,15 +170,26 @@ export function InvitationPage({
                     />
                   </SectionCard>
                 );
+                break;
               case 'rsvp':
-                return (
+                sectionNode = (
                   <SectionCard key={section.key} title="RSVP" eyebrow="Attendance">
                     <RSVPSection invitationId={invitation.id} invitationStatus={invitation.status} />
                   </SectionCard>
                 );
+                break;
               default:
-                return null;
+                sectionNode = null;
+                break;
             }
+
+            if (!sectionNode) return null;
+
+            return (
+              <div key={section.id} className="mq-section-shell" style={{ ['--mq-section-index' as string]: index } as React.CSSProperties}>
+                {sectionNode}
+              </div>
+            );
           })}
         </main>
       </div>

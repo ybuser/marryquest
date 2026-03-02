@@ -31,7 +31,7 @@ function SortableCard({ card }: SortableCardProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm"
+      className="mq-timeline-card flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm"
       {...attributes}
       {...listeners}
     >
@@ -118,7 +118,7 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
         body: JSON.stringify({
           invitationId,
           title: title.trim(),
-          artist: artist.trim() || null
+          artist: artist.trim() || ''
         })
       });
       if (response.status === 409) {
@@ -153,7 +153,7 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
         <div className="space-y-3">
           {musicData.tracks.length === 0 && <p className="text-sm text-slate-600">No tracks yet. Add one below.</p>}
           {musicData.tracks.map((track) => (
-            <div key={track.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3">
+            <div key={track.id} className="mq-music-track flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3">
               <div>
                 <p className="text-sm font-medium text-slate-800">{track.title}</p>
                 {track.artist && <p className="text-xs text-slate-500">{track.artist}</p>}
@@ -164,7 +164,7 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
                   type="button"
                   onClick={() => handleVote(track.id)}
                   disabled={alreadyUsed || submitting}
-                  className="rounded-md bg-slate-900 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                  className="mq-music-action rounded-md bg-slate-900 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
                 >
                   Vote
                 </button>
@@ -195,7 +195,7 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
           type="button"
           onClick={handleAdd}
           disabled={alreadyUsed || submitting || !title.trim()}
-          className="mt-3 rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="mq-music-action mt-3 rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
         >
           Add &amp; Vote
         </button>
@@ -320,7 +320,7 @@ export function TimelineSection({ invitationId, slug, invitationStatus, puzzle, 
         type="button"
         onClick={handleSubmit}
         disabled={previewing || submitting}
-        className="mt-4 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        className="mq-timeline-submit mt-4 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
       >
         {submitting ? 'Checking…' : 'Submit timeline'}
       </button>

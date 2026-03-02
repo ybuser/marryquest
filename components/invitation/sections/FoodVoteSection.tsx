@@ -112,7 +112,7 @@ export function FoodVoteSection({ slug, invitationStatus, previewMode, initialOp
             type="button"
             disabled={data.alreadyVoted || submitting || previewing}
             onClick={() => onVote(option.id)}
-            className={`w-full rounded-lg border px-4 py-3 text-left shadow-sm transition ${
+            className={`mq-food-option w-full rounded-lg border px-4 py-3 text-left shadow-sm transition ${
               selected ? 'border-slate-900 bg-slate-100' : 'border-slate-200 bg-white'
             } disabled:cursor-not-allowed disabled:opacity-80`}
           >

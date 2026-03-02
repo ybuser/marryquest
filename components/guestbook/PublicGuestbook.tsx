@@ -149,7 +149,7 @@ export function PublicGuestbook({
             <button
               type="button"
               onClick={() => setQuizOpen((prev) => !prev)}
-              className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-[var(--mq-fg)] transition hover:border-white/40"
+              className="mq-toggle-btn rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-[var(--mq-fg)] transition hover:border-white/40"
               aria-expanded={quizOpen}
             >
               {quizOpen ? '퀴즈 닫기' : '퀴즈 풀기'}
@@ -210,7 +210,7 @@ export function PublicGuestbook({
             <button
               type="submit"
               disabled={previewMode || submitting || !nickname.trim() || !message.trim()}
-              className="rounded-full bg-[var(--mq-fg)] px-5 py-2 text-sm font-semibold text-[var(--mq-bg)] transition hover:opacity-90 disabled:opacity-50"
+              className="mq-guestbook-submit rounded-full bg-[var(--mq-fg)] px-5 py-2 text-sm font-semibold text-[var(--mq-bg)] transition hover:opacity-90 disabled:opacity-50"
             >
               {submitting ? 'Submitting…' : 'Sign guestbook'}
             </button>
@@ -234,7 +234,7 @@ export function PublicGuestbook({
             return (
               <li
                 key={entry.id}
-                className={`rounded-2xl border p-4 shadow-lg ${
+                className={`mq-guestbook-item rounded-2xl border p-4 shadow-lg ${
                   isPerfect
                     ? 'border-amber-300/70 bg-amber-100/10 shadow-amber-200/20'
                     : 'border-white/10 bg-white/5'

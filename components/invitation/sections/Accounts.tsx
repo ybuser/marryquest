@@ -21,7 +21,7 @@ export function AccountsSection({ groomName, brideName, accountGroom, accountBri
           <button
             type="button"
             onClick={() => setRevealed((prev) => !prev)}
-            className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold tracking-wide text-[var(--mq-fg)] transition hover:-translate-y-0.5 hover:shadow-lg"
+            className="mq-toggle-btn rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold tracking-wide text-[var(--mq-fg)] transition hover:-translate-y-0.5 hover:shadow-lg"
           >
             {revealed ? 'Hide' : 'Show'}
           </button>
@@ -32,7 +32,7 @@ export function AccountsSection({ groomName, brideName, accountGroom, accountBri
 
       {hasAccounts && !revealed && (
         <p className="text-sm opacity-80">
-          For privacy, bank details are hidden. Tap “Show” to reveal when you need them.
+          For privacy, bank details are hidden. Tap "Show" to reveal when you need them.
         </p>
       )}
 

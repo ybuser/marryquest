@@ -630,3 +630,50 @@ Migration/문서 추가:
 * `npx prisma generate` 성공
 * `npx tsc --noEmit` 성공
 * `npm run build` 성공
+
+## 2026-03-03: 템플릿별 섹션 마이크로 인터랙션 튜닝 (진행 완료)
+
+목표:
+
+* 템플릿별 무드 차이를 "색상" 수준이 아니라 실제 인터랙션 감성으로 체감 가능하도록 개선
+* 모바일/데스크톱 모두에서 과하지 않고 깔끔한 반응성 유지
+
+적용 내용:
+
+* 공통 인터랙션 계층 추가
+  * 섹션 단위 진입 애니메이션(staggered reveal) 추가
+  * 카드/버튼/옵션류 hover/press transition 일관화
+  * `prefers-reduced-motion` 대응(애니메이션 비활성화)
+* 템플릿별 상호작용 차별화
+  * `bloom`:
+    * 팝업 배지 플로팅 시간차(stagger) 적용
+    * 카드/갤러리 hover에 playful 회전/상승 효과
+    * 액션 요소 hover에 핑크 톤 강조 그림자
+  * `luxe`:
+    * Hero/Section 카드 hover 시 골드 sheen 스윕 효과
+    * 액션 요소 골드 라인 강조 + 깊은 그림자
+  * `modern`:
+    * 절제된 1px급 상승/섀도우, 시안 포인트 border 반응
+  * `hanok`:
+    * 따뜻한 브라운 보더 반응 + 잔잔한 상승/섀도우
+* 섹션별 인터랙션 훅 클래스 부여
+  * map / toggle / rsvp / food vote / timeline / music / guestbook 액션 요소에 전용 클래스 연결
+* 섹션 렌더 구조 개선
+  * `InvitationPage`에서 각 섹션을 wrapper(`mq-section-shell`)로 감싸 순차 진입 모션 적용
+
+변경 파일:
+
+* `styles/globals.css`
+* `components/invitation/InvitationPage.tsx`
+* `components/invitation/sections/Gallery.tsx`
+* `components/invitation/sections/MapButtons.tsx`
+* `components/invitation/sections/Accounts.tsx`
+* `components/invitation/sections/RSVPSection.tsx`
+* `components/invitation/sections/FoodVoteSection.tsx`
+* `components/invitation/sections/TimelineSection.tsx`
+* `components/guestbook/PublicGuestbook.tsx`
+
+실행 검증(2026-03-03):
+
+* `npx tsc --noEmit` 성공
+* `npm run build` 성공
