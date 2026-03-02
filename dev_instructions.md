@@ -420,3 +420,41 @@ unique는 반드시 실제 DB에도 존재해야 함
 
 * 기능 확장 단계가 아니라
 * 안정화 / 운영 고도화 / 통계 / UX 개선 단계
+
+---
+
+# 9. 작업 로그 (Agent Handoff)
+
+## 2026-03-02: Landing Page 전면 개편 (진행 완료)
+
+배경:
+
+* 기존 `/` 랜딩 페이지가 공사중 느낌이며 핵심 CTA(Launch Builder)가 동작하지 않음
+
+적용 내용:
+
+* `pages/index.tsx`를 전면 교체하여 브랜드 방향을
+  * "받는 사람도 즐거운 우리의 청첩장 만들기"
+  * 인터랙티브 청첩장 빌더
+  로 명확히 전달하는 구조로 변경
+* `getServerSideProps`에서 `getServerSession + authOptions`로 로그인 상태 확인
+* 메인 CTA를 로그인 상태에 따라 분기:
+  * 로그인 상태: `/dashboard`
+  * 비로그인 상태: `/login?callbackUrl=%2Fdashboard`
+* 미래지향/futuristic 톤 강화를 위해:
+  * 애니메이션 오브(orb), 그리드 오버레이, 글래스 카드, hover 인터랙션 적용
+  * 정보 카드(Playable Invitation / Live Builder Flow / Guest-First UX) 추가
+* 타이포그래피 강화를 위해 전역 폰트 import 확장:
+  * `styles/globals.css`에 `Manrope`, `Orbitron` 추가
+
+변경 파일:
+
+* `pages/index.tsx`
+* `styles/globals.css`
+
+검증 포인트:
+
+* `/` 접속 시 메인 CTA가 실제 동작해야 함
+* 로그인 세션 존재 시 CTA가 `/dashboard`로 이동해야 함
+* 비로그인 상태에서는 `/login?callbackUrl=%2Fdashboard`로 이동해야 함
+* 모바일/데스크톱에서 레이아웃 깨짐 없이 렌더링되어야 함
