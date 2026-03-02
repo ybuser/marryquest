@@ -458,3 +458,62 @@ unique는 반드시 실제 DB에도 존재해야 함
 * 로그인 세션 존재 시 CTA가 `/dashboard`로 이동해야 함
 * 비로그인 상태에서는 `/login?callbackUrl=%2Fdashboard`로 이동해야 함
 * 모바일/데스크톱에서 레이아웃 깨짐 없이 렌더링되어야 함
+
+실행 검증(2026-03-02):
+
+* `npm ci` 완료 (Node v20.20.0 / npm 10.8.2 환경)
+* `npm run build` 성공 (Next.js 14.2.35, 타입/빌드 통과)
+* `npm run lint`는 Next ESLint 초기 설정 프롬프트로 인해 비대화형 실행 미완료
+
+## 2026-03-02: Dashboard + Builder UX 고도화 (진행 완료)
+
+사전 확인:
+
+* `pages/builder/[id].tsx` 전체 코드(탭 구조, 저장/검증 로직, DnD 흐름) 확인
+* 연관 API 확인:
+  * `/api/invitations`, `/api/invitations/[id]`, `/api/invitations/[id]/sections`
+  * `/api/invitations/[id]/slug`, `/api/invitations/[id]/status`
+  * `/api/quiz/[invitationId]`, `/api/timeline/[invitationId]`, `/api/food-vote/[invitationId]`
+  * `/api/guestbook`
+
+적용 내용:
+
+* Dashboard (`pages/dashboard/index.tsx`)
+  * 카드형 정보 구조로 전면 개편 (총 개수/상태별 카운트)
+  * 검색 + 상태 필터(`all/draft/published/private`) 추가
+  * 초대장 카드에 빠른 액션 추가:
+    * Builder 바로 열기
+    * (published인 경우) 공개 페이지 열기
+    * (published인 경우) 공개 URL 복사
+  * `New invitation` 생성 시 리스트 반영 후 즉시 Builder로 이동하도록 개선
+
+* Builder (`pages/builder/[id].tsx`)
+  * 상단 워크스페이스 헤더 추가:
+    * 현재 초대장 핵심 정보(슬러그/상태/커플 이름)
+    * Dashboard 복귀, 공개 페이지 열기(게시 상태)
+  * 탭 네비게이션 UI 개선:
+    * pill 형태 탭 + 탭별 unsaved 점 표시
+    * 현재 탭 설명 문구 노출
+  * 글로벌 액션 바 추가:
+    * `Save current tab`
+    * `Discard current tab`
+    * `Ctrl/Cmd + S` 키보드 저장 단축키
+  * 모바일 UX 개선:
+    * `Editor / Preview` 토글 추가 (모바일에서 패널 전환)
+  * 체크박스 기반 구형 UI 일부 교체:
+    * Sections enabled, Guestbook hidden, Quiz enabled, Timeline enabled를 토글 버튼 형태로 개선
+  * Sections 탭 변경 감지 개선:
+    * 기존 `Section` 변경만 감지하던 로직에 `FoodVote` 변경도 포함
+    * 탭 이탈 시 discard 동작에서 FoodVote draft도 함께 복원
+  * Builder 내 깨진 문자열/모지바케 정리:
+    * 저장/삭제 로딩 문구, 안내 문구, placeholder, confirm 문구 정리
+
+변경 파일:
+
+* `pages/dashboard/index.tsx`
+* `pages/builder/[id].tsx`
+
+실행 검증(2026-03-02):
+
+* `npx tsc --noEmit` 성공
+* `npm run build` 성공 (Next.js 14.2.35, 타입/빌드 통과)

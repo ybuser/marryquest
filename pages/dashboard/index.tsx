@@ -1,8 +1,9 @@
-import { useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import type { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import prisma from '@/lib/db';
 import { requirePageAuth } from '@/lib/auth';
@@ -21,6 +22,8 @@ interface InvitationListItem {
 interface DashboardProps {
   invitations: InvitationListItem[];
 }
+
+type StatusFilter = 'all' | 'draft' | 'published' | 'private';
 
 export const getServerSideProps: GetServerSideProps<DashboardProps> = async (context) => {
   return requirePageAuth<DashboardProps>(context, async (userId) => {
@@ -64,7 +67,55 @@ export const getServerSideProps: GetServerSideProps<DashboardProps> = async (con
 export default function Dashboard({ invitations: initialInvitations }: DashboardProps) {
   const [invitations, setInvitations] = useState(initialInvitations);
   const [creating, setCreating] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [origin, setOrigin] = useState('');
   const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOrigin(window.location.origin);
+    }
+  }, []);
+
+  const summary = useMemo(() => {
+    const counts = {
+      total: invitations.length,
+      draft: 0,
+      published: 0,
+      private: 0
+    };
+
+    for (const invitation of invitations) {
+      if (invitation.status === 'draft') counts.draft += 1;
+      if (invitation.status === 'published') counts.published += 1;
+      if (invitation.status === 'private') counts.private += 1;
+    }
+
+    return counts;
+  }, [invitations]);
+
+  const filteredInvitations = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    return invitations.filter((invitation) => {
+      const matchesStatus = statusFilter === 'all' ? true : invitation.status === statusFilter;
+      if (!matchesStatus) return false;
+      if (!keyword) return true;
+
+      const haystack = [
+        invitation.title ?? '',
+        invitation.groomName,
+        invitation.brideName,
+        invitation.slug,
+        invitation.status
+      ]
+        .join(' ')
+        .toLowerCase();
+
+      return haystack.includes(keyword);
+    });
+  }, [invitations, search, statusFilter]);
 
   const createInvitation = async () => {
     setCreating(true);
@@ -80,6 +131,7 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
 
       const invitation: InvitationListItem = await response.json();
       setInvitations((prev) => [invitation, ...prev]);
+      await router.push(`/builder/${invitation.slug ?? invitation.id}`);
     } catch (error) {
       console.error(error);
       alert('Failed to create invitation');
@@ -88,53 +140,155 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
     }
   };
 
-  return (
-    <div className="min-h-screen bg-slate-50">
-      <Head>
-        <title>Dashboard · MarryQuest</title>
-      </Head>
-      <div className="mx-auto max-w-5xl px-4 py-12 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-slate-900">Dashboard</h1>
-            <p className="text-slate-600">Manage your invitations.</p>
-          </div>
-          <Button onClick={createInvitation} disabled={creating}>
-            {creating ? 'Creating…' : 'New invitation'}
-          </Button>
-        </div>
+  async function copyPublicUrl(slug: string, invitationId: string) {
+    const url = origin ? `${origin}/${slug}` : `/${slug}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(invitationId);
+      window.setTimeout(() => setCopiedId((prev) => (prev === invitationId ? null : prev)), 1500);
+    } catch (error) {
+      console.error(error);
+      alert('Unable to copy URL');
+    }
+  }
 
-        <Card>
-          <CardHeader>
+  return (
+    <div className="min-h-screen bg-slate-100/70">
+      <Head>
+        <title>Dashboard | MarryQuest</title>
+      </Head>
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-10 sm:px-6">
+        <section className="rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm">
+          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold text-slate-900">Dashboard</h1>
+              <p className="mt-1 text-slate-600">Build and manage interactive invitations.</p>
+            </div>
+            <Button onClick={createInvitation} disabled={creating} size="lg">
+              {creating ? 'Creating...' : 'New invitation'}
+            </Button>
+          </div>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { label: 'Total', value: summary.total },
+              { label: 'Draft', value: summary.draft },
+              { label: 'Published', value: summary.published },
+              { label: 'Private', value: summary.private }
+            ].map((item) => (
+              <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-900">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <CardHeader className="pb-4">
             <CardTitle>Invitations</CardTitle>
-            <CardDescription>Your recent invitations are listed below.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {invitations.length === 0 ? (
-              <p className="text-slate-600">No invitations yet. Create your first one to get started.</p>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {invitations.map((invitation) => (
+            <CardDescription>Search and jump into builder quickly.</CardDescription>
+            <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search by title, couple names, slug..."
+                className="h-11 max-w-lg"
+              />
+              <div className="flex flex-wrap gap-2">
+                {(['all', 'draft', 'published', 'private'] as const).map((status) => (
                   <button
-                    key={invitation.id}
+                    key={status}
                     type="button"
-                    onClick={() => router.push(`/builder/${invitation.slug ?? invitation.id}`)}
-                    className="text-left"
+                    onClick={() => setStatusFilter(status)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
+                      statusFilter === status
+                        ? 'border-slate-900 bg-slate-900 text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
                   >
-                    <Card className="h-full">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-lg">{invitation.title || 'Untitled invitation'}</CardTitle>
-                        <CardDescription>
-                          {invitation.groomName} &amp; {invitation.brideName}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="flex items-center justify-between text-sm text-slate-600">
-                        <span className="capitalize">{invitation.status}</span>
-                        <span>{new Date(invitation.dateTime).toLocaleDateString()}</span>
-                      </CardContent>
-                    </Card>
+                    {status}
                   </button>
                 ))}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {filteredInvitations.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-slate-600">
+                {invitations.length === 0
+                  ? 'No invitations yet. Create your first one to get started.'
+                  : 'No invitations match your filters.'}
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {filteredInvitations.map((invitation) => {
+                  const builderHref = `/builder/${invitation.slug ?? invitation.id}`;
+                  const isPublished = invitation.status === 'published';
+                  const publicHref = `/${invitation.slug}`;
+
+                  return (
+                    <article
+                      key={invitation.id}
+                      className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <h3 className="text-lg font-semibold text-slate-900">{invitation.title || 'Untitled invitation'}</h3>
+                          <p className="text-sm text-slate-600">
+                            {invitation.groomName} &amp; {invitation.brideName}
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                            invitation.status === 'published'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : invitation.status === 'draft'
+                                ? 'bg-amber-100 text-amber-700'
+                                : 'bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {invitation.status}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500">
+                        <div className="rounded-md bg-slate-50 px-3 py-2">
+                          <p className="uppercase tracking-wide">Date</p>
+                          <p className="mt-1 text-sm text-slate-700">{new Date(invitation.dateTime).toLocaleDateString()}</p>
+                        </div>
+                        <div className="rounded-md bg-slate-50 px-3 py-2">
+                          <p className="uppercase tracking-wide">Slug</p>
+                          <p className="mt-1 truncate text-sm text-slate-700">{invitation.slug}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Button size="sm" onClick={() => router.push(builderHref)}>
+                          Open builder
+                        </Button>
+                        {isPublished && (
+                          <>
+                            <a
+                              href={publicHref}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                            >
+                              Open public page
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => copyPublicUrl(invitation.slug, invitation.id)}
+                              className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                            >
+                              {copiedId === invitation.id ? 'Copied!' : 'Copy URL'}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             )}
           </CardContent>
