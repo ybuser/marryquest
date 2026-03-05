@@ -3,8 +3,8 @@ const ContentSecurityPolicy = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "connect-src 'self'",
+  "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com",
+  "connect-src 'self' https://*.supabase.co",
   "font-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
@@ -41,6 +41,11 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'images.unsplash.com'
+      },
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
+        pathname: '/storage/v1/object/public/**'
       }
     ]
   },

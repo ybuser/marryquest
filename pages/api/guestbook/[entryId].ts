@@ -14,17 +14,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await requireApiAuth(req, res);
   if (!session?.user?.id) return;
 
-  if (req.method !== 'PATCH') {
-    return methodNotAllowed(res, 'PATCH');
+  if (req.method !== 'PATCH' && req.method !== 'DELETE') {
+    return methodNotAllowed(res, 'PATCH,DELETE');
   }
 
-  const validation = validate(patchSchema, req.body);
-  if (!validation.success) {
-    return apiError(res, 400, 'BAD_REQUEST', validation.errors.join(', '));
+  const entryId = req.query.entryId as string;
+  if (!entryId) {
+    return apiError(res, 400, 'BAD_REQUEST', 'Entry id is required');
   }
 
   const entry = await prisma.guestbookEntry.findUnique({
-    where: { id: req.query.entryId as string },
+    where: { id: entryId },
     include: {
       invitation: { select: { userId: true, deletedAt: true } }
     }
@@ -32,6 +32,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (!entry || entry.invitation.userId !== session.user.id || entry.invitation.deletedAt) {
     return apiError(res, 404, 'NOT_FOUND', 'Entry not found');
+  }
+
+  if (req.method === 'DELETE') {
+    await prisma.guestbookEntry.delete({
+      where: { id: entry.id }
+    });
+
+    return res.status(200).json({ id: entry.id, deleted: true });
+  }
+
+  const validation = validate(patchSchema, req.body);
+  if (!validation.success) {
+    return apiError(res, 400, 'BAD_REQUEST', validation.errors.join(', '));
   }
 
   const updated = await prisma.guestbookEntry.update({

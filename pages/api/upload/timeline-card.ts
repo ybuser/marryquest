@@ -1,11 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import formidable, { type File } from 'formidable';
 import { readFile } from 'fs/promises';
+import sharp from 'sharp';
 import prisma from '@/lib/db';
 import { requireApiAuth } from '@/lib/auth';
 
-const MAX_SIZE_BYTES = 2 * 1024 * 1024;
+const MAX_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const OUTPUT_SIZE_PX = 640;
+const OUTPUT_QUALITY = 82;
 
 export const config = {
   api: {
@@ -39,6 +42,14 @@ function getFirstField(fields: formidable.Fields, key: string) {
   return value;
 }
 
+async function toTimelineSquareWebp(input: Buffer) {
+  return sharp(input)
+    .rotate()
+    .resize(OUTPUT_SIZE_PX, OUTPUT_SIZE_PX, { fit: 'cover', position: 'attention' })
+    .webp({ quality: OUTPUT_QUALITY })
+    .toBuffer();
+}
+
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await requireApiAuth(req, res);
   if (!session?.user?.id) return;
@@ -65,6 +76,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'Missing invitationId or cardId' });
     }
 
+    const safeCardId = cardId.replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!safeCardId) {
+      return res.status(400).json({ error: 'Invalid card id' });
+    }
+
     const invitation = await prisma.invitation.findFirst({
       where: { id: invitationId, userId: session.user.id, deletedAt: null },
       select: { id: true }
@@ -82,19 +98,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'File too large' });
     }
 
-    const ext = file.mimetype === 'image/png' ? 'png' : file.mimetype === 'image/webp' ? 'webp' : 'jpg';
-    const objectPath = `timeline/${invitationId}/${cardId}-${Date.now()}.${ext}`;
+    const objectPath = `timeline/${invitationId}/${safeCardId}-${Date.now()}.webp`;
     const fileBuffer = await readFile(file.filepath);
+    const processedBuffer = await toTimelineSquareWebp(fileBuffer);
 
     const uploadResponse = await fetch(`${supabaseUrl}/storage/v1/object/${bucket}/${objectPath}`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${supabaseServiceKey}`,
         apikey: supabaseServiceKey,
-        'Content-Type': file.mimetype,
+        'Content-Type': 'image/webp',
         'x-upsert': 'true'
       },
-      body: fileBuffer
+      body: processedBuffer
     });
 
     if (!uploadResponse.ok) {

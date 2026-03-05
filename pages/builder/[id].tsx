@@ -54,6 +54,7 @@ interface SortableTimelineCardProps {
   onPhotoUpload: (id: string, file: File) => void;
   uploading: boolean;
   onRemove: (id: string) => void;
+  onFocusPreview: (targetId: string) => void;
 }
 
 interface SortableTimelineOrderItemProps {
@@ -100,7 +101,14 @@ function SortableItem({ section, label, onToggle }: SortableItemProps) {
   );
 }
 
-function SortableTimelineCard({ card, onChange, onPhotoUpload, uploading, onRemove }: SortableTimelineCardProps) {
+function SortableTimelineCard({
+  card,
+  onChange,
+  onPhotoUpload,
+  uploading,
+  onRemove,
+  onFocusPreview
+}: SortableTimelineCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
 
   const style = {
@@ -113,7 +121,8 @@ function SortableTimelineCard({ card, onChange, onPhotoUpload, uploading, onRemo
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm"
+      onClick={() => onFocusPreview(`timeline-card-${card.id}`)}
+      className="cursor-pointer flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm"
     >
       <div className="flex items-center gap-3" {...attributes} {...listeners}>
         <span className="cursor-grab text-slate-400">::</span>
@@ -122,6 +131,7 @@ function SortableTimelineCard({ card, onChange, onPhotoUpload, uploading, onRemo
         <input
           value={card.text}
           maxLength={120}
+          onFocus={() => onFocusPreview(`timeline-card-${card.id}`)}
           onChange={(event) => onChange(card.id, { text: event.target.value })}
           className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
           placeholder="Title"
@@ -130,6 +140,7 @@ function SortableTimelineCard({ card, onChange, onPhotoUpload, uploading, onRemo
           value={card.description ?? ''}
           maxLength={240}
           rows={2}
+          onFocus={() => onFocusPreview(`timeline-card-${card.id}`)}
           onChange={(event) => onChange(card.id, { description: event.target.value })}
           className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
           placeholder="Short description"
@@ -164,7 +175,11 @@ function SortableTimelineCard({ card, onChange, onPhotoUpload, uploading, onRemo
           {card.photoUrl && (
             <button
               type="button"
-              onClick={() => onChange(card.id, { photoUrl: null })}
+              onClick={(event) => {
+                event.stopPropagation();
+                onChange(card.id, { photoUrl: null });
+                onFocusPreview(`timeline-card-${card.id}`);
+              }}
               className="text-xs font-semibold text-slate-500 hover:text-slate-700"
             >
               Remove photo
@@ -174,7 +189,10 @@ function SortableTimelineCard({ card, onChange, onPhotoUpload, uploading, onRemo
       </div>
       <button
         type="button"
-        onClick={() => onRemove(card.id)}
+        onClick={(event) => {
+          event.stopPropagation();
+          onRemove(card.id);
+        }}
         className="text-xs font-semibold text-slate-500 hover:text-slate-700"
       >
         Remove
@@ -281,9 +299,14 @@ export default function InvitationBuilder({
   const [publishSaving, setPublishSaving] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [previewFocusRequest, setPreviewFocusRequest] = useState<{ targetId: string; requestId: number } | null>(null);
   const router = useRouter();
 
   const lastErrorTimeRef = useRef(0);
+
+  const focusPreviewTarget = useCallback((targetId: string) => {
+    setPreviewFocusRequest({ targetId, requestId: Date.now() + Math.random() });
+  }, []);
 
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -302,6 +325,16 @@ export default function InvitationBuilder({
       void fetchSummary();
     }
   }, [activeTab, savedInvitation.id, rsvpLoading, rsvpSummary]);
+
+  useEffect(() => {
+    if (activeTab === 'Guestbook' || activeTab === 'Quiz') {
+      focusPreviewTarget('section-guestbook');
+      return;
+    }
+    if (activeTab === 'Timeline') {
+      focusPreviewTarget('section-timeline');
+    }
+  }, [activeTab, focusPreviewTarget]);
 
   const hasBasicChanges = useMemo(() => {
     const fields: (keyof InvitationDetails)[] = [
@@ -528,21 +561,21 @@ export default function InvitationBuilder({
   }
 
   function addQuizQuestion() {
-    setDraftQuiz((prev) => {
-      if (prev.questions.length >= 5) return prev;
-      return {
-        ...prev,
-        questions: [
-          ...prev.questions,
-          {
-            prompt: '',
-            options: ['', '', '', ''],
-            correctIndex: 0,
-            order: prev.questions.length
-          }
-        ]
-      };
-    });
+    if (draftQuiz.questions.length >= 5) return;
+    const nextQuestionIndex = draftQuiz.questions.length;
+    setDraftQuiz((prev) => ({
+      ...prev,
+      questions: [
+        ...prev.questions,
+        {
+          prompt: '',
+          options: ['', '', '', ''],
+          correctIndex: 0,
+          order: prev.questions.length
+        }
+      ]
+    }));
+    focusPreviewTarget(`quiz-question-${nextQuestionIndex}`);
   }
 
   function updateQuizQuestion(index: number, updates: Partial<QuizQuestionDto>) {
@@ -588,13 +621,13 @@ export default function InvitationBuilder({
   }
 
   function addTimelineCard() {
-    setDraftTimeline((prev) => {
-      if (prev.cards.length >= 7) return prev;
-      return {
-        ...prev,
-        cards: [...prev.cards, createTimelineCard(prev.cards.length)]
-      };
-    });
+    if (draftTimeline.cards.length >= 7) return;
+    const nextCard = createTimelineCard(draftTimeline.cards.length);
+    setDraftTimeline((prev) => ({
+      ...prev,
+      cards: [...prev.cards, nextCard]
+    }));
+    focusPreviewTarget(`timeline-card-${nextCard.id}`);
   }
 
   function updateTimelineCard(id: string, updates: Partial<TimelineCardDto>) {
@@ -1008,6 +1041,35 @@ export default function InvitationBuilder({
     setDraftGuestbookEntries((prev) =>
       prev.map((entry) => (entry.id === entryId ? { ...entry, hidden: !entry.hidden } : entry))
     );
+  }
+
+  async function deleteGuestbookEntry(entryId: string, nickname: string) {
+    const confirmed = window.confirm(
+      `Delete this guestbook message from "${nickname}"?\n\nThis action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setGuestbookSaving(true);
+    resetStatus('Deleting...');
+    try {
+      const response = await fetch(`/api/guestbook/${entryId}`, { method: 'DELETE' });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        showError(payload?.error ?? 'Unable to delete guestbook entry');
+        return;
+      }
+
+      setSavedGuestbookEntries((prev) => prev.filter((entry) => entry.id !== entryId));
+      setDraftGuestbookEntries((prev) => prev.filter((entry) => entry.id !== entryId));
+      focusPreviewTarget('section-guestbook');
+      resetStatus('Deleted');
+    } catch (error) {
+      console.error(error);
+      showError('Unable to delete guestbook entry');
+    } finally {
+      setGuestbookSaving(false);
+    }
   }
 
   const publishUrl = useMemo(() => {
@@ -1548,7 +1610,7 @@ export default function InvitationBuilder({
                   {guestbookSaving ? 'Saving...' : 'Save changes'}
                 </button>
               </div>
-              <p className="text-sm text-slate-700">Toggle visibility to hide messages from the public guestbook.</p>
+              <p className="text-sm text-slate-700">Toggle visibility or delete messages from the public guestbook.</p>
               <div className="space-y-3">
                 {draftGuestbookEntries.length === 0 && (
                   <p className="text-sm text-slate-600">No guestbook entries yet.</p>
@@ -1556,7 +1618,8 @@ export default function InvitationBuilder({
                 {draftGuestbookEntries.map((entry) => (
                   <div
                     key={entry.id}
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm shadow-sm"
+                    onClick={() => focusPreviewTarget(`guestbook-entry-${entry.id}`)}
+                    className="cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm shadow-sm transition hover:border-slate-300 hover:bg-slate-100/70"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="space-y-1">
@@ -1571,17 +1634,35 @@ export default function InvitationBuilder({
                           )}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleGuestbookToggle(entry.id)}
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide transition ${
-                          entry.hidden
-                            ? 'border-amber-200 bg-amber-50 text-amber-700'
-                            : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                        }`}
-                      >
-                        {entry.hidden ? 'Hidden' : 'Visible'}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleGuestbookToggle(entry.id);
+                            focusPreviewTarget(`guestbook-entry-${entry.id}`);
+                          }}
+                          disabled={guestbookSaving}
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide transition disabled:opacity-50 ${
+                            entry.hidden
+                              ? 'border-amber-200 bg-amber-50 text-amber-700'
+                              : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          }`}
+                        >
+                          {entry.hidden ? 'Hidden' : 'Visible'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void deleteGuestbookEntry(entry.id, entry.nickname);
+                          }}
+                          disabled={guestbookSaving}
+                          className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1656,6 +1737,7 @@ export default function InvitationBuilder({
                             <input
                               maxLength={120}
                               value={question.prompt}
+                              onFocus={() => focusPreviewTarget(`quiz-question-${questionIndex}`)}
                               onChange={(e) =>
                                 updateQuizQuestion(questionIndex, {
                                   prompt: e.target.value,
@@ -1686,6 +1768,7 @@ export default function InvitationBuilder({
                                     type="radio"
                                     name={`correct-${questionIndex}`}
                                     checked={question.correctIndex === optionIndex}
+                                    onFocus={() => focusPreviewTarget(`quiz-question-${questionIndex}`)}
                                     onChange={() =>
                                       updateQuizQuestion(questionIndex, { correctIndex: optionIndex })
                                     }
@@ -1696,6 +1779,7 @@ export default function InvitationBuilder({
                               <input
                                 maxLength={120}
                                 value={option}
+                                onFocus={() => focusPreviewTarget(`quiz-question-${questionIndex}`)}
                                 onChange={(e) => updateQuizOption(questionIndex, optionIndex, e.target.value)}
                                 className="w-full rounded-lg border border-slate-200 px-3 py-2"
                                 placeholder={`Option ${optionIndex + 1}`}
@@ -1767,6 +1851,7 @@ export default function InvitationBuilder({
                           onPhotoUpload={uploadTimelineCardPhoto}
                           uploading={timelineUploadingId === card.id}
                           onRemove={removeTimelineCard}
+                          onFocusPreview={focusPreviewTarget}
                         />
                       ))}
                     </div>
@@ -1939,6 +2024,7 @@ export default function InvitationBuilder({
               timelinePuzzle={draftTimeline}
               previewGuestbookEntries={draftGuestbookEntries}
               previewMode
+              previewFocusRequest={previewFocusRequest}
               foodVoteOptions={draftFoodVoteOptions}
             />
           </div>

@@ -85,7 +85,11 @@ export function QuizSection({ quiz, invitationId, invitationStatus, onBadgeEarne
     <form className="space-y-5" onSubmit={submitQuiz}>
       <div className="space-y-4">
         {questions.map((question, questionIndex) => (
-          <div key={question.id ?? questionIndex} className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm">
+          <div
+            key={question.id ?? questionIndex}
+            data-preview-id={`quiz-question-${questionIndex}`}
+            className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm"
+          >
             <div className="flex items-center justify-between gap-3">
               <p className="text-base font-semibold text-[var(--mq-fg)]">Question {questionIndex + 1}</p>
               {localBadge && <span className="text-xs font-medium text-emerald-100">Badge unlocked</span>}

@@ -69,6 +69,11 @@ export function PublicGuestbook({
     void fetchEntries();
   }, [invitationStatus, previewEntries, previewMode, slug]);
 
+  useEffect(() => {
+    if (!previewMode) return;
+    setQuizOpen(Boolean(quiz?.enabled && quiz.questions.length > 0));
+  }, [previewMode, quiz?.enabled, quiz?.questions.length]);
+
   async function submitEntry(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (previewMode) {
@@ -234,6 +239,7 @@ export function PublicGuestbook({
             return (
               <li
                 key={entry.id}
+                data-preview-id={`guestbook-entry-${entry.id}`}
                 className={`mq-guestbook-item rounded-2xl border p-4 shadow-lg ${
                   isPerfect
                     ? 'border-amber-300/70 bg-amber-100/10 shadow-amber-200/20'

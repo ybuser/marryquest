@@ -31,6 +31,7 @@ function SortableCard({ card }: SortableCardProps) {
     <div
       ref={setNodeRef}
       style={style}
+      data-preview-id={`timeline-card-${card.id}`}
       className="mq-timeline-card flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm"
       {...attributes}
       {...listeners}

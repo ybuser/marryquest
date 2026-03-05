@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { GalleryPhoto, InvitationDetails, SectionConfig } from '@/types/invitation';
 import { DEFAULT_SECTIONS } from '@/types/invitation';
 import { PublicGuestbook } from '@/components/guestbook/PublicGuestbook';
@@ -24,6 +24,7 @@ interface InvitationPageProps {
   timelinePuzzle?: TimelinePuzzleDto | null;
   previewGuestbookEntries?: GuestbookEntryDto[];
   previewMode?: boolean;
+  previewFocusRequest?: { targetId: string; requestId: number } | null;
   foodVoteOptions?: import('@/types/foodvote').FoodVoteOptionDto[];
 }
 
@@ -53,20 +54,67 @@ export function InvitationPage({
   timelinePuzzle,
   previewGuestbookEntries,
   previewMode,
+  previewFocusRequest,
   foodVoteOptions = []
 }: InvitationPageProps) {
   const orderedSections = useMemo(() => mergeSections(invitation.id, sections), [invitation.id, sections]);
   const sortedPhotos = useMemo(() => [...photos].sort((a, b) => a.order - b.order), [photos]);
   const quizData = quiz ?? invitation.quiz ?? null;
   const [quizBadgeToken, setQuizBadgeToken] = useState<string | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const showBloomDecor = invitation.templateKey === 'bloom';
   const showLuxeDecor = invitation.templateKey === 'luxe';
   const showModernDecor = invitation.templateKey === 'modern';
   const showHanokDecor = invitation.templateKey === 'hanok';
 
+  useEffect(() => {
+    if (!previewMode || !previewFocusRequest?.targetId) return;
+
+    let cancelled = false;
+    let attempts = 0;
+    const targetId = previewFocusRequest.targetId;
+    const maxAttempts = 10;
+
+    const tryScroll = () => {
+      if (cancelled) return;
+      const root = rootRef.current;
+      if (!root) return;
+
+      const directMatch = root.querySelector(`[data-preview-id="${targetId}"]`) as HTMLElement | null;
+      const fallbackId = targetId.startsWith('guestbook-entry-') || targetId.startsWith('quiz-question-')
+        ? 'section-guestbook'
+        : targetId.startsWith('timeline-card-')
+          ? 'section-timeline'
+          : null;
+      const fallbackMatch = fallbackId
+        ? (root.querySelector(`[data-preview-id="${fallbackId}"]`) as HTMLElement | null)
+        : null;
+      const targetNode = directMatch ?? fallbackMatch;
+
+      if (targetNode) {
+        targetNode.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+        return;
+      }
+
+      attempts += 1;
+      if (attempts < maxAttempts) {
+        requestAnimationFrame(tryScroll);
+      }
+    };
+
+    tryScroll();
+    return () => {
+      cancelled = true;
+    };
+  }, [previewMode, previewFocusRequest?.requestId, previewFocusRequest?.targetId]);
+
   return (
     <ThemeProvider templateKey={invitation.templateKey}>
-      <div className="mq-invitation-shell relative isolate overflow-hidden bg-[var(--mq-bg)]" style={{ color: 'var(--mq-fg)' }}>
+      <div
+        ref={rootRef}
+        className="mq-invitation-shell relative isolate overflow-hidden bg-[var(--mq-bg)]"
+        style={{ color: 'var(--mq-fg)' }}
+      >
         <div className="pointer-events-none absolute inset-0 opacity-50" aria-hidden>
           <div className="absolute left-10 top-[-120px] h-64 w-64 rounded-full bg-[var(--mq-accent)]/20 blur-3xl" />
           <div className="absolute right-4 bottom-[-140px] h-72 w-72 rounded-full bg-[var(--mq-muted)]/40 blur-3xl" />
@@ -186,7 +234,12 @@ export function InvitationPage({
             if (!sectionNode) return null;
 
             return (
-              <div key={section.id} className="mq-section-shell" style={{ ['--mq-section-index' as string]: index } as React.CSSProperties}>
+              <div
+                key={section.id}
+                className="mq-section-shell"
+                style={{ ['--mq-section-index' as string]: index } as React.CSSProperties}
+                data-preview-id={`section-${section.key}`}
+              >
                 {sectionNode}
               </div>
             );

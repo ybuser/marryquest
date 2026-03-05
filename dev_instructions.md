@@ -677,3 +677,45 @@ Migration/문서 추가:
 
 * `npx tsc --noEmit` 성공
 * `npm run build` 성공
+
+## 2026-03-05: Builder moderation + preview sync + timeline image pipeline (completed)
+
+Summary:
+
+- Added guestbook delete support in builder with confirmation prompt before deletion.
+- Extended guestbook API route to allow DELETE with owner/deleted-invitation checks.
+- Added live-preview focus sync from builder to invitation preview:
+  - Section anchors (`data-preview-id="section-..."`)
+  - Guestbook entry anchors (`guestbook-entry-<id>`)
+  - Quiz question anchors (`quiz-question-<index>`)
+  - Timeline card anchors (`timeline-card-<id>`)
+- Added preview focus triggers in builder for:
+  - Guestbook row click/toggle/delete
+  - Quiz add-question and question field focus
+  - Timeline add-card and timeline card edits
+- Fixed timeline image rendering path issues:
+  - Updated CSP to allow Supabase image hosts and Supabase API connections.
+  - Added Next image remote pattern for Supabase public storage paths.
+- Upgraded timeline upload API (`/api/upload/timeline-card`) to process uploads with `sharp`:
+  - Auto-rotate using EXIF
+  - Resize/crop to square 640x640
+  - Encode to WebP (quality 82)
+  - Keep stored images lightweight and consistent for builder/preview/public pages.
+
+Files touched:
+
+- `pages/builder/[id].tsx`
+- `pages/api/guestbook/[entryId].ts`
+- `components/invitation/InvitationPage.tsx`
+- `components/guestbook/PublicGuestbook.tsx`
+- `components/invitation/sections/Quiz.tsx`
+- `components/invitation/sections/TimelineSection.tsx`
+- `pages/api/upload/timeline-card.ts`
+- `next.config.js`
+- `package.json`
+- `package-lock.json`
+
+Validation (2026-03-05):
+
+- `npx tsc --noEmit` passed
+- `npm run build` passed
