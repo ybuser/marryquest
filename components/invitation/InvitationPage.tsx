@@ -25,6 +25,7 @@ interface InvitationPageProps {
   previewGuestbookEntries?: GuestbookEntryDto[];
   previewMode?: boolean;
   previewFocusRequest?: { targetId: string; requestId: number } | null;
+  previewScrollContainerRef?: React.RefObject<HTMLDivElement | null>;
   foodVoteOptions?: import('@/types/foodvote').FoodVoteOptionDto[];
 }
 
@@ -55,6 +56,7 @@ export function InvitationPage({
   previewGuestbookEntries,
   previewMode,
   previewFocusRequest,
+  previewScrollContainerRef,
   foodVoteOptions = []
 }: InvitationPageProps) {
   const orderedSections = useMemo(() => mergeSections(invitation.id, sections), [invitation.id, sections]);
@@ -92,6 +94,17 @@ export function InvitationPage({
       const targetNode = directMatch ?? fallbackMatch;
 
       if (targetNode) {
+        const scrollContainer = previewScrollContainerRef?.current;
+        if (scrollContainer) {
+          const targetRect = targetNode.getBoundingClientRect();
+          const containerRect = scrollContainer.getBoundingClientRect();
+          const centerOffset = targetRect.top - containerRect.top + scrollContainer.scrollTop
+            - containerRect.height / 2
+            + targetRect.height / 2;
+          scrollContainer.scrollTo({ top: Math.max(0, centerOffset), behavior: 'smooth' });
+          return;
+        }
+
         targetNode.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
         return;
       }
@@ -106,7 +119,7 @@ export function InvitationPage({
     return () => {
       cancelled = true;
     };
-  }, [previewMode, previewFocusRequest?.requestId, previewFocusRequest?.targetId]);
+  }, [previewMode, previewFocusRequest?.requestId, previewFocusRequest?.targetId, previewScrollContainerRef]);
 
   return (
     <ThemeProvider templateKey={invitation.templateKey}>

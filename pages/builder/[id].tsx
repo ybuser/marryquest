@@ -303,6 +303,7 @@ export default function InvitationBuilder({
   const router = useRouter();
 
   const lastErrorTimeRef = useRef(0);
+  const previewScrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   const focusPreviewTarget = useCallback((targetId: string) => {
     setPreviewFocusRequest({ targetId, requestId: Date.now() + Math.random() });
@@ -2016,17 +2017,23 @@ export default function InvitationBuilder({
                 Draft
               </span>
             </div>
-            <InvitationPage
-              invitation={draftInvitation}
-              sections={orderedSections}
-              photos={photos}
-              quiz={draftQuiz}
-              timelinePuzzle={draftTimeline}
-              previewGuestbookEntries={draftGuestbookEntries}
-              previewMode
-              previewFocusRequest={previewFocusRequest}
-              foodVoteOptions={draftFoodVoteOptions}
-            />
+            <div
+              ref={previewScrollContainerRef}
+              className="h-[68vh] overflow-y-auto overscroll-contain rounded-2xl border border-slate-100 bg-slate-50/30 lg:h-[calc(100vh-7.5rem)]"
+            >
+              <InvitationPage
+                invitation={draftInvitation}
+                sections={orderedSections}
+                photos={photos}
+                quiz={draftQuiz}
+                timelinePuzzle={draftTimeline}
+                previewGuestbookEntries={draftGuestbookEntries}
+                previewMode
+                previewFocusRequest={previewFocusRequest}
+                previewScrollContainerRef={previewScrollContainerRef}
+                foodVoteOptions={draftFoodVoteOptions}
+              />
+            </div>
           </div>
         </div>
       </div>

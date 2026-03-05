@@ -719,3 +719,26 @@ Validation (2026-03-05):
 
 - `npx tsc --noEmit` passed
 - `npm run build` passed
+
+## 2026-03-05: Builder live preview isolated scrolling (completed)
+
+Goal:
+
+- Prevent builder editing actions from scrolling the whole page when auto-focusing live preview targets.
+
+Changes:
+
+- Added a dedicated scroll container for the builder live preview pane.
+- Passed the preview scroll container ref into `InvitationPage` in preview mode.
+- Updated preview focus logic to scroll the dedicated preview container directly instead of relying on `scrollIntoView` default viewport behavior.
+- Kept fallback behavior for non-builder contexts (where no preview scroll container ref is provided).
+
+Files changed:
+
+- `pages/builder/[id].tsx`
+- `components/invitation/InvitationPage.tsx`
+
+Validation (2026-03-05):
+
+- `npx tsc --noEmit` passed
+- `npm run build` passed
