@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { GuidedWalkthrough, type WalkthroughStep } from '@/components/walkthrough/GuidedWalkthrough';
 import prisma from '@/lib/db';
 import { requirePageAuth } from '@/lib/auth';
 
@@ -67,6 +68,7 @@ export const getServerSideProps: GetServerSideProps<DashboardProps> = async (con
 export default function Dashboard({ invitations: initialInvitations }: DashboardProps) {
   const [invitations, setInvitations] = useState(initialInvitations);
   const [creating, setCreating] = useState(false);
+  const [walkthroughOpen, setWalkthroughOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -117,6 +119,54 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
     });
   }, [invitations, search, statusFilter]);
 
+  const walkthroughSteps = useMemo<WalkthroughStep[]>(
+    () => [
+      {
+        id: 'create',
+        title: 'Create quickly',
+        description: 'Use New invitation to create a draft and open its builder immediately.',
+        selector: '[data-tour="dashboard-create"]',
+        placement: 'bottom'
+      },
+      {
+        id: 'summary',
+        title: 'Track your pipeline',
+        description: 'These counters show how many invitations are total, draft, published, and private.',
+        selector: '[data-tour="dashboard-summary"]',
+        placement: 'bottom'
+      },
+      {
+        id: 'search',
+        title: 'Find invitations fast',
+        description: 'Search by title, couple names, slug, or status to jump straight to the right record.',
+        selector: '[data-tour="dashboard-search"]',
+        placement: 'bottom'
+      },
+      {
+        id: 'filters',
+        title: 'Filter by status',
+        description: 'Quick filters narrow the list by publication state in one click.',
+        selector: '[data-tour="dashboard-filters"]',
+        placement: 'bottom'
+      },
+      {
+        id: 'actions',
+        title: 'Card action shortcuts',
+        description: 'Each card offers one-click actions for builder access, public view, and URL copy.',
+        selector: '[data-tour="dashboard-card-actions"]',
+        placement: 'top'
+      },
+      {
+        id: 'reopen',
+        title: 'Reopen any time',
+        description: 'Use this walkthrough button whenever you need a quick refresher.',
+        selector: '[data-tour="dashboard-walkthrough"]',
+        placement: 'bottom'
+      }
+    ],
+    []
+  );
+
   const createInvitation = async () => {
     setCreating(true);
     try {
@@ -158,15 +208,26 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
         <title>Dashboard | MarryQuest</title>
       </Head>
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-10 sm:px-6">
-        <section className="rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm">
+        <section data-tour="dashboard-summary" className="rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm">
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-3xl font-semibold text-slate-900">Dashboard</h1>
               <p className="mt-1 text-slate-600">Build and manage interactive invitations.</p>
             </div>
-            <Button onClick={createInvitation} disabled={creating} size="lg">
-              {creating ? 'Creating...' : 'New invitation'}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                data-tour="dashboard-walkthrough"
+                variant="outline"
+                onClick={() => setWalkthroughOpen(true)}
+                disabled={creating}
+                size="lg"
+              >
+                Walkthrough
+              </Button>
+              <Button data-tour="dashboard-create" onClick={createInvitation} disabled={creating} size="lg">
+                {creating ? 'Creating...' : 'New invitation'}
+              </Button>
+            </div>
           </div>
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
@@ -189,12 +250,13 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
             <CardDescription>Search and jump into builder quickly.</CardDescription>
             <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <Input
+                data-tour="dashboard-search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search by title, couple names, slug..."
                 className="h-11 max-w-lg"
               />
-              <div className="flex flex-wrap gap-2">
+              <div data-tour="dashboard-filters" className="flex flex-wrap gap-2">
                 {(['all', 'draft', 'published', 'private'] as const).map((status) => (
                   <button
                     key={status}
@@ -221,7 +283,7 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
-                {filteredInvitations.map((invitation) => {
+                {filteredInvitations.map((invitation, index) => {
                   const builderHref = `/builder/${invitation.slug ?? invitation.id}`;
                   const isPublished = invitation.status === 'published';
                   const publicHref = `/${invitation.slug}`;
@@ -262,7 +324,7 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
                         </div>
                       </div>
 
-                      <div className="mt-4 flex flex-wrap gap-2">
+                      <div data-tour={index === 0 ? 'dashboard-card-actions' : undefined} className="mt-4 flex flex-wrap gap-2">
                         <Button size="sm" onClick={() => router.push(builderHref)}>
                           Open builder
                         </Button>
@@ -294,6 +356,14 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
           </CardContent>
         </Card>
       </div>
+
+      <GuidedWalkthrough
+        open={walkthroughOpen}
+        title="Dashboard Guide"
+        subtitle="Learn the core controls in under a minute."
+        steps={walkthroughSteps}
+        onClose={() => setWalkthroughOpen(false)}
+      />
     </div>
   );
 }

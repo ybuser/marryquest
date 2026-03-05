@@ -742,3 +742,42 @@ Validation (2026-03-05):
 
 - `npx tsc --noEmit` passed
 - `npm run build` passed
+
+## 2026-03-05: Interactive walkthrough system for Dashboard + Builder (completed)
+
+Goal:
+
+- Add a clear, modern guided walkthrough for core user actions.
+- Add walkthrough entry points in Dashboard and Builder.
+- Add Builder header `...` menu on the right side of `View public page` with walkthrough action.
+
+Implemented:
+
+- Added reusable walkthrough overlay component:
+  - `components/walkthrough/GuidedWalkthrough.tsx`
+  - Features: step progress, target highlighting, smart placement, next/back/skip/finish controls, keyboard navigation (Esc/Arrow keys), smooth target focusing, hidden-target fallback messaging.
+
+- Dashboard walkthrough:
+  - Added `Walkthrough` button in dashboard header.
+  - Added target markers (`data-tour=...`) across key dashboard controls.
+  - Added guided steps for create flow, summary cards, search/filter, and card actions.
+
+- Builder walkthrough + more menu:
+  - Added `...` icon button in builder header to the right of `View public page`.
+  - Added dropdown menu with:
+    - `Start walkthrough`
+    - `Copy builder link` (recommended utility)
+  - Added click-outside and Escape-to-close handling for menu.
+  - Added target markers (`data-tour=...`) for builder header/tabs/actions/editor/preview/menu.
+  - Added guided steps covering end-to-end builder workflow.
+
+Files changed:
+
+- `components/walkthrough/GuidedWalkthrough.tsx` (new)
+- `pages/dashboard/index.tsx`
+- `pages/builder/[id].tsx`
+
+Validation (2026-03-05):
+
+- `npx tsc --noEmit` passed
+- `npm run build` passed

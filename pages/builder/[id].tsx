@@ -6,10 +6,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { Copy, Ellipsis, HelpCircle } from 'lucide-react';
 import prisma from '@/lib/db';
 import { requirePageAuth } from '@/lib/auth';
 import { themeTokens } from '@/components/theme/tokens';
 import { InvitationPage } from '@/components/invitation/InvitationPage';
+import { GuidedWalkthrough, type WalkthroughStep } from '@/components/walkthrough/GuidedWalkthrough';
 import type { GalleryPhoto, InvitationDetails, SectionConfig } from '@/types/invitation';
 import { DEFAULT_SECTIONS } from '@/types/invitation';
 import type { GuestbookEntryDto } from '@/types/guestbook';
@@ -300,10 +302,13 @@ export default function InvitationBuilder({
   const [deleteSaving, setDeleteSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [previewFocusRequest, setPreviewFocusRequest] = useState<{ targetId: string; requestId: number } | null>(null);
+  const [walkthroughOpen, setWalkthroughOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const router = useRouter();
 
   const lastErrorTimeRef = useRef(0);
   const previewScrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const moreMenuRef = useRef<HTMLDivElement | null>(null);
 
   const focusPreviewTarget = useCallback((targetId: string) => {
     setPreviewFocusRequest({ targetId, requestId: Date.now() + Math.random() });
@@ -336,6 +341,30 @@ export default function InvitationBuilder({
       focusPreviewTarget('section-timeline');
     }
   }, [activeTab, focusPreviewTarget]);
+
+  useEffect(() => {
+    if (!moreMenuOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (moreMenuRef.current && !moreMenuRef.current.contains(target)) {
+        setMoreMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMoreMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      window.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [moreMenuOpen]);
 
   const hasBasicChanges = useMemo(() => {
     const fields: (keyof InvitationDetails)[] = [
@@ -1107,6 +1136,20 @@ export default function InvitationBuilder({
     }
   }
 
+  async function copyBuilderUrl() {
+    const builderPath = `/builder/${draftInvitation.slug || draftInvitation.id}`;
+    const url = origin ? `${origin}${builderPath}` : builderPath;
+
+    try {
+      await navigator.clipboard.writeText(url);
+      resetStatus('Builder link copied');
+      setMoreMenuOpen(false);
+    } catch (error) {
+      console.error(error);
+      showError('Unable to copy builder link');
+    }
+  }
+
   const guestbookDate = (value: string) =>
     new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
 
@@ -1280,13 +1323,69 @@ export default function InvitationBuilder({
     }
   };
 
+  const builderWalkthroughSteps = useMemo<WalkthroughStep[]>(
+    () => [
+      {
+        id: 'header',
+        title: 'Builder workspace',
+        description: 'This header shows invitation identity, slug, and publication status at a glance.',
+        selector: '[data-tour="builder-header"]',
+        placement: 'bottom'
+      },
+      {
+        id: 'tabs',
+        title: 'Section-based editing',
+        description: 'Move across tabs to edit details, sections, moderation, timeline, and publishing.',
+        selector: '[data-tour="builder-tabs"]',
+        placement: 'bottom'
+      },
+      {
+        id: 'tab-actions',
+        title: 'Save discipline',
+        description: 'Use Save current tab for explicit writes and Discard current tab to revert tab-level drafts.',
+        selector: '[data-tour="builder-tab-actions"]',
+        placement: 'bottom'
+      },
+      {
+        id: 'editor',
+        title: 'Editing panel',
+        description: 'The left panel is your active editor. Inputs change only draft state until saved.',
+        selector: '[data-tour="builder-editor-panel"]',
+        placement: 'right'
+      },
+      {
+        id: 'preview',
+        title: 'Live preview pane',
+        description: 'The preview on the right updates from draft values and supports focused auto-scroll.',
+        selector: '[data-tour="builder-preview-panel"]',
+        placement: 'left'
+      },
+      {
+        id: 'more',
+        title: 'More actions',
+        description: 'Use this menu for advanced tools without crowding the main header.',
+        selector: '[data-tour="builder-more-trigger"]',
+        placement: 'bottom'
+      },
+      {
+        id: 'walkthrough-entry',
+        title: 'Walkthrough command',
+        description: 'This command reopens the walkthrough whenever you need onboarding or a refresher.',
+        selector: '[data-tour="builder-menu-walkthrough"]',
+        placement: 'left',
+        onEnter: () => setMoreMenuOpen(true)
+      }
+    ],
+    [setMoreMenuOpen]
+  );
+
   return (
     <div className="min-h-screen bg-slate-100/70">
       <Head>
         <title>Invitation Builder | {draftInvitation.title ?? 'Untitled'}</title>
       </Head>
       <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6 lg:py-8">
-        <header className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
+        <header data-tour="builder-header" className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Invitation Builder</p>
@@ -1318,6 +1417,7 @@ export default function InvitationBuilder({
               </Link>
               {draftInvitation.status === 'published' && draftInvitation.slug && (
                 <a
+                  data-tour="builder-public-page"
                   href={`/${draftInvitation.slug}`}
                   target="_blank"
                   rel="noreferrer"
@@ -1326,10 +1426,48 @@ export default function InvitationBuilder({
                   View public page
                 </a>
               )}
+              <div ref={moreMenuRef} className="relative">
+                <button
+                  type="button"
+                  data-tour="builder-more-trigger"
+                  onClick={() => setMoreMenuOpen((prev) => !prev)}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
+                  aria-expanded={moreMenuOpen}
+                  aria-label="More actions"
+                >
+                  <Ellipsis className="h-5 w-5" />
+                </button>
+                {moreMenuOpen && (
+                  <div className="absolute right-0 z-20 mt-2 min-w-[220px] rounded-2xl border border-slate-200 bg-white p-2 shadow-lg">
+                    <button
+                      type="button"
+                      data-tour="builder-menu-walkthrough"
+                      onClick={() => {
+                        setMoreMenuOpen(false);
+                        setWalkthroughOpen(true);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                    >
+                      <HelpCircle className="h-4 w-4 text-cyan-600" />
+                      Start walkthrough
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void copyBuilderUrl();
+                      }}
+                      className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                    >
+                      <Copy className="h-4 w-4 text-slate-500" />
+                      Copy builder link
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
+          <div data-tour="builder-tabs" className="mt-5 flex gap-2 overflow-x-auto pb-1">
             {tabs.map((tab) => (
               <button
                 key={tab}
@@ -1350,7 +1488,7 @@ export default function InvitationBuilder({
           <p className="mt-3 text-sm text-slate-600">{tabDescriptions[activeTab]} Press Ctrl/Cmd + S to save current tab.</p>
         </header>
 
-        <div className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div data-tour="builder-tab-actions" className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           {statusMessage ? (
             <div
               className={`rounded-xl border px-4 py-2.5 text-sm ${
@@ -1411,7 +1549,10 @@ export default function InvitationBuilder({
         </div>
 
         <div className="mt-4 flex flex-col gap-6 lg:flex-row">
-          <div className={`w-full space-y-4 lg:w-[52%] ${mobilePane === 'preview' ? 'hidden lg:block' : ''}`}>
+          <div
+            data-tour="builder-editor-panel"
+            className={`w-full space-y-4 lg:w-[52%] ${mobilePane === 'preview' ? 'hidden lg:block' : ''}`}
+          >
 
           {activeTab === 'Basic' && (
             <div className="space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -2009,7 +2150,7 @@ export default function InvitationBuilder({
           )}
         </div>
 
-        <div className={`w-full lg:w-[48%] ${mobilePane === 'editor' ? 'hidden lg:block' : ''}`}>
+        <div data-tour="builder-preview-panel" className={`w-full lg:w-[48%] ${mobilePane === 'editor' ? 'hidden lg:block' : ''}`}>
           <div className="sticky top-6 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-medium text-slate-700">Live preview</p>
@@ -2037,6 +2178,17 @@ export default function InvitationBuilder({
           </div>
         </div>
       </div>
+
+      <GuidedWalkthrough
+        open={walkthroughOpen}
+        title="Builder Guide"
+        subtitle="A fast tour of editing, preview, and publishing controls."
+        steps={builderWalkthroughSteps}
+        onClose={() => {
+          setWalkthroughOpen(false);
+          setMoreMenuOpen(false);
+        }}
+      />
     </div>
     </div>
   );
