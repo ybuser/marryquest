@@ -1,58 +1,43 @@
-import crypto from 'crypto';
 import type { GetServerSidePropsContext, GetServerSidePropsResult } from 'next';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession, type NextAuthOptions } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import prisma from './db';
-
-export const ADMIN_EMAIL = 'admin@marryquest.local';
-
-function secureCompare(provided: string, expected: string) {
-  if (provided.length !== expected.length) return false;
-  const providedBuffer = Buffer.from(provided);
-  const expectedBuffer = Buffer.from(expected);
-  return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
-}
+import { findTestUserAccount } from './testUsers';
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   providers: [
     CredentialsProvider({
-      name: 'Passphrase',
+      name: 'Test Accounts',
       credentials: {
-        passphrase: { label: 'Passphrase', type: 'password' }
+        loginId: { label: 'Login ID', type: 'text' },
+        password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials) {
-        const candidate = credentials?.passphrase?.trim() ?? '';
-        const adminPassphrase = process.env.ADMIN_PASSPHRASE;
+        const loginId = credentials?.loginId?.trim() ?? '';
+        const password = credentials?.password ?? '';
+        const account = findTestUserAccount(loginId, password);
 
-        if (!adminPassphrase) {
-          throw new Error('ADMIN_PASSPHRASE is not configured');
-        }
-
-        if (candidate.length < 12) {
-          return null;
-        }
-
-        if (!secureCompare(candidate, adminPassphrase)) {
+        if (!account) {
           return null;
         }
 
         const user = await prisma.user
           .upsert({
-            where: { email: ADMIN_EMAIL },
-            update: {},
+            where: { email: account.email },
+            update: { name: account.name },
             create: {
-              email: ADMIN_EMAIL,
-              name: 'Admin'
+              email: account.email,
+              name: account.name
             }
           })
           .catch((err) => {
             const label = err?.constructor?.name || 'PrismaError';
             const message = err instanceof Error ? err.message : 'Unknown error';
             console.error(
-              `[auth] Failed to upsert admin user (${label}): ${message}. Check database connectivity or pooling configuration.`
+              `[auth] Failed to upsert test user (${label}): ${message}. Check database connectivity or pooling configuration.`
             );
             return null;
           });

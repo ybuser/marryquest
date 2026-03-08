@@ -781,3 +781,46 @@ Validation (2026-03-05):
 
 - `npx tsc --noEmit` passed
 - `npm run build` passed
+
+## 2026-03-08: Test-user login system redesign (completed)
+
+Objective:
+
+- Replace single-passphrase login with an ID/password login for test users.
+- Add 10 hardcoded easy test accounts.
+- Redesign login UI to match MarryQuest wedding-friendly visual style.
+
+Implemented:
+
+- Added code-based test-account source:
+  - `lib/testUsers.ts` (10 accounts, ID/password/name/email)
+  - helper lookup function `findTestUserAccount(loginId, password)`
+- Updated NextAuth credentials flow in `lib/auth.ts`:
+  - credentials fields switched to `loginId` and `password`
+  - authentication now validates against test-account map
+  - successful login upserts/fetches Prisma `User` by stable test email
+  - existing session callbacks and route protection behavior preserved
+- Rebuilt `pages/login.tsx` with modern UI:
+  - wedding-themed layered gradient background and polished card layout
+  - explicit `User ID` + `Password` fields
+  - show/hide password control
+  - random account autofill (`Surprise me`)
+  - clear form helper
+  - quick account chips for one-click test login
+  - friendly dynamic “wedding vibe” message
+
+Notes:
+
+- No DB schema migration required.
+- Existing callback URL redirect behavior remains intact.
+
+Files changed:
+
+- `lib/testUsers.ts` (new)
+- `lib/auth.ts`
+- `pages/login.tsx`
+
+Validation (2026-03-08):
+
+- `npx tsc --noEmit` passed
+- `npm run build` passed
