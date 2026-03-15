@@ -125,43 +125,50 @@ export function GuidedWalkthrough({ open, title, subtitle, steps, onClose, onCom
   const panelStyle = useMemo(() => {
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1280;
     const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 720;
-    const panelWidth = Math.min(380, viewportWidth - 24);
+    const viewportPadding = 12;
+    const gap = 14;
     const mobile = viewportWidth < 768;
+    const panelWidth = mobile ? viewportWidth - viewportPadding * 2 : Math.min(380, viewportWidth - viewportPadding * 2);
+    const panelMaxHeight = Math.min(mobile ? 520 : 460, viewportHeight - viewportPadding * 2);
+    const maxLeft = Math.max(viewportPadding, viewportWidth - panelWidth - viewportPadding);
+    const maxTop = Math.max(viewportPadding, viewportHeight - panelMaxHeight - viewportPadding);
     const placement = activeStep?.placement ?? 'auto';
 
     if (mobile) {
-      const panelHeight = Math.min(420, viewportHeight - 28);
       return {
-        width: viewportWidth - 24,
-        left: 12,
-        top: Math.max(12, viewportHeight - panelHeight - 12),
-        maxHeight: panelHeight
+        width: panelWidth,
+        left: viewportPadding,
+        top: maxTop,
+        maxHeight: panelMaxHeight
       };
     }
 
     if (!targetBox || placement === 'center') {
       return {
         width: panelWidth,
-        left: clamp((viewportWidth - panelWidth) / 2, 12, viewportWidth - panelWidth - 12),
-        top: clamp(viewportHeight / 2 - 130, 16, viewportHeight - 280)
+        left: clamp((viewportWidth - panelWidth) / 2, viewportPadding, maxLeft),
+        top: clamp((viewportHeight - panelMaxHeight) / 2, viewportPadding, maxTop),
+        maxHeight: panelMaxHeight
       };
     }
 
-    const gap = 14;
     const targetMidX = targetBox.left + targetBox.width / 2;
     const targetMidY = targetBox.top + targetBox.height / 2;
 
     let resolvedPlacement: WalkthroughPlacement = placement;
     if (placement === 'auto') {
-      const bottom = targetBox.top + targetBox.height;
-      const right = targetBox.left + targetBox.width;
-      if (bottom + 280 < viewportHeight) {
+      const spaceBelow = viewportHeight - (targetBox.top + targetBox.height) - viewportPadding;
+      const spaceAbove = targetBox.top - viewportPadding;
+      const spaceRight = viewportWidth - (targetBox.left + targetBox.width) - viewportPadding;
+      const spaceLeft = targetBox.left - viewportPadding;
+
+      if (spaceBelow >= panelMaxHeight || spaceBelow >= spaceAbove) {
         resolvedPlacement = 'bottom';
-      } else if (targetBox.top > 300) {
+      } else if (spaceAbove >= panelMaxHeight) {
         resolvedPlacement = 'top';
-      } else if (right + panelWidth + gap < viewportWidth) {
+      } else if (spaceRight >= panelWidth || spaceRight >= spaceLeft) {
         resolvedPlacement = 'right';
-      } else if (targetBox.left - panelWidth - gap > 0) {
+      } else if (spaceLeft >= panelWidth) {
         resolvedPlacement = 'left';
       } else {
         resolvedPlacement = 'center';
@@ -171,24 +178,27 @@ export function GuidedWalkthrough({ open, title, subtitle, steps, onClose, onCom
     if (resolvedPlacement === 'center') {
       return {
         width: panelWidth,
-        left: clamp((viewportWidth - panelWidth) / 2, 12, viewportWidth - panelWidth - 12),
-        top: clamp(viewportHeight / 2 - 130, 16, viewportHeight - 280)
+        left: clamp((viewportWidth - panelWidth) / 2, viewportPadding, maxLeft),
+        top: clamp((viewportHeight - panelMaxHeight) / 2, viewportPadding, maxTop),
+        maxHeight: panelMaxHeight
       };
     }
 
     if (resolvedPlacement === 'top') {
       return {
         width: panelWidth,
-        left: clamp(targetMidX - panelWidth / 2, 12, viewportWidth - panelWidth - 12),
-        top: clamp(targetBox.top - 250, 12, viewportHeight - 280)
+        left: clamp(targetMidX - panelWidth / 2, viewportPadding, maxLeft),
+        top: clamp(targetBox.top - panelMaxHeight - gap, viewportPadding, maxTop),
+        maxHeight: panelMaxHeight
       };
     }
 
     if (resolvedPlacement === 'left') {
       return {
         width: panelWidth,
-        left: clamp(targetBox.left - panelWidth - gap, 12, viewportWidth - panelWidth - 12),
-        top: clamp(targetMidY - 120, 12, viewportHeight - 280)
+        left: clamp(targetBox.left - panelWidth - gap, viewportPadding, maxLeft),
+        top: clamp(targetMidY - panelMaxHeight / 2, viewportPadding, maxTop),
+        maxHeight: panelMaxHeight
       };
     }
 
@@ -196,16 +206,18 @@ export function GuidedWalkthrough({ open, title, subtitle, steps, onClose, onCom
       const right = targetBox.left + targetBox.width;
       return {
         width: panelWidth,
-        left: clamp(right + gap, 12, viewportWidth - panelWidth - 12),
-        top: clamp(targetMidY - 120, 12, viewportHeight - 280)
+        left: clamp(right + gap, viewportPadding, maxLeft),
+        top: clamp(targetMidY - panelMaxHeight / 2, viewportPadding, maxTop),
+        maxHeight: panelMaxHeight
       };
     }
 
     const bottom = targetBox.top + targetBox.height;
     return {
       width: panelWidth,
-      left: clamp(targetMidX - panelWidth / 2, 12, viewportWidth - panelWidth - 12),
-      top: clamp(bottom + gap, 12, viewportHeight - 280)
+      left: clamp(targetMidX - panelWidth / 2, viewportPadding, maxLeft),
+      top: clamp(bottom + gap, viewportPadding, maxTop),
+      maxHeight: panelMaxHeight
     };
   }, [activeStep?.placement, targetBox]);
 
@@ -231,7 +243,7 @@ export function GuidedWalkthrough({ open, title, subtitle, steps, onClose, onCom
         role="dialog"
         aria-modal="true"
         aria-label={isKorean ? `${title} 단계 ${stepIndex + 1}` : `${title} step ${stepIndex + 1}`}
-        className="fixed overflow-y-auto rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xl"
+        className="fixed flex flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xl"
         style={panelStyle}
       >
         <div className="flex items-start justify-between gap-3">
@@ -254,23 +266,25 @@ export function GuidedWalkthrough({ open, title, subtitle, steps, onClose, onCom
           <div className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 transition-all" style={{ width: `${progress}%` }} />
         </div>
 
-        <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <Sparkles className="h-3.5 w-3.5 text-cyan-600" />
-            {isKorean ? `${stepIndex + 1} / ${totalSteps} 단계` : `Step ${stepIndex + 1} of ${totalSteps}`}
+        <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <Sparkles className="h-3.5 w-3.5 text-cyan-600" />
+              {isKorean ? `${stepIndex + 1} / ${totalSteps} 단계` : `Step ${stepIndex + 1} of ${totalSteps}`}
+            </div>
+            <p className="text-base font-semibold text-slate-900">{activeStep.title}</p>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">{activeStep.description}</p>
+            {activeStep.selector && !targetBox && (
+              <p className="mt-2 text-xs font-medium text-amber-700">
+                {isKorean
+                  ? '이 단계의 대상 요소가 지금 화면에 보이지 않습니다. 다음 단계로 넘어가도 괜찮습니다.'
+                  : 'This target is currently hidden in the UI. Continue to the next step.'}
+              </p>
+            )}
           </div>
-          <p className="text-base font-semibold text-slate-900">{activeStep.title}</p>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">{activeStep.description}</p>
-          {activeStep.selector && !targetBox && (
-            <p className="mt-2 text-xs font-medium text-amber-700">
-              {isKorean
-                ? '이 단계의 대상 요소가 지금 화면에 보이지 않습니다. 다음 단계로 넘어가도 괜찮습니다.'
-                : 'This target is currently hidden in the UI. Continue to the next step.'}
-            </p>
-          )}
         </div>
 
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
           <button
             type="button"
             onClick={onClose}

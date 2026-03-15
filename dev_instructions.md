@@ -341,5 +341,6 @@ As of 2026-03-15:
 - Language system is implemented with Korean as the default, a sitewide English toggle, and hydration-safe restoration of the saved language after mount
 - Landing, login, dashboard, builder, walkthrough, public invitation sections, and guestbook quiz copy are localized for Korean-first UX with English fallback
 - Invitation mobile behavior now includes tighter spacing, responsive gallery columns, and better small-screen cards for RSVP, guestbook, food vote, and timeline sections
+- Walkthrough overlays now clamp to the viewport with internal scrolling, so guide controls stay reachable on short laptop screens and phones
 
 There is no active in-progress feature branch state recorded in this file. New Codex sessions should start from the current codebase and this document.
