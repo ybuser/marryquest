@@ -30,7 +30,7 @@ export function GallerySection({ photos }: GallerySectionProps) {
               src={photo.url}
               alt={photo.caption ?? 'Gallery photo'}
               fill
-              sizes="(max-width: 768px) 100vw, 33vw"
+              sizes="(max-width: 480px) 100vw, (max-width: 768px) 50vw, 33vw"
               className="object-cover transition duration-500 group-hover:scale-[1.03]"
             />
             {photo.caption && (

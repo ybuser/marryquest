@@ -149,7 +149,7 @@ export function InvitationPage({
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_100%_0,rgba(139,94,52,0.12),transparent_42%)]" aria-hidden />
         )}
 
-        <main className="relative mx-auto flex min-h-screen max-w-5xl flex-col gap-[var(--mq-spacing-section)] px-4 py-16">
+        <main className="relative mx-auto flex min-h-screen max-w-5xl flex-col gap-[var(--mq-spacing-section)] px-4 py-10 sm:px-6 sm:py-14">
           {orderedSections.map((section, index) => {
             let sectionNode: React.ReactNode = null;
             switch (section.key) {

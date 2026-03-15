@@ -70,6 +70,17 @@ export function GuidedWalkthrough({ open, title, subtitle, steps, onClose, onCom
   }, [open]);
 
   useEffect(() => {
+    if (!open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
+  useEffect(() => {
     if (!open || !activeStep) return;
 
     activeStep.onEnter?.();
@@ -112,7 +123,18 @@ export function GuidedWalkthrough({ open, title, subtitle, steps, onClose, onCom
     const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1280;
     const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 720;
     const panelWidth = Math.min(380, viewportWidth - 24);
+    const mobile = viewportWidth < 768;
     const placement = activeStep?.placement ?? 'auto';
+
+    if (mobile) {
+      const panelHeight = Math.min(420, viewportHeight - 28);
+      return {
+        width: viewportWidth - 24,
+        left: 12,
+        top: Math.max(12, viewportHeight - panelHeight - 12),
+        maxHeight: panelHeight
+      };
+    }
 
     if (!targetBox || placement === 'center') {
       return {
@@ -206,7 +228,7 @@ export function GuidedWalkthrough({ open, title, subtitle, steps, onClose, onCom
         role="dialog"
         aria-modal="true"
         aria-label={`${title} step ${stepIndex + 1}`}
-        className="fixed rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xl"
+        className="fixed overflow-y-auto rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xl"
         style={panelStyle}
       >
         <div className="flex items-start justify-between gap-3">

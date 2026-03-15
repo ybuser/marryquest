@@ -1,6 +1,7 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { GetServerSideProps } from 'next';
 import Head from 'next/head';
+import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -215,6 +216,9 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
               <p className="mt-1 text-slate-600">Build and manage interactive invitations.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <Button variant="ghost" onClick={() => void signOut({ callbackUrl: '/login' })} disabled={creating} size="lg">
+                Sign out
+              </Button>
               <Button
                 data-tour="dashboard-walkthrough"
                 variant="outline"
@@ -367,3 +371,4 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
     </div>
   );
 }
+

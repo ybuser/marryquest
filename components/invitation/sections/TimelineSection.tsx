@@ -32,22 +32,24 @@ function SortableCard({ card }: SortableCardProps) {
       ref={setNodeRef}
       style={style}
       data-preview-id={`timeline-card-${card.id}`}
-      className="mq-timeline-card flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm"
+      className="mq-timeline-card flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 shadow-sm sm:flex-row sm:items-center"
       {...attributes}
       {...listeners}
     >
-      <span className="cursor-grab text-slate-400">⋮⋮</span>
-      {card.photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={card.photoUrl} alt="" className="h-12 w-12 rounded-md object-cover" />
-      ) : (
-        <div className="flex h-12 w-12 items-center justify-center rounded-md border border-dashed border-slate-200 text-[10px] text-slate-400">
-          No photo
-        </div>
-      )}
-      <div>
+      <div className="flex items-center gap-3">
+        <span className="cursor-grab text-slate-400">⋮⋮</span>
+        {card.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={card.photoUrl} alt="" className="h-14 w-14 rounded-xl object-cover" />
+        ) : (
+          <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-dashed border-slate-200 text-[10px] text-slate-400">
+            No photo
+          </div>
+        )}
+      </div>
+      <div className="min-w-0">
         <p className="text-sm font-semibold text-slate-800">{card.text}</p>
-        {card.description && <p className="text-xs text-slate-500">{card.description}</p>}
+        {card.description && <p className="mt-1 text-xs leading-5 text-slate-500">{card.description}</p>}
       </div>
     </div>
   );
@@ -144,7 +146,7 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
 
   return (
     <div className="mt-6 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-lg font-semibold text-slate-900">Music voting</p>
         {alreadyUsed && <span className="text-xs font-medium text-slate-500">Vote used</span>}
       </div>
@@ -154,7 +156,7 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
         <div className="space-y-3">
           {musicData.tracks.length === 0 && <p className="text-sm text-slate-600">No tracks yet. Add one below.</p>}
           {musicData.tracks.map((track) => (
-            <div key={track.id} className="mq-music-track flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3">
+            <div key={track.id} className="mq-music-track flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-medium text-slate-800">{track.title}</p>
                 {track.artist && <p className="text-xs text-slate-500">{track.artist}</p>}
@@ -174,9 +176,9 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
           ))}
         </div>
       )}
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <p className="text-sm font-semibold text-slate-800">Add a song</p>
-        <div className="mt-3 grid gap-2 md:grid-cols-2">
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -250,7 +252,7 @@ export function TimelineSection({ invitationId, slug, invitationStatus, puzzle, 
   }, []);
 
   const displayCards = useMemo(() => cards, [cards]);
-  const sensors = useSensors(useSensor(PointerSensor));
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   if (!puzzle || !puzzle.enabled || displayCards.length === 0) {
     return <p className="text-sm text-slate-600">Timeline puzzle is not available.</p>;
@@ -306,7 +308,7 @@ export function TimelineSection({ invitationId, slug, invitationStatus, puzzle, 
 
   return (
     <div>
-      <p className="text-sm text-slate-600">Drag the moments into the correct order.</p>
+      <p className="text-sm leading-6 text-slate-600">Drag the moments into the correct order.</p>
       {previewing && <p className="mt-2 text-xs text-slate-500">Preview mode: publish to play.</p>}
       <div className="mt-4 space-y-2">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

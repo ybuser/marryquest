@@ -1,826 +1,340 @@
-# MarryQuest Development Context (Post PR-12, Stable Phase)
+# MarryQuest Dev Instructions
+
+Last updated: 2026-03-15
+
+This file is the handoff document for new Codex sessions. Treat it as the current source of truth for project state, recent architectural decisions, and operational rules. Older logs and temporary drift-audit files were intentionally cleaned up.
+
+## 1. Product Summary
+
+MarryQuest is a wedding invitation builder and public invitation site.
+
+- Authenticated users manage invitations in `/dashboard` and `/builder/[id]`.
+- Guests interact with published invitations at `/[slug]`.
+- The product focuses on interactive invitation experiences, not static pages.
+
+Current guest-facing features:
 
-이 문서는 MarryQuest 프로젝트의 **현재 기준 단일 소스 오브 트루스(Single Source of Truth)**이다.
-모든 설계, Codex 프롬프트, 리팩토링, DB 변경, 핫픽스는 **이 문서를 기준으로 수행한다.**
+- Invitation sections
+- RSVP
+- Guestbook
+- Quiz
+- Timeline puzzle
+- Music voting
+- Food voting
+- Gallery display
+- Map / accounts / info sections
+
+## 2. Tech Stack
 
----
+- Next.js 14, Pages Router only
+- React 18
+- TypeScript
+- Tailwind CSS
+- NextAuth
+- Prisma ORM
+- Supabase Postgres
+- Supabase Storage for timeline card images
+- Zod for validation
 
-# 1. 프로젝트 개요
+Do not introduce App Router patterns unless explicitly requested. The current app is Pages Router only.
 
-## 1.1 목적
+## 3. Core Routes
 
-MarryQuest는 결혼 초대장을 단순 정보 페이지가 아닌 **참여형 인터랙티브 경험 플랫폼**으로 만드는 서비스이다.
+Public routes:
 
-* 신랑·신부: 로그인 후 초대장 제작
-* 하객: 로그인 없이 참여
-* 퀴즈, 타임라인 퍼즐, 음악 투표, 음식 투표, 방명록, RSVP 등 참여형 기능 제공
+- `/`
+- `/login`
+- `/[slug]`
 
----
+Authenticated routes:
 
-## 1.2 기술 스택
+- `/dashboard`
+- `/builder/[id]`
 
-Frontend / Backend
+Main API areas:
 
-* Next.js 14 (Pages Router 유지)
-* React 18
-* TypeScript
+- `/api/invitations`
+- `/api/invitations/[id]`
+- `/api/invitations/[id]/sections`
+- `/api/invitations/[id]/slug`
+- `/api/invitations/[id]/status`
+- `/api/invitations/[id]/rsvp-summary`
+- `/api/guestbook`
+- `/api/guestbook/[entryId]`
+- `/api/quiz/[invitationId]`
+- `/api/quiz/attempt`
+- `/api/timeline/[invitationId]`
+- `/api/timeline/attempt`
+- `/api/music`
+- `/api/music/add`
+- `/api/music/vote`
+- `/api/food-vote`
+- `/api/food-vote/[invitationId]`
+- `/api/food-vote/vote`
+- `/api/upload/timeline-card`
 
-Auth
+## 4. Auth Model
 
-* NextAuth (Prisma Adapter)
+Authentication is currently test-user based. There is no signup flow.
 
-Database
+- `lib/auth.ts` uses a NextAuth Credentials provider.
+- Credentials are `loginId` and `password`.
+- Successful login upserts a Prisma `User` by stable email.
+- Protected pages and APIs use `requirePageAuth` and `requireApiAuth`.
 
-* Supabase (PostgreSQL)
-* Prisma ORM
+The test account source is `lib/testUsers.ts`.
 
-Deploy
+Current test accounts:
 
-* Vercel
+| Login ID | Password |
+| --- | --- |
+| `guest1` | `wedding1` |
+| `guest2` | `wedding2` |
+| `guest3` | `wedding3` |
+| `guest4` | `wedding4` |
+| `guest5` | `wedding5` |
+| `guest6` | `wedding6` |
+| `guest7` | `wedding7` |
+| `guest8` | `wedding8` |
+| `guest9` | `wedding9` |
+| `guest10` | `wedding10` |
 
-Validation
+Important distinction:
 
-* Zod
+- The normal app login uses test accounts.
+- `/api/admin/invitations/[id]/stats` still uses `x-admin-passphrase` against `ADMIN_PASSPHRASE`. That route is separate from the main login flow.
 
-UI
+## 5. Dashboard and Builder State
 
-* Tailwind CSS
-* 일부 Radix UI
+Dashboard:
 
----
+- Search and status filters are implemented.
+- Invitation cards support quick open, public page open, and copy URL.
+- A dashboard walkthrough is available from the header.
 
-## 1.3 운영 철학 (중요)
+Builder:
 
-로그인 없는 하객 참여 구조.
+- Tabs: `Basic`, `Sections`, `Guestbook`, `Quiz`, `Timeline`, `Publish`, `Export`
+- Draft editing model with explicit save per tab
+- `Ctrl/Cmd + S` saves the current tab
+- Live preview is on the right side
+- Live preview uses its own scroll container and should not scroll the whole page
+- Builder header has a `...` menu with:
+  - walkthrough
+  - copy builder link
 
-우선순위:
+Current builder extras:
 
-1. UX
-2. 무결성
-3. 보안
+- Guestbook moderation supports hide/show and delete with confirmation
+- Builder interactions can auto-focus related preview content
+- Timeline builder uploads images through the server and stores optimized square WebP files
 
-완전한 보안 대신 다음 전략 사용:
+## 6. Walkthrough System
 
-* IP 기반 Rate Limit
-* `mq_guest` 쿠키 기반 세션 식별
-* DB 제약조건(unique, count 기반 제한)
-* 토큰 기반 1회성 권한 부여
-* Soft 제한 + UX 친화적 메시지
+There is a reusable guided walkthrough system in:
 
----
+- `components/walkthrough/GuidedWalkthrough.tsx`
 
-# 2. 아키텍처 구조
+Current walkthrough entry points:
 
-## 2.1 Public 영역
+- Dashboard header button
+- Builder header `...` menu
 
-URL:
+Behavior:
 
-* `/[slug]`
-* `/[slug]/preview` (Builder Live Preview)
+- Target highlighting
+- Step progress
+- Smart tooltip placement
+- Next / back / skip / finish
+- Escape and arrow-key support
 
-Invitation Page 섹션:
+## 7. Public Invitation Rendering
 
-* Hero
-* Info
-* Map
-* Gallery
-* Accounts
-* Quiz
-* Timeline Puzzle
-* Music Voting
-* Food Voting (PR-12)
-* Guestbook
-* RSVP
+`components/invitation/InvitationPage.tsx` is the main invitation renderer.
 
-섹션 노출은:
+Current section keys handled there:
 
-* `SectionConfig`
-* `DEFAULT_SECTIONS`
-  로 제어
+- `hero`
+- `info`
+- `details`
+- `maps`
+- `gallery`
+- `accounts`
+- `timeline`
+- `foodVote`
+- `guestbook`
+- `rsvp`
 
----
+Templates currently supported:
 
-## 2.2 Builder 영역
+- `mono`
+- `editorial`
+- `film`
+- `bloom`
+- `luxe`
+- `modern`
+- `hanok`
 
-URL:
+Template tokens live in `components/theme/tokens.ts`.
 
-* `/dashboard`
-* `/builder/[id or slug]`
+## 8. Database and Prisma Rules
 
-Builder 탭:
+Prisma source of truth:
 
-* Basic (Design 통합)
-* Sections
-* Gallery
-* Quiz
-* Timeline
-* Food
-* Export
-* Settings
+- `prisma/schema.prisma`
 
-Live Preview는 DB fetch 대신 draft 객체 전달 구조 유지.
+Do not treat any other Prisma schema snapshot as authoritative. Temporary drift-audit schema snapshots were removed during cleanup.
 
----
+Current migration history:
 
-## 2.3 API 구조 (pages/api)
+- `000_init`
+- `001_add_attendee_name`
+- `002_add_quiz`
+- `003_add_invitation_deleted_at`
+- `004_add_timeline_music`
+- `005_hotfix_timeline_photo_correct_order`
+- `006_align_timeline_card_columns`
+- `007_session_limits_voterKey`
+- `008_food_vote`
+- `009_add_template_keys`
+- `010_align_supabase_drift`
 
-Core:
+Current important schema details:
 
-* `/api/invitations`
-* `/api/invitation/[id]`
-* `/api/invitations/[id]/sections`
-* `/api/invitations/[id]/slug`
-* `/api/invitations/[id]/status`
+- `Invitation.deletedAt` exists and public queries must respect it
+- `Invitation.status` is `draft`, `published`, or `private`
+- `TimelineCard.text` maps to DB column `title`
+- `TimelineCard.description` maps to DB column `shortDescription`
+- `TimelineCard.description` is non-null in Prisma and DB
+- `RSVPResponse.attendeeName` defaults to `""`
+- `FoodVote` unique index is mapped as `FoodVote_invitationId_voterKey_uniq`
 
-Participation:
+If you change the database:
 
-* `/api/guestbook`
-* `/api/rsvp`
-* `/api/quiz/[invitationId]`
-* `/api/timeline/[invitationId]`
-* `/api/timeline/attempt`
-* `/api/music`
-* `/api/music/vote`
-* `/api/music/add`
-* `/api/food`
-* `/api/food/vote`
+1. Edit `prisma/schema.prisma`
+2. Create a proper Prisma migration
+3. If the change also needs manual Supabase SQL, add a matching SQL doc under `docs/sql`
+4. Run validation after the change
 
-Export:
+Supabase connection rule:
 
-* `/api/export/rsvp.csv`
+- Use the direct connection or port `5432`
+- Do not use the Transaction Pooler on `6543` with Prisma migrations
 
----
+## 9. Guest Identity, Limits, and Anti-Abuse
 
-# 3. 참여 식별 전략 (mq_guest 중심)
+Guest participation is built around the `mq_guest` cookie.
 
-## 3.1 mq_guest 쿠키
+Relevant file:
 
-* `/lib/guestKey.ts`
-* `getOrSetGuestKey(req, res)`
-* HttpOnly
-* SameSite=Lax
-* Max-Age: 180 days
-* production에서만 Secure
+- `lib/guestKey.ts`
 
-사용처:
+Current patterns:
 
-* RSVP 제한
-* Guestbook 제한
-* MusicVote unique
-* FoodVote unique
-* RateLimit keyFn
+- RSVP is limited by `voterKey`
+- Guestbook is limited by `voterKey`
+- Music vote is unique per invitation and voter
+- Food vote is unique per invitation and voter
+- Rate limit code can use `mq_guest` through `keyFn`
 
----
+Important behavior:
 
-## 3.2 RateLimit 구조
+- Guestbook can allow one extra entry when a valid `quizPerfect` badge token is present
+- Quiz badge token signing uses `QUIZ_BADGE_SECRET` or falls back to `NEXTAUTH_SECRET`
 
-`lib/security/rateLimit.ts`
+## 10. Image and Storage Notes
 
-* 기본: IP 기반
-* 확장: `keyFn?: (req)=>string`
-* PR-09 이후:
+Timeline image upload is implemented in:
 
-  * `keyFn` 사용 시 mq_guest 우선
-  * 없으면 IP fallback
-
----
-
-# 4. 데이터베이스 현재 상태 (Post PR-12)
-
-## 4.1 Invitation 정책
-
-```ts
-Invitation {
-  deletedAt: DateTime?
-}
-```
-
-삭제 시:
-
-* deletedAt 설정
-* status = private
-
-모든 public API는:
-
-* deletedAt: null 필수
-* status published 조건 필수 (preview 제외)
-
----
-
-## 4.2 TimelineCard (매우 중요)
-
-Supabase 실제 컬럼:
-
-| column           | nullable   |
-| ---------------- | ---------- |
-| title            | NO         |
-| shortDescription | NO ('' 허용) |
-
-Prisma:
-
-```prisma
-model TimelineCard {
-  id           String @id @default(cuid())
-  puzzleId     String
-  text         String  @map("title")
-  description  String? @map("shortDescription")
-  photoUrl     String?
-  order        Int
-  correctOrder Int
-
-  @@map("TimelineCard")
-}
-```
-
-중요:
-
-* shortDescription은 DB에서 NOT NULL
-* API 저장 시 null 금지
-* 항상 '' 사용
-
----
-
-## 4.3 RSVP 제한 (PR-10 적용)
-
-Model:
-
-```prisma
-model RSVPResponse {
-  voterKey String?
-  @@index([invitationId, voterKey, createdAt])
-}
-```
-
-제한:
-
-* 동일 mq_guest
-* invitation 당 최대 2회
-
-DB count 기반 제한
-
----
-
-## 4.4 Guestbook 제한 (PR-10 적용)
-
-Model:
-
-```prisma
-model GuestbookEntry {
-  voterKey String?
-  @@index([invitationId, voterKey, createdAt])
-}
-```
-
-제한:
-
-* 기본 1회
-* quizPerfect badgeToken이 해당 POST에 포함된 경우에만 2회 허용
-* bonus 영구 저장 안 함
-* hidden 포함 count
-
----
-
-## 4.5 MusicVote (PR-09)
-
-```prisma
-model MusicVote {
-  invitationId String
-  voterKey     String
-
-  @@unique([invitationId, voterKey])
-}
-```
-
-정책:
-
-* vote OR add 중 하나만
-* add 시 트랜잭션 내:
-
-  * MusicTrack 생성
-  * MusicVote 생성
-
----
-
-## 4.6 FoodVote (PR-12)
-
-Music 구조와 동일 패턴:
-
-```prisma
-model FoodVote {
-  invitationId String
-  voterKey     String
-
-  @@unique([invitationId, voterKey])
-}
-```
-
-Food 참여는:
-
-* 독립 기능
-* Timeline 성공과 분리
-* mq_guest 기반 1회
-
----
-
-# 5. PR 히스토리 (완료 기준)
-
-PR-01 ~ PR-04
-
-* Auth
-* Invitation
-* Builder 구조
-* Public 렌더링
-
-PR-05
-
-* Guestbook
-* hidden 처리
-
-PR-06
-
-* RSVP
-* CSV Export
-
-PR-07
-
-* ThemeProvider
-* Live Preview
-
-PR-08
-
-* Quiz
-* badgeToken 검증
-
-PR-09
-
-* Timeline Puzzle
-* mq_guest 도입
-* MusicVote unique
-* keyFn rate limit 확장
-
-PR-10
-
-* RSVP 2회 제한
-* Guestbook 1회 + quiz bonus
-* DB count 기반 제한
-* 429 UX 메시지 개선
-
-PR-11
-
-* 운영 안정화
-* RateLimit 구조 정리
-* RLS 문서화
-* Export 안정화
-
-PR-12
-
-* Food 투표 기능
-* mq_guest unique 구조 재사용
-* Music과 동일 패턴 유지
-
----
-
-# 6. 자주 발생했던 문제 (LLM 주의)
-
-1. Prisma 필드 ↔ DB 컬럼 mismatch
-2. nullable 불일치
-3. SQL Editor만 수정하고 migration 미생성
-4. Live Preview가 published 조건에 막힘
-5. deletedAt 조건 누락
-6. unique 제약과 count 제한 혼용 시 충돌
-
----
-
-# 7. 개발 원칙
-
-DB 변경 시 항상:
-
-1. prisma/schema.prisma 수정
-2. migration 생성
-3. Supabase SQL Editor 스크립트 포함
-
-컬럼 rename은 `@map` 사용
-destructive migration 금지
-unique는 반드시 실제 DB에도 존재해야 함
-
----
-
-# 8. 현재 시스템 상태
-
-* Quiz 안정
-* Timeline 안정
-* Music 안정 (unique 기반)
-* Guestbook 제한 정상
-* RSVP 제한 정상
-* FoodVote 정상
-* keyFn 기반 rate limit 정상 동작
-* Build 통과 상태
-
-시스템은 이제:
-
-* 기능 확장 단계가 아니라
-* 안정화 / 운영 고도화 / 통계 / UX 개선 단계
-
----
-
-# 9. 작업 로그 (Agent Handoff)
-
-## 2026-03-02: Landing Page 전면 개편 (진행 완료)
-
-배경:
-
-* 기존 `/` 랜딩 페이지가 공사중 느낌이며 핵심 CTA(Launch Builder)가 동작하지 않음
-
-적용 내용:
-
-* `pages/index.tsx`를 전면 교체하여 브랜드 방향을
-  * "받는 사람도 즐거운 우리의 청첩장 만들기"
-  * 인터랙티브 청첩장 빌더
-  로 명확히 전달하는 구조로 변경
-* `getServerSideProps`에서 `getServerSession + authOptions`로 로그인 상태 확인
-* 메인 CTA를 로그인 상태에 따라 분기:
-  * 로그인 상태: `/dashboard`
-  * 비로그인 상태: `/login?callbackUrl=%2Fdashboard`
-* 미래지향/futuristic 톤 강화를 위해:
-  * 애니메이션 오브(orb), 그리드 오버레이, 글래스 카드, hover 인터랙션 적용
-  * 정보 카드(Playable Invitation / Live Builder Flow / Guest-First UX) 추가
-* 타이포그래피 강화를 위해 전역 폰트 import 확장:
-  * `styles/globals.css`에 `Manrope`, `Orbitron` 추가
-
-변경 파일:
-
-* `pages/index.tsx`
-* `styles/globals.css`
-
-검증 포인트:
-
-* `/` 접속 시 메인 CTA가 실제 동작해야 함
-* 로그인 세션 존재 시 CTA가 `/dashboard`로 이동해야 함
-* 비로그인 상태에서는 `/login?callbackUrl=%2Fdashboard`로 이동해야 함
-* 모바일/데스크톱에서 레이아웃 깨짐 없이 렌더링되어야 함
-
-실행 검증(2026-03-02):
-
-* `npm ci` 완료 (Node v20.20.0 / npm 10.8.2 환경)
-* `npm run build` 성공 (Next.js 14.2.35, 타입/빌드 통과)
-* `npm run lint`는 Next ESLint 초기 설정 프롬프트로 인해 비대화형 실행 미완료
-
-## 2026-03-02: Dashboard + Builder UX 고도화 (진행 완료)
-
-사전 확인:
-
-* `pages/builder/[id].tsx` 전체 코드(탭 구조, 저장/검증 로직, DnD 흐름) 확인
-* 연관 API 확인:
-  * `/api/invitations`, `/api/invitations/[id]`, `/api/invitations/[id]/sections`
-  * `/api/invitations/[id]/slug`, `/api/invitations/[id]/status`
-  * `/api/quiz/[invitationId]`, `/api/timeline/[invitationId]`, `/api/food-vote/[invitationId]`
-  * `/api/guestbook`
-
-적용 내용:
-
-* Dashboard (`pages/dashboard/index.tsx`)
-  * 카드형 정보 구조로 전면 개편 (총 개수/상태별 카운트)
-  * 검색 + 상태 필터(`all/draft/published/private`) 추가
-  * 초대장 카드에 빠른 액션 추가:
-    * Builder 바로 열기
-    * (published인 경우) 공개 페이지 열기
-    * (published인 경우) 공개 URL 복사
-  * `New invitation` 생성 시 리스트 반영 후 즉시 Builder로 이동하도록 개선
-
-* Builder (`pages/builder/[id].tsx`)
-  * 상단 워크스페이스 헤더 추가:
-    * 현재 초대장 핵심 정보(슬러그/상태/커플 이름)
-    * Dashboard 복귀, 공개 페이지 열기(게시 상태)
-  * 탭 네비게이션 UI 개선:
-    * pill 형태 탭 + 탭별 unsaved 점 표시
-    * 현재 탭 설명 문구 노출
-  * 글로벌 액션 바 추가:
-    * `Save current tab`
-    * `Discard current tab`
-    * `Ctrl/Cmd + S` 키보드 저장 단축키
-  * 모바일 UX 개선:
-    * `Editor / Preview` 토글 추가 (모바일에서 패널 전환)
-  * 체크박스 기반 구형 UI 일부 교체:
-    * Sections enabled, Guestbook hidden, Quiz enabled, Timeline enabled를 토글 버튼 형태로 개선
-  * Sections 탭 변경 감지 개선:
-    * 기존 `Section` 변경만 감지하던 로직에 `FoodVote` 변경도 포함
-    * 탭 이탈 시 discard 동작에서 FoodVote draft도 함께 복원
-  * Builder 내 깨진 문자열/모지바케 정리:
-    * 저장/삭제 로딩 문구, 안내 문구, placeholder, confirm 문구 정리
-
-변경 파일:
-
-* `pages/dashboard/index.tsx`
-* `pages/builder/[id].tsx`
-
-실행 검증(2026-03-02):
-
-* `npx tsc --noEmit` 성공
-* `npm run build` 성공 (Next.js 14.2.35, 타입/빌드 통과)
-
-## 2026-03-03: 템플릿 확장 (K-웨딩 선호 반영, 진행 완료)
-
-배경:
-
-* 기존 템플릿이 `mono / editorial / film` 3종으로 선택 폭이 좁음
-* 한국 모바일 청첩장 시장의 실제 선호(심플/러블리/고급/유니크)에 맞춘 다양한 무드가 필요
-
-사전 조사(온라인 청첩장 서비스 레퍼런스 기반):
-
-* 국내 서비스에서 실제로 많이 노출되는 스타일 키워드 확인:
-  * 심플, 플라워, 핑크, 유니크, 골드/레이저, 럭셔리 계열
-* 기능 기대치 확인:
-  * 모바일 중심 커스터마이징, 빠른 제작, 공유/방명록/상태관리 등
-* MarryQuest 방향에 맞게 “보기 좋은 카드” + “참여형 UX” 결합 템플릿 구성으로 정의
-
-적용 내용:
-
-* 템플릿 키 확장 (기존 3 + 신규 4)
-  * 기존: `mono`, `editorial`, `film`
-  * 신규: `bloom`(러블리/큐트), `luxe`(하이엔드), `modern`(심플/클린), `hanok`(한국적 모던)
-* 토큰 시스템 확장:
-  * `components/theme/tokens.ts`
-  * 템플릿별 `name/description/concept/recommendedFor` 및 타이포/간격/갤러리/팔레트 세분화
-* Builder 템플릿 선택 UX 개선:
-  * `pages/builder/[id].tsx`
-  * 단순 버튼 나열 -> 카드형 선택 UI
-  * 각 템플릿별 콘셉트/설명/추천 사용 시나리오 표시
-* 템플릿별 시각 차별화(Invitation 렌더):
-  * `components/invitation/InvitationPage.tsx`
-  * `components/invitation/sections/Hero.tsx`
-  * `components/invitation/sections/SectionCard.tsx`
-  * `styles/globals.css`
-  * `bloom`: 파스텔+팝업 데코(플로팅 배지)
-  * `luxe`: 골드 포인트+딥 톤
-  * `modern`: 밝고 절제된 클린 카드
-  * `hanok`: 뉴트럴/한지톤 감성
-* 폰트 확장:
-  * `styles/globals.css`에 `Nunito`, `Cormorant Garamond`, `Noto Sans KR`, `Noto Serif KR` 추가
-
-DB/API 동기화:
-
-* Prisma enum 확장:
-  * `prisma/schema.prisma`의 `TemplateKey`에 신규 4개 추가
-* Migration 추가:
-  * `prisma/migrations/009_add_template_keys/migration.sql`
-* Supabase 수동 동기화 스크립트 추가:
-  * `docs/sql/pr13_template_keys_supabase.sql`
-* API validation 확장:
-  * `pages/api/invitations/[id].ts`의 `templateKey` zod enum에 신규 템플릿 추가
-
-변경 파일:
-
-* `components/theme/tokens.ts`
-* `components/invitation/InvitationPage.tsx`
-* `components/invitation/sections/Hero.tsx`
-* `components/invitation/sections/SectionCard.tsx`
-* `styles/globals.css`
-* `pages/builder/[id].tsx`
-* `pages/api/invitations/[id].ts`
-* `prisma/schema.prisma`
-* `prisma/migrations/009_add_template_keys/migration.sql`
-* `docs/sql/pr13_template_keys_supabase.sql`
-
-실행 검증(2026-03-03):
-
-* `npx prisma generate` 성공
-* `npx tsc --noEmit` 성공
-* `npm run build` 성공 (Next.js 14.2.35, 타입/빌드 통과)
-
-## 2026-03-03: Supabase Drift 동기화 (앱 관리 전환, 진행 완료)
-
-배경:
-
-* Supabase SQL Editor 수동 변경으로 인해 Prisma migration history와 실제 DB 상태 간 drift 존재
-* 운영 DB의 현재 상태를 코드(`schema + migration`)로 관리 전환 필요
-
-적용 내용:
-
-* `prisma/schema.prisma`를 Supabase 현재 상태 기준으로 동기화
-  * Invitation: `@@index([deletedAt])` 추가
-  * RSVPResponse: `attendeeName @default("")`
-  * QuizQuestion: `@@index([quizId, order])`
-  * TimelineCard:
-    * `description String @map("shortDescription")` (NOT NULL 반영)
-    * `@@index([puzzleId, correctOrder])` 추가
-    * 단일 `@@index([puzzleId])` 제거
-  * MusicTrack:
-    * `artist String` (NOT NULL 반영)
-    * `@@index([invitationId, createdAt])` 추가
-    * 단일 `@@index([invitationId])` 제거
-  * MusicVote:
-    * `@@index([invitationId, trackId])`로 변경
-    * `@@index([trackId])` 제거
-  * FoodVoteOption/FoodVote:
-    * `createdAt/updatedAt`를 `@db.Timestamptz(6)`로 정렬
-    * FoodVoteOption `updatedAt`에 `@default(now())` 추가
-    * FoodVote 계열 FK `onUpdate: NoAction` 반영
-    * FoodVote unique 인덱스명 map: `"FoodVote_invitationId_voterKey_uniq"` 반영
-* 관련 코드 정합성 수정:
-  * `pages/api/music/add.ts`에서 `artist` 저장 시 null 대신 `''` 저장
-  * `types/music.ts`의 `artist`를 non-null string으로 정렬
-
-Migration/문서 추가:
-
-* `prisma/migrations/010_align_supabase_drift/migration.sql`
-* `docs/sql/pr14_supabase_drift_alignment.sql` (Supabase SQL Editor 수동 동기화용)
-
-실행 검증(2026-03-03):
-
-* `npx prisma generate` 성공
-* `npx tsc --noEmit` 성공
-* `npm run build` 성공
-
-## 2026-03-03: 템플릿별 섹션 마이크로 인터랙션 튜닝 (진행 완료)
-
-목표:
-
-* 템플릿별 무드 차이를 "색상" 수준이 아니라 실제 인터랙션 감성으로 체감 가능하도록 개선
-* 모바일/데스크톱 모두에서 과하지 않고 깔끔한 반응성 유지
-
-적용 내용:
-
-* 공통 인터랙션 계층 추가
-  * 섹션 단위 진입 애니메이션(staggered reveal) 추가
-  * 카드/버튼/옵션류 hover/press transition 일관화
-  * `prefers-reduced-motion` 대응(애니메이션 비활성화)
-* 템플릿별 상호작용 차별화
-  * `bloom`:
-    * 팝업 배지 플로팅 시간차(stagger) 적용
-    * 카드/갤러리 hover에 playful 회전/상승 효과
-    * 액션 요소 hover에 핑크 톤 강조 그림자
-  * `luxe`:
-    * Hero/Section 카드 hover 시 골드 sheen 스윕 효과
-    * 액션 요소 골드 라인 강조 + 깊은 그림자
-  * `modern`:
-    * 절제된 1px급 상승/섀도우, 시안 포인트 border 반응
-  * `hanok`:
-    * 따뜻한 브라운 보더 반응 + 잔잔한 상승/섀도우
-* 섹션별 인터랙션 훅 클래스 부여
-  * map / toggle / rsvp / food vote / timeline / music / guestbook 액션 요소에 전용 클래스 연결
-* 섹션 렌더 구조 개선
-  * `InvitationPage`에서 각 섹션을 wrapper(`mq-section-shell`)로 감싸 순차 진입 모션 적용
-
-변경 파일:
-
-* `styles/globals.css`
-* `components/invitation/InvitationPage.tsx`
-* `components/invitation/sections/Gallery.tsx`
-* `components/invitation/sections/MapButtons.tsx`
-* `components/invitation/sections/Accounts.tsx`
-* `components/invitation/sections/RSVPSection.tsx`
-* `components/invitation/sections/FoodVoteSection.tsx`
-* `components/invitation/sections/TimelineSection.tsx`
-* `components/guestbook/PublicGuestbook.tsx`
-
-실행 검증(2026-03-03):
-
-* `npx tsc --noEmit` 성공
-* `npm run build` 성공
-
-## 2026-03-05: Builder moderation + preview sync + timeline image pipeline (completed)
-
-Summary:
-
-- Added guestbook delete support in builder with confirmation prompt before deletion.
-- Extended guestbook API route to allow DELETE with owner/deleted-invitation checks.
-- Added live-preview focus sync from builder to invitation preview:
-  - Section anchors (`data-preview-id="section-..."`)
-  - Guestbook entry anchors (`guestbook-entry-<id>`)
-  - Quiz question anchors (`quiz-question-<index>`)
-  - Timeline card anchors (`timeline-card-<id>`)
-- Added preview focus triggers in builder for:
-  - Guestbook row click/toggle/delete
-  - Quiz add-question and question field focus
-  - Timeline add-card and timeline card edits
-- Fixed timeline image rendering path issues:
-  - Updated CSP to allow Supabase image hosts and Supabase API connections.
-  - Added Next image remote pattern for Supabase public storage paths.
-- Upgraded timeline upload API (`/api/upload/timeline-card`) to process uploads with `sharp`:
-  - Auto-rotate using EXIF
-  - Resize/crop to square 640x640
-  - Encode to WebP (quality 82)
-  - Keep stored images lightweight and consistent for builder/preview/public pages.
-
-Files touched:
-
-- `pages/builder/[id].tsx`
-- `pages/api/guestbook/[entryId].ts`
-- `components/invitation/InvitationPage.tsx`
-- `components/guestbook/PublicGuestbook.tsx`
-- `components/invitation/sections/Quiz.tsx`
-- `components/invitation/sections/TimelineSection.tsx`
 - `pages/api/upload/timeline-card.ts`
-- `next.config.js`
-- `package.json`
-- `package-lock.json`
 
-Validation (2026-03-05):
+Current behavior:
 
-- `npx tsc --noEmit` passed
-- `npm run build` passed
+- Upload requires auth
+- Accepts jpeg/png/webp
+- Max upload size is 10 MB
+- Server converts to square `640x640` WebP with `sharp`
+- Upload path is under the timeline bucket
+- Public URL is returned from Supabase Storage
 
-## 2026-03-05: Builder live preview isolated scrolling (completed)
+Security and rendering support:
 
-Goal:
+- `next.config.js` allows Supabase image hosts in CSP
+- `next.config.js` also allows Supabase Storage in Next image remote patterns
 
-- Prevent builder editing actions from scrolling the whole page when auto-focusing live preview targets.
+Current limitation:
 
-Changes:
+- Gallery photos render from DB URLs
+- There is no dedicated gallery upload flow in the current builder codebase
 
-- Added a dedicated scroll container for the builder live preview pane.
-- Passed the preview scroll container ref into `InvitationPage` in preview mode.
-- Updated preview focus logic to scroll the dedicated preview container directly instead of relying on `scrollIntoView` default viewport behavior.
-- Kept fallback behavior for non-builder contexts (where no preview scroll container ref is provided).
+## 11. Environment Variables
 
-Files changed:
+Required for normal local app usage:
 
-- `pages/builder/[id].tsx`
-- `components/invitation/InvitationPage.tsx`
+- `DATABASE_URL`
+- `NEXTAUTH_SECRET`
 
-Validation (2026-03-05):
+Required if using timeline uploads:
 
-- `npx tsc --noEmit` passed
-- `npm run build` passed
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
-## 2026-03-05: Interactive walkthrough system for Dashboard + Builder (completed)
+Optional:
 
-Goal:
+- `SUPABASE_STORAGE_BUCKET` default is `timeline`
+- `QUIZ_BADGE_SECRET` falls back to `NEXTAUTH_SECRET`
+- `ADMIN_PASSPHRASE` only for the admin stats API
+- `SKIP_PRISMA_GENERATION`
 
-- Add a clear, modern guided walkthrough for core user actions.
-- Add walkthrough entry points in Dashboard and Builder.
-- Add Builder header `...` menu on the right side of `View public page` with walkthrough action.
+Use quoted values in `.env` for safety, especially for URLs and secrets.
 
-Implemented:
+## 12. Key Files
 
-- Added reusable walkthrough overlay component:
-  - `components/walkthrough/GuidedWalkthrough.tsx`
-  - Features: step progress, target highlighting, smart placement, next/back/skip/finish controls, keyboard navigation (Esc/Arrow keys), smooth target focusing, hidden-target fallback messaging.
+High-signal files for future sessions:
 
-- Dashboard walkthrough:
-  - Added `Walkthrough` button in dashboard header.
-  - Added target markers (`data-tour=...`) across key dashboard controls.
-  - Added guided steps for create flow, summary cards, search/filter, and card actions.
-
-- Builder walkthrough + more menu:
-  - Added `...` icon button in builder header to the right of `View public page`.
-  - Added dropdown menu with:
-    - `Start walkthrough`
-    - `Copy builder link` (recommended utility)
-  - Added click-outside and Escape-to-close handling for menu.
-  - Added target markers (`data-tour=...`) for builder header/tabs/actions/editor/preview/menu.
-  - Added guided steps covering end-to-end builder workflow.
-
-Files changed:
-
-- `components/walkthrough/GuidedWalkthrough.tsx` (new)
+- `lib/auth.ts`
+- `lib/testUsers.ts`
+- `pages/login.tsx`
 - `pages/dashboard/index.tsx`
 - `pages/builder/[id].tsx`
+- `components/walkthrough/GuidedWalkthrough.tsx`
+- `components/invitation/InvitationPage.tsx`
+- `pages/api/upload/timeline-card.ts`
+- `pages/api/guestbook/[entryId].ts`
+- `components/theme/tokens.ts`
+- `prisma/schema.prisma`
+- `next.config.js`
 
-Validation (2026-03-05):
+## 13. Validation Commands
 
-- `npx tsc --noEmit` passed
-- `npm run build` passed
+Use these after meaningful changes:
 
-## 2026-03-08: Test-user login system redesign (completed)
+```powershell
+npx tsc --noEmit
+npm run build
+```
 
-Objective:
+For DB changes:
 
-- Replace single-passphrase login with an ID/password login for test users.
-- Add 10 hardcoded easy test accounts.
-- Redesign login UI to match MarryQuest wedding-friendly visual style.
+```powershell
+npx prisma generate
+npm run db:migrate
+```
 
-Implemented:
+## 14. Current Project Status
 
-- Added code-based test-account source:
-  - `lib/testUsers.ts` (10 accounts, ID/password/name/email)
-  - helper lookup function `findTestUserAccount(loginId, password)`
-- Updated NextAuth credentials flow in `lib/auth.ts`:
-  - credentials fields switched to `loginId` and `password`
-  - authentication now validates against test-account map
-  - successful login upserts/fetches Prisma `User` by stable test email
-  - existing session callbacks and route protection behavior preserved
-- Rebuilt `pages/login.tsx` with modern UI:
-  - wedding-themed layered gradient background and polished card layout
-  - explicit `User ID` + `Password` fields
-  - show/hide password control
-  - random account autofill (`Surprise me`)
-  - clear form helper
-  - quick account chips for one-click test login
-  - friendly dynamic “wedding vibe” message
+As of 2026-03-15:
 
-Notes:
+- Build is green
+- Dashboard walkthrough is implemented
+- Builder walkthrough and `...` menu are implemented
+- Builder preview isolated scrolling is implemented
+- Guestbook delete with confirmation is implemented
+- Timeline image processing and display fixes are implemented
+- Test-user login system is implemented
+- Mobile/layout polish pass is implemented across landing, builder, walkthrough, and public invitation sections
+- Builder and dashboard now expose sign-out actions for test-user sessions
+- Public interaction copy is cleaned up and standardized to English in the main guest-facing flows
+- Invitation mobile behavior now includes tighter spacing, responsive gallery columns, and better small-screen cards for RSVP, guestbook, food vote, and timeline sections
 
-- No DB schema migration required.
-- Existing callback URL redirect behavior remains intact.
-
-Files changed:
-
-- `lib/testUsers.ts` (new)
-- `lib/auth.ts`
-- `pages/login.tsx`
-
-Validation (2026-03-08):
-
-- `npx tsc --noEmit` passed
-- `npm run build` passed
+There is no active in-progress feature branch state recorded in this file. New Codex sessions should start from the current codebase and this document.

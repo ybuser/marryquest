@@ -11,6 +11,7 @@
 body {
   @apply bg-white text-slate-900 antialiased;
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
 }
 
 a {
@@ -254,6 +255,23 @@ a {
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 768px) {
+  .mq-invitation-shell {
+    --mq-card-padding: 1.15rem;
+    --mq-spacing-section: 1rem;
+    --mq-gallery-columns: 2;
+    --mq-gallery-gap: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .mq-invitation-shell {
+    --mq-card-padding: 1rem;
+    --mq-gallery-columns: 1;
+    --mq-gallery-gap: 0.65rem;
   }
 }
 

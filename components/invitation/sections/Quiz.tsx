@@ -95,7 +95,7 @@ export function QuizSection({ quiz, invitationId, invitationStatus, onBadgeEarne
               {localBadge && <span className="text-xs font-medium text-emerald-100">Badge unlocked</span>}
             </div>
             <p className="mt-1 text-[var(--mq-fg)]/90">{question.prompt}</p>
-            <div className="mt-3 grid gap-2 md:grid-cols-2">
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {question.options.map((option, optionIndex) => (
                 <label
                   key={optionIndex}

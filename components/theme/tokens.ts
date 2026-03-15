@@ -45,7 +45,7 @@ export const themeTokens: Record<TemplateKey, ThemeTokens> = {
     name: 'Mono Minimal',
     description: 'Calm, typographic, and precise with monospaced details.',
     concept: 'Minimal',
-    recommendedFor: '차분하고 절제된 무드의 웨딩',
+    recommendedFor: 'Calm weddings with restrained, minimal direction',
     typography: {
       fontFamily: 'Space Mono, ui-monospace, SFMono-Regular, Menlo, monospace',
       headingWeight: 700,
@@ -81,7 +81,7 @@ export const themeTokens: Record<TemplateKey, ThemeTokens> = {
     name: 'Editorial Magazine',
     description: 'Elegant serif headlines with generous whitespace.',
     concept: 'Classic',
-    recommendedFor: '웨딩 화보 느낌의 정제된 구성',
+    recommendedFor: 'Editorial wedding pages with a polished photo-led feel',
     typography: {
       fontFamily: 'Playfair Display, Georgia, serif',
       headingWeight: 700,
@@ -117,7 +117,7 @@ export const themeTokens: Record<TemplateKey, ThemeTokens> = {
     name: 'Film Strip',
     description: 'Cinematic layout with horizontal storytelling and bold contrasts.',
     concept: 'Cinematic',
-    recommendedFor: '영화 같은 스냅 중심의 청첩장',
+    recommendedFor: 'Story-driven invitations built around cinematic snapshots',
     typography: {
       fontFamily: 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif',
       headingWeight: 700,
@@ -153,7 +153,7 @@ export const themeTokens: Record<TemplateKey, ThemeTokens> = {
     name: 'Bloom Pop',
     description: 'Cute pastel mood with playful pop-up accents and soft gradients.',
     concept: 'Cute Girly',
-    recommendedFor: '발랄하고 사랑스러운 무드, 일러스트/컬러 스냅',
+    recommendedFor: 'Playful couples who want bright color and romantic energy',
     typography: {
       fontFamily: 'Nunito, "Noto Sans KR", Inter, sans-serif',
       headingWeight: 700,
@@ -189,7 +189,7 @@ export const themeTokens: Record<TemplateKey, ThemeTokens> = {
     name: 'Luxe Signature',
     description: 'Premium ivory and gold palette with high-end editorial tone.',
     concept: 'Luxury',
-    recommendedFor: '호텔 예식, 격식 있는 프리미엄 웨딩',
+    recommendedFor: 'Formal hotel weddings and premium ceremony styling',
     typography: {
       fontFamily: '"Cormorant Garamond", "Noto Serif KR", Georgia, serif',
       headingWeight: 700,
@@ -225,7 +225,7 @@ export const themeTokens: Record<TemplateKey, ThemeTokens> = {
     name: 'Modern Clean',
     description: 'Simple and fresh layout focused on readability and rhythm.',
     concept: 'Simple Modern',
-    recommendedFor: '깔끔한 정보 전달 중심, 미니멀 웨딩',
+    recommendedFor: 'Clean, information-first invitations with modern restraint',
     typography: {
       fontFamily: 'Manrope, "Noto Sans KR", Inter, sans-serif',
       headingWeight: 700,
@@ -261,7 +261,7 @@ export const themeTokens: Record<TemplateKey, ThemeTokens> = {
     name: 'Hanok Calm',
     description: 'Korean-inspired neutral palette with understated elegance.',
     concept: 'K-Modern',
-    recommendedFor: '전통+모던 혼합 무드, 담백한 한국적 감성',
+    recommendedFor: 'Couples blending Korean warmth with a modern presentation',
     typography: {
       fontFamily: '"Noto Serif KR", "Noto Sans KR", serif',
       headingWeight: 600,

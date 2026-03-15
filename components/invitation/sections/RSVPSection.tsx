@@ -42,7 +42,7 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
     if (response.ok) {
       setMessage('Thanks! Your RSVP has been recorded.');
     } else if (response.status === 429) {
-      setMessage('이 기기에서는 RSVP를 최대 2번까지 보낼 수 있어요.');
+      setMessage('This device can submit up to two RSVP responses for this invitation.');
     } else {
       setMessage('Unable to save RSVP. Please try again.');
     }
@@ -66,10 +66,10 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
         />
       </label>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 lg:grid-cols-3">
         <label className="space-y-2">
           <span className="block text-xs uppercase tracking-wide text-slate-500">Attendance</span>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {(['yes', 'no', 'maybe'] as AttendanceOption[]).map((option) => (
               <button
                 key={option}
@@ -86,7 +86,7 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
           </div>
         </label>
 
-        <label className="space-y-2">
+        <label className="space-y-2 sm:max-w-[14rem]">
           <span className="block text-xs uppercase tracking-wide text-slate-500">Guests</span>
           <input
             type="number"
@@ -99,7 +99,7 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
           />
         </label>
 
-        <label className="space-y-2">
+        <label className="space-y-2 sm:max-w-[14rem]">
           <span className="block text-xs uppercase tracking-wide text-slate-500">Kids</span>
           <input
             type="number"
@@ -126,11 +126,11 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
         />
       </label>
 
-      <p className="text-xs text-slate-600">
-        This RSVP is for approximate headcount only — final numbers don’t have to be exact.
+      <p className="text-xs leading-5 text-slate-600">
+        This RSVP is only for planning the headcount, so guests do not need to provide final numbers yet.
       </p>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <button
           type="submit"
           disabled={disabled || submitting}

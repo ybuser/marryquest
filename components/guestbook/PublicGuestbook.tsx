@@ -107,8 +107,8 @@ export function PublicGuestbook({
           const attemptedBonus = Boolean(requestPayload.badgeToken || requestPayload.badge === 'quizPerfect');
           setError(
             attemptedBonus
-              ? '이 기기에서는 방명록을 더 이상 작성할 수 없어요.'
-              : '이 기기에서는 방명록을 1회만 작성할 수 있어요. (퀴즈 정답 시 1회 추가)'
+              ? 'This device cannot add any more guestbook messages.'
+              : 'This device can leave one guestbook message by default, plus one more after a perfect quiz score.'
           );
           return;
         }
@@ -146,9 +146,9 @@ export function PublicGuestbook({
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-[var(--mq-fg)]">퀴즈 참여</p>
+              <p className="text-sm font-semibold text-[var(--mq-fg)]">Quiz challenge</p>
               <p className="text-xs text-[var(--mq-fg)]/70">
-                결혼 주인공의 퀴즈를 풀고 금색 테두리를 얻으세요
+                Solve the wedding quiz to unlock a special guestbook badge.
               </p>
             </div>
             <button
@@ -157,7 +157,7 @@ export function PublicGuestbook({
               className="mq-toggle-btn rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-[var(--mq-fg)] transition hover:border-white/40"
               aria-expanded={quizOpen}
             >
-              {quizOpen ? '퀴즈 닫기' : '퀴즈 풀기'}
+              {quizOpen ? 'Close quiz' : 'Open quiz'}
             </button>
           </div>
           {quizOpen && quiz && (
@@ -211,7 +211,7 @@ export function PublicGuestbook({
               <span className="block text-xs opacity-70">{characterCounts.message}/300</span>
             </label>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <button
               type="submit"
               disabled={previewMode || submitting || !nickname.trim() || !message.trim()}
