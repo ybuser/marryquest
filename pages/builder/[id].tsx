@@ -8,6 +8,8 @@ import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from 
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Copy, Ellipsis, HelpCircle, LogOut } from 'lucide-react';
+import { LanguageToggle } from '@/components/i18n/LanguageToggle';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 import prisma from '@/lib/db';
 import { requirePageAuth } from '@/lib/auth';
 import { themeTokens } from '@/components/theme/tokens';
@@ -45,6 +47,29 @@ const tabDescriptions: Record<TabKey, string> = {
 
 const templateOptions = Object.values(themeTokens);
 
+const KOREAN_SECTION_LABELS: Record<string, string> = {
+  hero: '메인',
+  info: '기본 안내',
+  maps: '오시는 길',
+  gallery: '갤러리',
+  accounts: '계좌 안내',
+  quiz: '퀴즈',
+  timeline: '타임라인',
+  foodVote: '메뉴 투표',
+  guestbook: '방명록',
+  rsvp: '참석 여부'
+};
+
+const KOREAN_TEMPLATE_TEXT: Record<string, { name: string; concept: string; description: string; recommendedFor: string }> = {
+  mono: { name: '모노 미니멀', concept: '미니멀', description: '절제된 타이포 중심의 차분한 분위기로, 군더더기 없이 정돈된 인상을 전합니다.', recommendedFor: '간결하고 차분한 예식 무드를 원할 때' },
+  editorial: { name: '에디토리얼 매거진', concept: '클래식', description: '세련된 세리프 타이포와 넓은 여백으로 화보 같은 청첩장 분위기를 만듭니다.', recommendedFor: '사진 중심의 우아한 청첩장을 만들고 싶을 때' },
+  film: { name: '필름 스트립', concept: '시네마틱', description: '장면이 이어지는 듯한 구성과 대비감 있는 화면으로 스토리 흐름을 살립니다.', recommendedFor: '추억을 장면처럼 보여주고 싶은 커플에게' },
+  bloom: { name: '블룸 팝', concept: '러블리', description: '화사한 색감과 발랄한 포인트가 살아 있어 사랑스럽고 밝은 분위기를 냅니다.', recommendedFor: '귀엽고 생기 있는 웨딩 무드를 원할 때' },
+  luxe: { name: '럭스 시그니처', concept: '프리미엄', description: '아이보리와 골드 톤이 중심이 되는 고급스러운 무드로 격식 있는 예식에 잘 어울립니다.', recommendedFor: '호텔 예식이나 클래식한 프리미엄 분위기에' },
+  modern: { name: '모던 클린', concept: '모던', description: '읽기 편한 정보 구성과 깔끔한 여백으로 담백하면서 세련된 인상을 줍니다.', recommendedFor: '정보 전달이 또렷한 현대적인 청첩장을 원할 때' },
+  hanok: { name: '한옥 무드', concept: '한국적 무드', description: '한국적인 색감과 차분한 결을 살려 단정하고 따뜻한 분위기를 전합니다.', recommendedFor: '한국적인 정서와 모던함을 함께 담고 싶을 때' }
+};
+
 interface SortableItemProps {
   section: SectionConfig;
   label: string;
@@ -71,6 +96,7 @@ interface SortableFoodOptionProps {
 }
 
 function SortableItem({ section, label, onToggle }: SortableItemProps) {
+  const { isKorean } = useLanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id });
 
   const style = {
@@ -98,7 +124,7 @@ function SortableItem({ section, label, onToggle }: SortableItemProps) {
             : 'border-slate-200 bg-slate-100 text-slate-600'
         }`}
       >
-        {section.enabled ? 'Enabled' : 'Hidden'}
+        {section.enabled ? (isKorean ? '사용 중' : 'Enabled') : isKorean ? '숨김' : 'Hidden'}
       </button>
     </div>
   );
@@ -112,6 +138,7 @@ function SortableTimelineCard({
   onRemove,
   onFocusPreview
 }: SortableTimelineCardProps) {
+  const { isKorean } = useLanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
 
   const style = {
@@ -137,7 +164,7 @@ function SortableTimelineCard({
           onFocus={() => onFocusPreview(`timeline-card-${card.id}`)}
           onChange={(event) => onChange(card.id, { text: event.target.value })}
           className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-          placeholder="Title"
+          placeholder={isKorean ? '카드 제목' : 'Title'}
         />
         <textarea
           value={card.description ?? ''}
@@ -146,7 +173,7 @@ function SortableTimelineCard({
           onFocus={() => onFocusPreview(`timeline-card-${card.id}`)}
           onChange={(event) => onChange(card.id, { description: event.target.value })}
           className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-          placeholder="Short description"
+          placeholder={isKorean ? '짧은 설명' : 'Short description'}
         />
         <div className="flex flex-wrap items-center gap-3">
           {card.photoUrl ? (
@@ -154,12 +181,12 @@ function SortableTimelineCard({
             <img src={card.photoUrl} alt="" className="h-16 w-16 rounded-md object-cover" />
           ) : (
             <div className="flex h-16 w-16 items-center justify-center rounded-md border border-dashed border-slate-200 text-xs text-slate-400">
-              No photo
+              {isKorean ? '사진 없음' : 'No photo'}
             </div>
           )}
           <label className="text-xs font-semibold text-slate-600">
             <span className="rounded-md border border-slate-200 px-3 py-2 shadow-sm hover:bg-slate-50">
-              {uploading ? 'Uploading...' : card.photoUrl ? 'Replace photo' : 'Upload photo'}
+              {uploading ? (isKorean ? '업로드 중…' : 'Uploading...') : card.photoUrl ? (isKorean ? '사진 교체' : 'Replace photo') : isKorean ? '사진 업로드' : 'Upload photo'}
             </span>
             <input
               type="file"
@@ -185,7 +212,7 @@ function SortableTimelineCard({
               }}
               className="text-xs font-semibold text-slate-500 hover:text-slate-700"
             >
-              Remove photo
+              {isKorean ? '사진 삭제' : 'Remove photo'}
             </button>
           )}
         </div>
@@ -198,13 +225,14 @@ function SortableTimelineCard({
         }}
         className="self-start text-xs font-semibold text-slate-500 hover:text-slate-700"
       >
-        Remove
+        {isKorean ? '삭제' : 'Remove'}
       </button>
     </div>
   );
 }
 
 function SortableTimelineOrderItem({ card }: SortableTimelineOrderItemProps) {
+  const { isKorean } = useLanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
 
   const style = {
@@ -222,13 +250,14 @@ function SortableTimelineOrderItem({ card }: SortableTimelineOrderItemProps) {
       {...listeners}
     >
       <span className="cursor-grab text-slate-400">::</span>
-      <span className="font-medium">{card.text || 'Untitled'}</span>
+      <span className="font-medium">{card.text || (isKorean ? '제목 없음' : 'Untitled')}</span>
     </div>
   );
 }
 
 
 function SortableFoodOption({ option, onChange, onRemove }: SortableFoodOptionProps) {
+  const { isKorean } = useLanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: option.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1 };
 
@@ -243,18 +272,18 @@ function SortableFoodOption({ option, onChange, onRemove }: SortableFoodOptionPr
           onChange={(event) => onChange(option.id, { label: event.target.value })}
           maxLength={80}
           className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-          placeholder="Menu label"
+          placeholder={isKorean ? '메뉴 이름' : 'Menu label'}
         />
         <input
           value={option.description ?? ''}
           onChange={(event) => onChange(option.id, { description: event.target.value })}
           maxLength={200}
           className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
-          placeholder="Description (optional)"
+          placeholder={isKorean ? '설명 (선택)' : 'Description (optional)'}
         />
       </div>
       <button type="button" onClick={() => onRemove(option.id)} className="text-xs font-semibold text-slate-500 hover:text-slate-700">
-        Remove
+        {isKorean ? '삭제' : 'Remove'}
       </button>
     </div>
   );
@@ -266,6 +295,39 @@ export default function InvitationBuilder({
   guestbookEntries,
   timelinePuzzle
 }: BuilderPageProps) {
+  const { isKorean, language } = useLanguage();
+  const tabLabels: Record<TabKey, string> = isKorean
+    ? { Basic: '기본 정보', Sections: '섹션', Guestbook: '방명록', Quiz: '퀴즈', Timeline: '타임라인', Publish: '공개 설정', Export: '참석 내역' }
+    : { Basic: 'Basic', Sections: 'Sections', Guestbook: 'Guestbook', Quiz: 'Quiz', Timeline: 'Timeline', Publish: 'Publish', Export: 'Export' };
+  const tabDescriptionsLocalized: Record<TabKey, string> = isKorean
+    ? {
+        Basic: '신랑신부 정보와 예식 기본 정보를 정리합니다.',
+        Sections: '섹션 순서와 메뉴 투표 구성을 조정합니다.',
+        Guestbook: '공개 방명록 메시지를 관리합니다.',
+        Quiz: '하객 참여용 퀴즈를 설정합니다.',
+        Timeline: '타임라인 퍼즐 카드와 정답 순서를 편집합니다.',
+        Publish: '공개 상태, 링크 주소, 삭제를 관리합니다.',
+        Export: '참석 응답 요약을 확인하고 CSV로 내려받습니다.'
+      }
+    : tabDescriptions;
+  const sectionLabels: Record<string, string> = isKorean
+    ? KOREAN_SECTION_LABELS
+    : (Object.fromEntries(DEFAULT_SECTIONS.map((section) => [section.key, section.label])) as Record<string, string>);
+  const statusLabels: Record<'draft' | 'published' | 'private', string> = isKorean
+    ? { draft: '임시저장', published: '공개', private: '비공개' }
+    : { draft: 'draft', published: 'published', private: 'private' };
+  const attendanceLabels: Record<'yes' | 'maybe' | 'no', string> = isKorean
+    ? { yes: '참석', maybe: '미정', no: '불참' }
+    : { yes: 'yes', maybe: 'maybe', no: 'no' };
+  const guestbookDateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(language === 'ko' ? 'ko-KR' : 'en-US', {
+        year: 'numeric',
+        month: language === 'ko' ? 'numeric' : 'short',
+        day: 'numeric'
+      }),
+    [language]
+  );
   const [savedInvitation, setSavedInvitation] = useState<InvitationDetails>(initialInvitation);
   const [draftInvitation, setDraftInvitation] = useState<InvitationDetails>(initialInvitation);
   const [savedSections, setSavedSections] = useState<SectionConfig[]>(initialInvitation.sections);
@@ -485,7 +547,7 @@ export default function InvitationBuilder({
 
   async function saveBasic() {
     setBasicSaving(true);
-    resetStatus('Saving...');
+    resetStatus(isKorean ? '저장 중…' : 'Saving...');
     try {
       const response = await fetch(`/api/invitations/${savedInvitation.id}`, {
         method: 'PATCH',
@@ -506,7 +568,7 @@ export default function InvitationBuilder({
       });
 
       if (!response.ok) {
-        showError('Failed to save basic details');
+        showError(isKorean ? '기본 정보를 저장하지 못했습니다.' : 'Failed to save basic details');
         return;
       }
 
@@ -515,10 +577,10 @@ export default function InvitationBuilder({
       const next = { ...draftInvitation, ...updated, dateTime: normalizedDate } as InvitationDetails;
       setSavedInvitation((prev) => ({ ...prev, ...next }));
       setDraftInvitation((prev) => ({ ...prev, ...next }));
-      resetStatus('Saved');
+      resetStatus(isKorean ? '저장됨' : 'Saved');
     } catch (error) {
       console.error(error);
-      showError('Failed to save basic details');
+      showError(isKorean ? '기본 정보를 저장하지 못했습니다.' : 'Failed to save basic details');
     } finally {
       setBasicSaving(false);
     }
@@ -526,7 +588,7 @@ export default function InvitationBuilder({
 
   async function saveSections() {
     setSectionsSaving(true);
-    resetStatus('Saving...');
+    resetStatus(isKorean ? '저장 중…' : 'Saving...');
     try {
       const response = await fetch(`/api/invitations/${savedInvitation.id}/sections`, {
         method: 'PATCH',
@@ -535,7 +597,7 @@ export default function InvitationBuilder({
       });
 
       if (!response.ok) {
-        showError('Unable to update sections');
+        showError(isKorean ? '섹션 구성을 저장하지 못했습니다.' : 'Unable to update sections');
         return;
       }
 
@@ -544,10 +606,10 @@ export default function InvitationBuilder({
       setDraftSections(updated);
       setSavedInvitation((prev) => ({ ...prev, sections: updated }));
       setDraftInvitation((prev) => ({ ...prev, sections: updated }));
-      resetStatus('Saved');
+      resetStatus(isKorean ? '저장됨' : 'Saved');
     } catch (error) {
       console.error(error);
-      showError('Unable to update sections');
+      showError(isKorean ? '섹션 구성을 저장하지 못했습니다.' : 'Unable to update sections');
     } finally {
       setSectionsSaving(false);
     }
@@ -555,14 +617,14 @@ export default function InvitationBuilder({
 
   async function saveGuestbook() {
     setGuestbookSaving(true);
-    resetStatus('Saving...');
+    resetStatus(isKorean ? '저장 중…' : 'Saving...');
 
     const updates = draftGuestbookEntries
       .filter((entry, index) => entry.hidden !== savedGuestbookEntries[index]?.hidden)
       .map((entry) => ({ id: entry.id, hidden: entry.hidden }));
 
     if (updates.length === 0) {
-      resetStatus('Saved');
+      resetStatus(isKorean ? '저장됨' : 'Saved');
       setGuestbookSaving(false);
       return;
     }
@@ -575,17 +637,17 @@ export default function InvitationBuilder({
       });
 
       if (!response.ok) {
-        showError('Unable to update guestbook');
+        showError(isKorean ? '방명록 설정을 저장하지 못했습니다.' : 'Unable to update guestbook');
         return;
       }
 
       const refreshed: GuestbookEntryDto[] = await response.json();
       setSavedGuestbookEntries(refreshed);
       setDraftGuestbookEntries(refreshed);
-      resetStatus('Saved');
+      resetStatus(isKorean ? '저장됨' : 'Saved');
     } catch (error) {
       console.error(error);
-      showError('Unable to update guestbook');
+      showError(isKorean ? '방명록 설정을 저장하지 못했습니다.' : 'Unable to update guestbook');
     } finally {
       setGuestbookSaving(false);
     }
@@ -685,7 +747,7 @@ export default function InvitationBuilder({
 
   async function saveQuiz() {
     setQuizSaving(true);
-    resetStatus('Saving...');
+    resetStatus(isKorean ? '저장 중…' : 'Saving...');
 
     const trimmedQuestions = draftQuiz.questions.map((question) => ({
       prompt: question.prompt.trim(),
@@ -694,7 +756,7 @@ export default function InvitationBuilder({
     }));
 
     if (draftQuiz.enabled && trimmedQuestions.length === 0) {
-      showError('Add at least one question to enable the quiz');
+      showError(isKorean ? '퀴즈를 사용하려면 문제를 1개 이상 추가해 주세요.' : 'Add at least one question to enable the quiz');
       setQuizSaving(false);
       return;
     }
@@ -704,7 +766,7 @@ export default function InvitationBuilder({
     );
 
     if (invalidQuestion) {
-      showError('Please fill in all prompts and options');
+      showError(isKorean ? '문제와 보기 내용을 모두 입력해 주세요.' : 'Please fill in all prompts and options');
       setQuizSaving(false);
       return;
     }
@@ -721,7 +783,7 @@ export default function InvitationBuilder({
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        showError(payload?.error ?? 'Unable to save quiz');
+        showError(payload?.error ?? (isKorean ? '퀴즈를 저장하지 못했습니다.' : 'Unable to save quiz'));
         return;
       }
 
@@ -731,10 +793,10 @@ export default function InvitationBuilder({
       setDraftQuiz(normalizedQuiz);
       setSavedInvitation((prev) => ({ ...prev, quiz: normalizedQuiz }));
       setDraftInvitation((prev) => ({ ...prev, quiz: normalizedQuiz }));
-      resetStatus('Saved');
+      resetStatus(isKorean ? '저장됨' : 'Saved');
     } catch (error) {
       console.error(error);
-      showError('Unable to save quiz');
+      showError(isKorean ? '퀴즈를 저장하지 못했습니다.' : 'Unable to save quiz');
     } finally {
       setQuizSaving(false);
     }
@@ -742,7 +804,7 @@ export default function InvitationBuilder({
 
   async function saveTimeline() {
     setTimelineSaving(true);
-    resetStatus('Saving...');
+    resetStatus(isKorean ? '저장 중…' : 'Saving...');
 
     const trimmedCards = draftTimeline.cards.map((card) => ({
       ...card,
@@ -752,13 +814,13 @@ export default function InvitationBuilder({
 
     if (draftTimeline.enabled) {
       if (trimmedCards.length < 5 || trimmedCards.length > 7) {
-        showError('Timeline needs 5 to 7 cards');
+        showError(isKorean ? '타임라인 퍼즐은 카드 5~7장이 필요합니다.' : 'Timeline needs 5 to 7 cards');
         setTimelineSaving(false);
         return;
       }
 
       if (trimmedCards.some((card) => !card.text)) {
-        showError('Please fill in all timeline cards');
+        showError(isKorean ? '타임라인 카드 내용을 모두 입력해 주세요.' : 'Please fill in all timeline cards');
         setTimelineSaving(false);
         return;
       }
@@ -766,13 +828,13 @@ export default function InvitationBuilder({
       const correctOrders = trimmedCards.map((card) => card.correctOrder);
       const uniqueOrders = new Set(correctOrders);
       if (uniqueOrders.size !== trimmedCards.length) {
-        showError('Correct order values must be unique');
+        showError(isKorean ? '정답 순서는 중복 없이 설정해 주세요.' : 'Correct order values must be unique');
         setTimelineSaving(false);
         return;
       }
       const maxOrder = Math.max(...correctOrders);
       if (maxOrder >= trimmedCards.length) {
-        showError('Correct order values must be within card range');
+        showError(isKorean ? '정답 순서는 카드 개수 범위 안에서 설정해 주세요.' : 'Correct order values must be within card range');
         setTimelineSaving(false);
         return;
       }
@@ -795,7 +857,7 @@ export default function InvitationBuilder({
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        showError(payload?.error ?? 'Unable to save timeline');
+        showError(payload?.error ?? (isKorean ? '타임라인을 저장하지 못했습니다.' : 'Unable to save timeline'));
         return;
       }
 
@@ -804,10 +866,10 @@ export default function InvitationBuilder({
       setDraftTimeline(updated);
       setSavedInvitation((prev) => ({ ...prev, timelinePuzzle: updated }));
       setDraftInvitation((prev) => ({ ...prev, timelinePuzzle: updated }));
-      resetStatus('Saved');
+      resetStatus(isKorean ? '저장됨' : 'Saved');
     } catch (error) {
       console.error(error);
-      showError('Unable to save timeline');
+      showError(isKorean ? '타임라인을 저장하지 못했습니다.' : 'Unable to save timeline');
     } finally {
       setTimelineSaving(false);
     }
@@ -829,7 +891,7 @@ export default function InvitationBuilder({
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        setTimelineUploadError(payload?.error ?? 'Unable to upload photo');
+        setTimelineUploadError(payload?.error ?? (isKorean ? '사진을 업로드하지 못했습니다.' : 'Unable to upload photo'));
         return;
       }
 
@@ -837,7 +899,7 @@ export default function InvitationBuilder({
       updateTimelineCard(cardId, { photoUrl: payload.url });
     } catch (error) {
       console.error(error);
-      setTimelineUploadError('Unable to upload photo');
+      setTimelineUploadError(isKorean ? '사진을 업로드하지 못했습니다.' : 'Unable to upload photo');
     } finally {
       setTimelineUploadingId(null);
     }
@@ -845,7 +907,7 @@ export default function InvitationBuilder({
 
   async function savePublish() {
     setPublishSaving(true);
-    resetStatus('Saving...');
+    resetStatus(isKorean ? '저장 중…' : 'Saving...');
 
     try {
       if (draftInvitation.slug !== savedInvitation.slug) {
@@ -858,7 +920,7 @@ export default function InvitationBuilder({
         if (!slugResponse.ok) {
           const error = await slugResponse.json();
           setSlugError(Array.isArray(error.error) ? error.error.join(', ') : error.error);
-          showError('Failed to update slug');
+          showError(isKorean ? '링크 주소를 저장하지 못했습니다.' : 'Failed to update slug');
           return;
         }
 
@@ -876,7 +938,7 @@ export default function InvitationBuilder({
         });
 
         if (!statusResponse.ok) {
-          showError('Unable to update status');
+          showError(isKorean ? '공개 상태를 저장하지 못했습니다.' : 'Unable to update status');
           return;
         }
 
@@ -885,17 +947,17 @@ export default function InvitationBuilder({
         setSavedInvitation((prev) => ({ ...prev, status: updated.status }));
       }
 
-      resetStatus('Saved');
+      resetStatus(isKorean ? '저장됨' : 'Saved');
     } catch (error) {
       console.error(error);
-      showError('Unable to save publish settings');
+      showError(isKorean ? '공개 설정을 저장하지 못했습니다.' : 'Unable to save publish settings');
     } finally {
       setPublishSaving(false);
     }
   }
 
   async function deleteInvitation() {
-    if (!window.confirm('Delete this invitation? This action cannot be undone.')) {
+    if (!window.confirm(isKorean ? '이 청첩장을 삭제할까요? 삭제 후에는 되돌릴 수 없습니다.' : 'Delete this invitation? This action cannot be undone.')) {
       return;
     }
 
@@ -907,13 +969,13 @@ export default function InvitationBuilder({
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error ?? 'Failed to delete invitation');
+        throw new Error(payload?.error ?? (isKorean ? '청첩장을 삭제하지 못했습니다.' : 'Failed to delete invitation'));
       }
 
       await router.push('/dashboard');
     } catch (error) {
       console.error(error);
-      alert('Failed to delete invitation');
+      alert(isKorean ? '청첩장을 삭제하지 못했습니다.' : 'Failed to delete invitation');
     } finally {
       setDeleteSaving(false);
     }
@@ -1023,7 +1085,7 @@ export default function InvitationBuilder({
 
   async function saveFoodVoteOptions() {
     setFoodVoteSaving(true);
-    resetStatus('Saving...');
+    resetStatus(isKorean ? '저장 중…' : 'Saving...');
     const cleaned = orderedFoodVoteOptions.map((option) => ({
       label: option.label.trim(),
       description: option.description?.trim() || null,
@@ -1031,13 +1093,13 @@ export default function InvitationBuilder({
     }));
 
     if (cleaned.length < 2 || cleaned.length > 6) {
-      showError('Food vote options must be between 2 and 6');
+      showError(isKorean ? '메뉴 투표 항목은 2개 이상 6개 이하로 설정해 주세요.' : 'Food vote options must be between 2 and 6');
       setFoodVoteSaving(false);
       return;
     }
 
     if (cleaned.some((option) => !option.label)) {
-      showError('Please fill in all food vote labels');
+      showError(isKorean ? '메뉴 이름을 모두 입력해 주세요.' : 'Please fill in all food vote labels');
       setFoodVoteSaving(false);
       return;
     }
@@ -1050,7 +1112,7 @@ export default function InvitationBuilder({
       });
 
       if (!response.ok) {
-        showError('Unable to save food vote options');
+        showError(isKorean ? '메뉴 투표 항목을 저장하지 못했습니다.' : 'Unable to save food vote options');
         return;
       }
 
@@ -1059,10 +1121,10 @@ export default function InvitationBuilder({
       setDraftFoodVoteOptions(updated);
       setSavedInvitation((prev) => ({ ...prev, foodVoteOptions: updated }));
       setDraftInvitation((prev) => ({ ...prev, foodVoteOptions: updated }));
-      resetStatus('Saved');
+      resetStatus(isKorean ? '저장됨' : 'Saved');
     } catch (error) {
       console.error(error);
-      showError('Unable to save food vote options');
+      showError(isKorean ? '메뉴 투표 항목을 저장하지 못했습니다.' : 'Unable to save food vote options');
     } finally {
       setFoodVoteSaving(false);
     }
@@ -1076,28 +1138,30 @@ export default function InvitationBuilder({
 
   async function deleteGuestbookEntry(entryId: string, nickname: string) {
     const confirmed = window.confirm(
-      `Delete this guestbook message from "${nickname}"?\n\nThis action cannot be undone.`
+      isKorean
+        ? `"${nickname}" 님의 방명록 메시지를 삭제할까요?\n\n삭제 후에는 되돌릴 수 없습니다.`
+        : `Delete this guestbook message from "${nickname}"?\n\nThis action cannot be undone.`
     );
     if (!confirmed) return;
 
     setGuestbookSaving(true);
-    resetStatus('Deleting...');
+    resetStatus(isKorean ? '삭제 중…' : 'Deleting...');
     try {
       const response = await fetch(`/api/guestbook/${entryId}`, { method: 'DELETE' });
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        showError(payload?.error ?? 'Unable to delete guestbook entry');
+        showError(payload?.error ?? (isKorean ? '방명록 메시지를 삭제하지 못했습니다.' : 'Unable to delete guestbook entry'));
         return;
       }
 
       setSavedGuestbookEntries((prev) => prev.filter((entry) => entry.id !== entryId));
       setDraftGuestbookEntries((prev) => prev.filter((entry) => entry.id !== entryId));
       focusPreviewTarget('section-guestbook');
-      resetStatus('Deleted');
+      resetStatus(isKorean ? '삭제됨' : 'Deleted');
     } catch (error) {
       console.error(error);
-      showError('Unable to delete guestbook entry');
+      showError(isKorean ? '방명록 메시지를 삭제하지 못했습니다.' : 'Unable to delete guestbook entry');
     } finally {
       setGuestbookSaving(false);
     }
@@ -1120,7 +1184,7 @@ export default function InvitationBuilder({
 
     try {
       await navigator.clipboard.writeText(publishUrl);
-      setCopyMessage('Copied!');
+      setCopyMessage(isKorean ? '복사됨' : 'Copied!');
     } catch (error) {
       try {
         const textarea = document.createElement('textarea');
@@ -1129,10 +1193,10 @@ export default function InvitationBuilder({
         textarea.select();
         document.execCommand('copy');
         document.body.removeChild(textarea);
-        setCopyMessage('Copied!');
+        setCopyMessage(isKorean ? '복사됨' : 'Copied!');
       } catch (fallbackError) {
         console.error(fallbackError);
-        showError('Unable to copy link');
+        showError(isKorean ? '링크를 복사하지 못했습니다.' : 'Unable to copy link');
       }
     }
   }
@@ -1143,21 +1207,22 @@ export default function InvitationBuilder({
 
     try {
       await navigator.clipboard.writeText(url);
-      resetStatus('Builder link copied');
+      resetStatus(isKorean ? '빌더 링크를 복사했습니다.' : 'Builder link copied');
       setMoreMenuOpen(false);
     } catch (error) {
       console.error(error);
-      showError('Unable to copy builder link');
+      showError(isKorean ? '빌더 링크를 복사하지 못했습니다.' : 'Unable to copy builder link');
     }
   }
 
-  const guestbookDate = (value: string) =>
-    new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
+  const guestbookDate = (value: string) => guestbookDateFormatter.format(new Date(value));
 
   const guestbookBadgeLabel = (badge: GuestbookEntryDto['badge']) => {
     if (badge === 'none') return null;
-    const label = badge.replace(/_/g, ' ');
-    return label.charAt(0).toUpperCase() + label.slice(1);
+    if (badge === 'quizPerfect') return isKorean ? '퀴즈 만점' : 'Quiz Perfect';
+    if (badge === 'timelinePerfect') return isKorean ? '타임라인 정답' : 'Timeline Perfect';
+    if (badge === 'foodWinner') return isKorean ? '메뉴 투표 픽' : 'Food Winner';
+    return badge;
   };
 
   const unsavedLabel = (tab: TabKey) => {
@@ -1177,9 +1242,9 @@ export default function InvitationBuilder({
                   : false;
 
     return hasChanges ? (
-      <span className="text-xs font-medium text-amber-700">Unsaved changes</span>
+      <span className="text-xs font-medium text-amber-700">{isKorean ? "저장 전 변경사항" : "Unsaved changes"}</span>
     ) : (
-      <span className="text-xs text-slate-500">Saved</span>
+      <span className="text-xs text-slate-500">{isKorean ? "저장됨" : "Saved"}</span>
     );
   };
 
@@ -1318,84 +1383,138 @@ export default function InvitationBuilder({
       return;
     }
 
-    if (window.confirm('You have unsaved changes in this tab. Discard them and switch tabs?')) {
+    if (window.confirm(isKorean ? '이 탭에 저장되지 않은 수정사항이 있습니다. 버리고 다른 탭으로 이동할까요?' : 'You have unsaved changes in this tab. Discard them and switch tabs?')) {
       discardDraftChanges(activeTab);
       setActiveTab(nextTab);
     }
   };
 
   const builderWalkthroughSteps = useMemo<WalkthroughStep[]>(
-    () => [
-      {
-        id: 'header',
-        title: 'Builder workspace',
-        description: 'This header shows invitation identity, slug, and publication status at a glance.',
-        selector: '[data-tour="builder-header"]',
-        placement: 'bottom'
-      },
-      {
-        id: 'tabs',
-        title: 'Section-based editing',
-        description: 'Move across tabs to edit details, sections, moderation, timeline, and publishing.',
-        selector: '[data-tour="builder-tabs"]',
-        placement: 'bottom'
-      },
-      {
-        id: 'tab-actions',
-        title: 'Save discipline',
-        description: 'Use Save current tab for explicit writes and Discard current tab to revert tab-level drafts.',
-        selector: '[data-tour="builder-tab-actions"]',
-        placement: 'bottom'
-      },
-      {
-        id: 'editor',
-        title: 'Editing panel',
-        description: 'The left panel is your active editor. Inputs change only draft state until saved.',
-        selector: '[data-tour="builder-editor-panel"]',
-        placement: 'right'
-      },
-      {
-        id: 'preview',
-        title: 'Live preview pane',
-        description: 'The preview on the right updates from draft values and supports focused auto-scroll.',
-        selector: '[data-tour="builder-preview-panel"]',
-        placement: 'left'
-      },
-      {
-        id: 'more',
-        title: 'More actions',
-        description: 'Use this menu for advanced tools without crowding the main header.',
-        selector: '[data-tour="builder-more-trigger"]',
-        placement: 'bottom'
-      },
-      {
-        id: 'walkthrough-entry',
-        title: 'Walkthrough command',
-        description: 'This command reopens the walkthrough whenever you need onboarding or a refresher.',
-        selector: '[data-tour="builder-menu-walkthrough"]',
-        placement: 'left',
-        onEnter: () => setMoreMenuOpen(true)
-      }
-    ],
-    [setMoreMenuOpen]
+    () =>
+      isKorean
+        ? [
+            {
+              id: 'header',
+              title: '청첩장 편집 헤더',
+              description: '현재 편집 중인 청첩장의 제목, 링크 주소, 공개 상태를 이곳에서 바로 확인할 수 있습니다.',
+              selector: '[data-tour="builder-header"]',
+              placement: 'bottom'
+            },
+            {
+              id: 'tabs',
+              title: '탭별 편집 흐름',
+              description: '기본 정보부터 방명록, 퀴즈, 타임라인, 공개 설정까지 탭 단위로 나누어 관리합니다.',
+              selector: '[data-tour="builder-tabs"]',
+              placement: 'bottom'
+            },
+            {
+              id: 'tab-actions',
+              title: '저장과 되돌리기',
+              description: '현재 탭 저장 버튼으로만 실제 반영되며, 필요하면 현재 탭만 되돌릴 수 있습니다.',
+              selector: '[data-tour="builder-tab-actions"]',
+              placement: 'bottom'
+            },
+            {
+              id: 'editor',
+              title: '편집 패널',
+              description: '왼쪽 영역에서 내용을 수정합니다. 저장 전까지는 초안 상태로만 유지됩니다.',
+              selector: '[data-tour="builder-editor-panel"]',
+              placement: 'right'
+            },
+            {
+              id: 'preview',
+              title: '실시간 미리보기',
+              description: '오른쪽 미리보기는 초안 변경을 즉시 반영하고, 편집한 위치로 자동 이동해 확인하기 쉽습니다.',
+              selector: '[data-tour="builder-preview-panel"]',
+              placement: 'left'
+            },
+            {
+              id: 'more',
+              title: '추가 메뉴',
+              description: '자주 쓰지만 상단을 복잡하게 만들고 싶지 않은 기능은 이 메뉴에 담겨 있습니다.',
+              selector: '[data-tour="builder-more-trigger"]',
+              placement: 'bottom'
+            },
+            {
+              id: 'walkthrough-entry',
+              title: '가이드 다시 열기',
+              description: '처음 사용자 안내가 필요하거나 작업 흐름을 다시 보고 싶을 때 이 메뉴를 사용합니다.',
+              selector: '[data-tour="builder-menu-walkthrough"]',
+              placement: 'left',
+              onEnter: () => setMoreMenuOpen(true)
+            }
+          ]
+        : [
+            {
+              id: 'header',
+              title: 'Builder workspace',
+              description: 'This header shows invitation identity, slug, and publication status at a glance.',
+              selector: '[data-tour="builder-header"]',
+              placement: 'bottom'
+            },
+            {
+              id: 'tabs',
+              title: 'Section-based editing',
+              description: 'Move across tabs to edit details, sections, moderation, timeline, and publishing.',
+              selector: '[data-tour="builder-tabs"]',
+              placement: 'bottom'
+            },
+            {
+              id: 'tab-actions',
+              title: 'Save discipline',
+              description: 'Use Save current tab for explicit writes and Discard current tab to revert tab-level drafts.',
+              selector: '[data-tour="builder-tab-actions"]',
+              placement: 'bottom'
+            },
+            {
+              id: 'editor',
+              title: 'Editing panel',
+              description: 'The left panel is your active editor. Inputs change only draft state until saved.',
+              selector: '[data-tour="builder-editor-panel"]',
+              placement: 'right'
+            },
+            {
+              id: 'preview',
+              title: 'Live preview pane',
+              description: 'The preview on the right updates from draft values and supports focused auto-scroll.',
+              selector: '[data-tour="builder-preview-panel"]',
+              placement: 'left'
+            },
+            {
+              id: 'more',
+              title: 'More actions',
+              description: 'Use this menu for advanced tools without crowding the main header.',
+              selector: '[data-tour="builder-more-trigger"]',
+              placement: 'bottom'
+            },
+            {
+              id: 'walkthrough-entry',
+              title: 'Walkthrough command',
+              description: 'This command reopens the walkthrough whenever you need onboarding or a refresher.',
+              selector: '[data-tour="builder-menu-walkthrough"]',
+              placement: 'left',
+              onEnter: () => setMoreMenuOpen(true)
+            }
+          ],
+    [isKorean, setMoreMenuOpen]
   );
 
   return (
     <div className="min-h-screen bg-slate-100/70">
       <Head>
-        <title>Invitation Builder | {draftInvitation.title ?? 'Untitled'}</title>
+        <title>{isKorean ? '청첩장 편집실' : 'Invitation Builder'} | {draftInvitation.title ?? (isKorean ? '제목 없음' : 'Untitled')}</title>
       </Head>
       <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6 lg:py-8">
         <header data-tour="builder-header" className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="space-y-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Invitation Builder</p>
-              <h1 className="text-2xl font-semibold text-slate-900">{draftInvitation.title ?? 'Untitled invitation'}</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">{isKorean ? '청첩장 편집실' : 'Invitation Builder'}</p>
+              <h1 className="text-2xl font-semibold text-slate-900">{draftInvitation.title ?? (isKorean ? '제목 없는 청첩장' : 'Untitled invitation')}</h1>
               <p className="text-sm text-slate-600">
                 {draftInvitation.groomName} &amp; {draftInvitation.brideName}
               </p>
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700">slug: {draftInvitation.slug}</span>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-700">{isKorean ? '링크 주소' : 'slug'}: {draftInvitation.slug}</span>
                 <span
                   className={`rounded-full px-2.5 py-1 font-semibold uppercase tracking-wide ${
                     draftInvitation.status === 'published'
@@ -1405,16 +1524,17 @@ export default function InvitationBuilder({
                         : 'bg-slate-200 text-slate-700'
                   }`}
                 >
-                  {draftInvitation.status}
+                  {statusLabels[draftInvitation.status as 'draft' | 'published' | 'private'] ?? draftInvitation.status}
                 </span>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <LanguageToggle />
               <Link
                 href="/dashboard"
                 className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
               >
-                Back to dashboard
+                {isKorean ? '대시보드로' : 'Back to dashboard'}
               </Link>
               {draftInvitation.status === 'published' && draftInvitation.slug && (
                 <a
@@ -1424,7 +1544,7 @@ export default function InvitationBuilder({
                   rel="noreferrer"
                   className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                 >
-                  View public page
+                  {isKorean ? '공개 페이지 보기' : 'View public page'}
                 </a>
               )}
               <div ref={moreMenuRef} className="relative">
@@ -1434,7 +1554,7 @@ export default function InvitationBuilder({
                   onClick={() => setMoreMenuOpen((prev) => !prev)}
                   className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
                   aria-expanded={moreMenuOpen}
-                  aria-label="More actions"
+                  aria-label={isKorean ? "추가 메뉴" : "More actions"}
                 >
                   <Ellipsis className="h-5 w-5" />
                 </button>
@@ -1450,7 +1570,7 @@ export default function InvitationBuilder({
                       className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                     >
                       <HelpCircle className="h-4 w-4 text-cyan-600" />
-                      Start walkthrough
+                      {isKorean ? '사용 가이드 보기' : 'Start walkthrough'}
                     </button>
                     <button
                       type="button"
@@ -1460,7 +1580,7 @@ export default function InvitationBuilder({
                       className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                     >
                       <Copy className="h-4 w-4 text-slate-500" />
-                      Copy builder link
+                      {isKorean ? '빌더 링크 복사' : 'Copy builder link'}
                     </button>
                     <button
                       type="button"
@@ -1471,7 +1591,7 @@ export default function InvitationBuilder({
                       className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                     >
                       <LogOut className="h-4 w-4 text-slate-500" />
-                      Sign out
+                      {isKorean ? '로그아웃' : 'Sign out'}
                     </button>
                   </div>
                 )}
@@ -1490,23 +1610,23 @@ export default function InvitationBuilder({
                 }`}
                 onClick={() => trySwitchTab(tab)}
               >
-                <span>{tab}</span>
+                <span>{tabLabels[tab]}</span>
                 {tabHasChanges(tab) && (
                   <span className={`h-1.5 w-1.5 rounded-full ${activeTab === tab ? 'bg-amber-300' : 'bg-amber-500'}`} />
                 )}
               </button>
             ))}
           </div>
-          <p className="mt-3 text-sm text-slate-600">{tabDescriptions[activeTab]} Press Ctrl/Cmd + S to save current tab.</p>
+          <p className="mt-3 text-sm text-slate-600">{tabDescriptionsLocalized[activeTab]} {isKorean ? 'Ctrl/Cmd + S로 현재 탭을 저장할 수 있습니다.' : 'Press Ctrl/Cmd + S to save current tab.'}</p>
         </header>
 
         <div data-tour="builder-tab-actions" className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           {statusMessage ? (
             <div
               className={`rounded-xl border px-4 py-2.5 text-sm ${
-                statusMessage.toLowerCase().includes('fail') || statusMessage.toLowerCase().includes('unable')
+                /fail|unable|error|못했습니다|실패|오류/i.test(statusMessage)
                   ? 'border-red-200 bg-red-50 text-red-700'
-                  : statusMessage === 'Saved'
+                  : /saved|deleted|copied|저장됨|삭제됨|복사/i.test(statusMessage)
                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                     : 'border-slate-200 bg-white text-slate-700'
               }`}
@@ -1514,7 +1634,7 @@ export default function InvitationBuilder({
               {statusMessage}
             </div>
           ) : (
-            <div className="text-sm text-slate-500">All changes in the current tab must be saved manually.</div>
+            <div className="text-sm text-slate-500">{isKorean ? '현재 탭의 변경사항은 저장 버튼을 눌러야 실제로 반영됩니다.' : 'All changes in the current tab must be saved manually.'}</div>
           )}
 
           <div className="flex flex-wrap items-center gap-2">
@@ -1524,7 +1644,7 @@ export default function InvitationBuilder({
               disabled={!tabHasChanges(activeTab)}
               className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
             >
-              Discard current tab
+              {isKorean ? '현재 탭 되돌리기' : 'Discard current tab'}
             </button>
             <button
               type="button"
@@ -1534,7 +1654,7 @@ export default function InvitationBuilder({
               disabled={!tabHasChanges(activeTab) || activeTabSaving || activeTab === 'Export'}
               className="inline-flex h-10 items-center justify-center rounded-full bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
             >
-              {activeTabSaving ? 'Saving...' : 'Save current tab'}
+              {activeTabSaving ? (isKorean ? '저장 중…' : 'Saving...') : isKorean ? '현재 탭 저장' : 'Save current tab'}
             </button>
           </div>
         </div>
@@ -1547,7 +1667,7 @@ export default function InvitationBuilder({
               mobilePane === 'editor' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700'
             }`}
           >
-            Editor
+            {isKorean ? '편집' : 'Editor'}
           </button>
           <button
             type="button"
@@ -1556,7 +1676,7 @@ export default function InvitationBuilder({
               mobilePane === 'preview' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700'
             }`}
           >
-            Preview
+            {isKorean ? '미리보기' : 'Preview'}
           </button>
         </div>
 
@@ -1575,12 +1695,12 @@ export default function InvitationBuilder({
                   onClick={saveBasic}
                   disabled={!hasBasicChanges || basicSaving}
                 >
-                  {basicSaving ? 'Saving...' : 'Save Basic'}
+                  {basicSaving ? (isKorean ? '저장 중…' : 'Saving...') : isKorean ? '기본 정보 저장' : 'Save Basic'}
                 </button>
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-1 text-sm font-medium text-slate-700">
-                  Groom name
+                  {isKorean ? '신랑 이름' : 'Groom name'}
                   <input
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
                     value={draftInvitation.groomName}
@@ -1588,7 +1708,7 @@ export default function InvitationBuilder({
                   />
                 </label>
                 <label className="space-y-1 text-sm font-medium text-slate-700">
-                  Bride name
+                  {isKorean ? '신부 이름' : 'Bride name'}
                   <input
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
                     value={draftInvitation.brideName}
@@ -1597,7 +1717,7 @@ export default function InvitationBuilder({
                 </label>
               </div>
               <label className="space-y-1 text-sm font-medium text-slate-700">
-                Wedding date &amp; time
+                {isKorean ? '예식 일시' : 'Wedding date & time'}
                 <input
                   type="datetime-local"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2"
@@ -1609,7 +1729,7 @@ export default function InvitationBuilder({
               </label>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-1 text-sm font-medium text-slate-700">
-                  Venue name
+                  {isKorean ? '예식장명' : 'Venue name'}
                   <input
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
                     value={draftInvitation.venueName}
@@ -1617,7 +1737,7 @@ export default function InvitationBuilder({
                   />
                 </label>
                 <label className="space-y-1 text-sm font-medium text-slate-700">
-                  Address
+                  {isKorean ? '주소' : 'Address'}
                   <input
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
                     value={draftInvitation.address}
@@ -1627,7 +1747,7 @@ export default function InvitationBuilder({
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-1 text-sm font-medium text-slate-700">
-                  Accounts (groom)
+                  {isKorean ? '신랑측 계좌' : 'Accounts (groom)'}
                   <input
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
                     value={draftInvitation.accountGroom ?? ''}
@@ -1635,7 +1755,7 @@ export default function InvitationBuilder({
                   />
                 </label>
                 <label className="space-y-1 text-sm font-medium text-slate-700">
-                  Accounts (bride)
+                  {isKorean ? '신부측 계좌' : 'Accounts (bride)'}
                   <input
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
                     value={draftInvitation.accountBride ?? ''}
@@ -1645,7 +1765,7 @@ export default function InvitationBuilder({
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-1 text-sm font-medium text-slate-700">
-                  Contacts (groom)
+                  {isKorean ? '신랑측 연락처' : 'Contacts (groom)'}
                   <input
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
                     value={draftInvitation.contactGroom ?? ''}
@@ -1653,7 +1773,7 @@ export default function InvitationBuilder({
                   />
                 </label>
                 <label className="space-y-1 text-sm font-medium text-slate-700">
-                  Contacts (bride)
+                  {isKorean ? '신부측 연락처' : 'Contacts (bride)'}
                   <input
                     className="w-full rounded-lg border border-slate-200 px-3 py-2"
                     value={draftInvitation.contactBride ?? ''}
@@ -1662,7 +1782,7 @@ export default function InvitationBuilder({
                 </label>
               </div>
               <div className="space-y-2">
-                <p className="text-sm font-medium text-slate-700">Template</p>
+                <p className="text-sm font-medium text-slate-700">{isKorean ? "템플릿" : "Template"}</p>
                 <div className="grid gap-3 md:grid-cols-2">
                   {templateOptions.map((template) => (
                     <button
@@ -1676,7 +1796,7 @@ export default function InvitationBuilder({
                       }`}
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold">{template.name}</p>
+                        <p className="text-sm font-semibold">{isKorean ? KOREAN_TEMPLATE_TEXT[template.key as keyof typeof KOREAN_TEMPLATE_TEXT].name : template.name}</p>
                         <span
                           className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${
                             draftInvitation.templateKey === template.key
@@ -1684,14 +1804,14 @@ export default function InvitationBuilder({
                               : 'bg-slate-100 text-slate-600'
                           }`}
                         >
-                          {template.concept}
+                          {isKorean ? KOREAN_TEMPLATE_TEXT[template.key as keyof typeof KOREAN_TEMPLATE_TEXT].concept : template.concept}
                         </span>
                       </div>
                       <p className={`mt-2 text-xs leading-relaxed ${draftInvitation.templateKey === template.key ? 'text-slate-100/90' : 'text-slate-600'}`}>
-                        {template.description}
+                        {isKorean ? KOREAN_TEMPLATE_TEXT[template.key as keyof typeof KOREAN_TEMPLATE_TEXT].description : template.description}
                       </p>
                       <p className={`mt-2 text-xs ${draftInvitation.templateKey === template.key ? 'text-slate-200/90' : 'text-slate-500'}`}>
-                        Best for: {template.recommendedFor}
+                        {isKorean ? '추천 분위기' : 'Best for'}: {isKorean ? KOREAN_TEMPLATE_TEXT[template.key as keyof typeof KOREAN_TEMPLATE_TEXT].recommendedFor : template.recommendedFor}
                       </p>
                     </button>
                   ))}
@@ -1709,10 +1829,10 @@ export default function InvitationBuilder({
                   onClick={saveSections}
                   disabled={!hasSectionsChanges || sectionsSaving}
                 >
-                  {sectionsSaving ? 'Saving...' : 'Save Sections'}
+                  {sectionsSaving ? (isKorean ? '저장 중…' : 'Saving...') : isKorean ? '섹션 저장' : 'Save Sections'}
                 </button>
               </div>
-              <p className="text-sm text-slate-700">Drag to reorder sections. Toggle visibility as needed.</p>
+              <p className="text-sm text-slate-700">{isKorean ? '드래그로 섹션 순서를 바꾸고, 필요한 항목만 노출할 수 있습니다.' : 'Drag to reorder sections. Toggle visibility as needed.'}</p>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={orderedSections.map((section) => section.id)} strategy={verticalListSortingStrategy}>
                   <div className="space-y-3">
@@ -1720,7 +1840,7 @@ export default function InvitationBuilder({
                       <SortableItem
                         key={section.id}
                         section={section}
-                        label={DEFAULT_SECTIONS.find((def) => def.key === section.key)?.label ?? section.key}
+                        label={sectionLabels[section.key] ?? section.key}
                         onToggle={handleToggle}
                       />
                     ))}
@@ -1731,12 +1851,12 @@ export default function InvitationBuilder({
               <div className="mt-6 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-slate-800">Food vote options</p>
-                    <p className="text-xs text-slate-600">Manage 2 to 6 options and drag to reorder.</p>
+                    <p className="text-sm font-semibold text-slate-800">{isKorean ? '식사 메뉴 투표' : 'Food vote options'}</p>
+                    <p className="text-xs text-slate-600">{isKorean ? '항목은 2개에서 6개까지 등록할 수 있고, 순서도 직접 조정할 수 있습니다.' : 'Manage 2 to 6 options and drag to reorder.'}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button type="button" onClick={addFoodVoteOption} disabled={orderedFoodVoteOptions.length >= 6} className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-50">Add option</button>
-                    <button type="button" onClick={saveFoodVoteOptions} disabled={!hasFoodVoteChanges || foodVoteSaving} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{foodVoteSaving ? 'Saving...' : 'Save food vote'}</button>
+                    <button type="button" onClick={addFoodVoteOption} disabled={orderedFoodVoteOptions.length >= 6} className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-50">{isKorean ? "항목 추가" : "Add option"}</button>
+                    <button type="button" onClick={saveFoodVoteOptions} disabled={!hasFoodVoteChanges || foodVoteSaving} className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{foodVoteSaving ? (isKorean ? "저장 중…" : "Saving...") : isKorean ? "메뉴 투표 저장" : "Save food vote"}</button>
                   </div>
                 </div>
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleFoodVoteDragEnd}>
@@ -1761,13 +1881,13 @@ export default function InvitationBuilder({
                   onClick={saveGuestbook}
                   disabled={!hasGuestbookChanges || guestbookSaving}
                 >
-                  {guestbookSaving ? 'Saving...' : 'Save changes'}
+                  {guestbookSaving ? (isKorean ? '저장 중…' : 'Saving...') : isKorean ? '변경사항 저장' : 'Save changes'}
                 </button>
               </div>
-              <p className="text-sm text-slate-700">Toggle visibility or delete messages from the public guestbook.</p>
+              <p className="text-sm text-slate-700">{isKorean ? '공개 방명록에 보여줄지 숨길지 정리하고, 원치 않는 메시지는 삭제할 수 있습니다.' : 'Toggle visibility or delete messages from the public guestbook.'}</p>
               <div className="space-y-3">
                 {draftGuestbookEntries.length === 0 && (
-                  <p className="text-sm text-slate-600">No guestbook entries yet.</p>
+                  <p className="text-sm text-slate-600">{isKorean ? '아직 등록된 방명록 메시지가 없습니다.' : 'No guestbook entries yet.'}</p>
                 )}
                 {draftGuestbookEntries.map((entry) => (
                   <div
@@ -1803,7 +1923,7 @@ export default function InvitationBuilder({
                               : 'border-emerald-200 bg-emerald-50 text-emerald-700'
                           }`}
                         >
-                          {entry.hidden ? 'Hidden' : 'Visible'}
+                          {entry.hidden ? (isKorean ? '숨김' : 'Hidden') : isKorean ? '노출 중' : 'Visible'}
                         </button>
                         <button
                           type="button"
@@ -1814,7 +1934,7 @@ export default function InvitationBuilder({
                           disabled={guestbookSaving}
                           className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-red-700 transition hover:bg-red-100 disabled:opacity-50"
                         >
-                          Delete
+                          {isKorean ? '삭제' : 'Delete'}
                         </button>
                       </div>
                     </div>
@@ -1833,14 +1953,14 @@ export default function InvitationBuilder({
                   onClick={saveQuiz}
                   disabled={!hasQuizChanges || quizSaving}
                 >
-                  {quizSaving ? 'Saving...' : 'Save Quiz'}
+                  {quizSaving ? (isKorean ? '저장 중…' : 'Saving...') : isKorean ? '퀴즈 저장' : 'Save Quiz'}
                 </button>
               </div>
 
               <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                 <div>
-                  <p className="text-sm font-semibold text-slate-800">Enable quiz</p>
-                  <p className="text-xs text-slate-600">Guests will only see the quiz once this invitation is published.</p>
+                  <p className="text-sm font-semibold text-slate-800">{isKorean ? '퀴즈 사용' : 'Enable quiz'}</p>
+                  <p className="text-xs text-slate-600">{isKorean ? '청첩장을 공개한 뒤에만 하객에게 퀴즈가 노출됩니다.' : 'Guests will only see the quiz once this invitation is published.'}</p>
                 </div>
                 <button
                   type="button"
@@ -1851,15 +1971,15 @@ export default function InvitationBuilder({
                       : 'border-slate-200 bg-slate-100 text-slate-600'
                   }`}
                 >
-                  {draftQuiz.enabled ? 'Enabled' : 'Disabled'}
+                  {draftQuiz.enabled ? (isKorean ? '사용 중' : 'Enabled') : isKorean ? '사용 안 함' : 'Disabled'}
                 </button>
               </div>
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-800">Questions</h3>
-                    <p className="text-xs text-slate-600">Add up to 5 questions with exactly 4 options each.</p>
+                    <h3 className="text-sm font-semibold text-slate-800">{isKorean ? '문제 목록' : 'Questions'}</h3>
+                    <p className="text-xs text-slate-600">{isKorean ? '문제는 최대 5개까지 만들 수 있고, 각 문제는 보기 4개로 구성됩니다.' : 'Add up to 5 questions with exactly 4 options each.'}</p>
                   </div>
                   <button
                     type="button"
@@ -1867,13 +1987,13 @@ export default function InvitationBuilder({
                     disabled={draftQuiz.questions.length >= 5 || quizSaving}
                     className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
                   >
-                    Add question
+                    {isKorean ? '문제 추가' : 'Add question'}
                   </button>
                 </div>
 
                 {draftQuiz.questions.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-700">
-                    Start by adding your first question. Quiz changes are only saved when you click "Save Quiz".
+                    {isKorean ? '먼저 첫 문제를 추가해 주세요. 퀴즈 내용은 저장 버튼을 눌러야 반영됩니다.' : 'Start by adding your first question. Quiz changes are only saved when you click Save Quiz.'}
                   </p>
                 ) : (
                   <div className="space-y-4">
@@ -1885,7 +2005,7 @@ export default function InvitationBuilder({
                         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                           <label className="flex-1 space-y-1 text-sm font-medium text-slate-700">
                             <div className="flex items-center justify-between">
-                              <span>Prompt</span>
+                              <span>{isKorean ? '문제 문구' : 'Prompt'}</span>
                               <span className="text-xs text-slate-500">{question.prompt.length}/120</span>
                             </div>
                             <input
@@ -1899,7 +2019,7 @@ export default function InvitationBuilder({
                                 })
                               }
                               className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                              placeholder="e.g. Who met first?"
+                              placeholder={isKorean ? '예: 처음 먼저 연락한 사람은 누구였을까요?' : 'e.g. Who met first?'}
                             />
                           </label>
                           <button
@@ -1908,7 +2028,7 @@ export default function InvitationBuilder({
                             disabled={quizSaving}
                             className="self-start rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
                           >
-                            Remove
+                            {isKorean ? '삭제' : 'Remove'}
                           </button>
                         </div>
 
@@ -1916,7 +2036,7 @@ export default function InvitationBuilder({
                           {question.options.map((option, optionIndex) => (
                             <label key={optionIndex} className="space-y-1 text-sm font-medium text-slate-700">
                               <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-500">
-                                <span>Option {optionIndex + 1}</span>
+                                <span>{isKorean ? `보기 ${optionIndex + 1}` : `Option ${optionIndex + 1}`}</span>
                                 <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-700">
                                   <input
                                     type="radio"
@@ -1927,7 +2047,7 @@ export default function InvitationBuilder({
                                       updateQuizQuestion(questionIndex, { correctIndex: optionIndex })
                                     }
                                   />
-                                  Correct
+                                  {isKorean ? '정답' : 'Correct'}
                                 </span>
                               </div>
                               <input
@@ -1936,7 +2056,7 @@ export default function InvitationBuilder({
                                 onFocus={() => focusPreviewTarget(`quiz-question-${questionIndex}`)}
                                 onChange={(e) => updateQuizOption(questionIndex, optionIndex, e.target.value)}
                                 className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                                placeholder={`Option ${optionIndex + 1}`}
+                                placeholder={isKorean ? `보기 ${optionIndex + 1}` : `Option ${optionIndex + 1}`}
                               />
                             </label>
                           ))}
@@ -1958,13 +2078,13 @@ export default function InvitationBuilder({
                   onClick={saveTimeline}
                   disabled={!hasTimelineChanges || timelineSaving}
                 >
-                  {timelineSaving ? 'Saving...' : 'Save Timeline'}
+                  {timelineSaving ? (isKorean ? '저장 중…' : 'Saving...') : isKorean ? '타임라인 저장' : 'Save Timeline'}
                 </button>
               </div>
               <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
                 <div>
-                  <p className="text-sm font-semibold text-slate-800">Enable timeline puzzle</p>
-                  <p className="text-xs text-slate-600">Guests will only see the timeline after publishing.</p>
+                  <p className="text-sm font-semibold text-slate-800">{isKorean ? '타임라인 퍼즐 사용' : 'Enable timeline puzzle'}</p>
+                  <p className="text-xs text-slate-600">{isKorean ? '청첩장을 공개하면 하객이 타임라인 퍼즐을 볼 수 있습니다.' : 'Guests will only see the timeline after publishing.'}</p>
                 </div>
                 <button
                   type="button"
@@ -1975,15 +2095,15 @@ export default function InvitationBuilder({
                       : 'border-slate-200 bg-slate-100 text-slate-600'
                   }`}
                 >
-                  {draftTimeline.enabled ? 'Enabled' : 'Disabled'}
+                  {draftTimeline.enabled ? (isKorean ? '사용 중' : 'Enabled') : isKorean ? '사용 안 함' : 'Disabled'}
                 </button>
               </div>
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-800">Timeline cards</h3>
-                    <p className="text-xs text-slate-600">Add 5-7 moments for guests to reorder.</p>
+                    <h3 className="text-sm font-semibold text-slate-800">{isKorean ? '타임라인 카드' : 'Timeline cards'}</h3>
+                    <p className="text-xs text-slate-600">{isKorean ? '하객이 순서를 맞춰 볼 수 있도록 순간 카드 5~7장을 구성해 주세요.' : 'Add 5-7 moments for guests to reorder.'}</p>
                   </div>
                   <button
                     type="button"
@@ -1991,7 +2111,7 @@ export default function InvitationBuilder({
                     disabled={draftTimeline.cards.length >= 7}
                     className="rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
                   >
-                    Add card
+                    {isKorean ? '카드 추가' : 'Add card'}
                   </button>
                 </div>
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleTimelineDragEnd}>
@@ -2013,14 +2133,14 @@ export default function InvitationBuilder({
                 </DndContext>
                 {timelineUploadError && <p className="text-xs text-red-600">{timelineUploadError}</p>}
                 {draftTimeline.enabled && draftTimeline.cards.length < 5 && (
-                  <p className="text-xs text-amber-600">Add at least 5 cards to enable the puzzle.</p>
+                  <p className="text-xs text-amber-600">{isKorean ? '퍼즐을 사용하려면 카드가 최소 5장 필요합니다.' : 'Add at least 5 cards to enable the puzzle.'}</p>
                 )}
               </div>
 
               <div className="space-y-3">
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-800">Correct order</h3>
-                  <p className="text-xs text-slate-600">Drag cards into the correct timeline sequence.</p>
+                  <h3 className="text-sm font-semibold text-slate-800">{isKorean ? '정답 순서' : 'Correct order'}</h3>
+                  <p className="text-xs text-slate-600">{isKorean ? '실제 순서대로 드래그해 정답 순서를 정해 주세요.' : 'Drag cards into the correct timeline sequence.'}</p>
                 </div>
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCorrectOrderDragEnd}>
                   <SortableContext items={orderedCorrectCards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
@@ -2044,11 +2164,11 @@ export default function InvitationBuilder({
                   onClick={savePublish}
                   disabled={!hasPublishChanges || publishSaving}
                 >
-                  {publishSaving ? 'Saving...' : 'Save Publish'}
+                  {publishSaving ? (isKorean ? '저장 중…' : 'Saving...') : isKorean ? '공개 설정 저장' : 'Save Publish'}
                 </button>
               </div>
               <div className="space-y-2">
-                <p className="text-sm font-medium text-slate-800">Status</p>
+                <p className="text-sm font-medium text-slate-800">{isKorean ? '공개 상태' : 'Status'}</p>
                 <div className="flex gap-2">
                   {['draft', 'published', 'private'].map((status) => (
                     <button
@@ -2058,7 +2178,7 @@ export default function InvitationBuilder({
                         draftInvitation.status === status ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200'
                       }`}
                     >
-                      {status}
+                      {statusLabels[status as 'draft' | 'published' | 'private'] ?? status}
                     </button>
                   ))}
                 </div>
@@ -2073,7 +2193,7 @@ export default function InvitationBuilder({
                 {slugError && <p className="text-xs text-red-600">{slugError}</p>}
                 {draftInvitation.status === 'published' && (
                   <div className="mt-3 space-y-2 rounded-lg border border-slate-100 bg-slate-50 p-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Public URL</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{isKorean ? '공개 링크' : 'Public URL'}</p>
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div className="flex flex-wrap items-center gap-2 text-lg font-semibold text-slate-900">
                         <span className="text-slate-600">{origin ? `${origin}/` : '/'}</span>
@@ -2087,7 +2207,7 @@ export default function InvitationBuilder({
                         className="inline-flex items-center justify-center rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm disabled:opacity-50"
                         disabled={!draftInvitation.slug}
                       >
-                        Copy
+                        {isKorean ? '복사' : 'Copy'}
                       </button>
                     </div>
                     {copyMessage && <p className="text-xs text-emerald-600">{copyMessage}</p>}
@@ -2095,14 +2215,14 @@ export default function InvitationBuilder({
                 )}
               </div>
               <div className="space-y-2">
-                <p className="text-sm font-medium text-slate-800">Danger zone</p>
+                <p className="text-sm font-medium text-slate-800">{isKorean ? '삭제' : 'Danger zone'}</p>
                 <button
                   type="button"
                   onClick={deleteInvitation}
                   disabled={deleteSaving}
                   className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:opacity-50"
                 >
-                  {deleteSaving ? 'Deleting...' : 'Delete invitation'}
+                  {deleteSaving ? (isKorean ? '삭제 중…' : 'Deleting...') : isKorean ? '청첩장 삭제' : 'Delete invitation'}
                 </button>
               </div>
             </div>
@@ -2110,38 +2230,38 @@ export default function InvitationBuilder({
 
           {activeTab === 'Export' && (
             <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-              <p className="text-base font-semibold text-slate-900">RSVP Summary</p>
+              <p className="text-base font-semibold text-slate-900">{isKorean ? '참석 응답 요약' : 'RSVP Summary'}</p>
               <div className="flex items-center justify-between">
-                <p className="text-sm text-slate-600">Quick attendance snapshot</p>
+                <p className="text-sm text-slate-600">{isKorean ? '현재까지 접수된 참석 응답을 빠르게 확인할 수 있습니다.' : 'Quick attendance snapshot'}</p>
               </div>
               <a
                 href={`/api/export/rsvp.csv?invitationId=${savedInvitation.id}`}
                 className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 shadow-sm"
               >
-                Download CSV
+                {isKorean ? 'CSV 내려받기' : 'Download CSV'}
               </a>
 
               <div className="grid gap-3 md:grid-cols-4">
                 <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Total Responses</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">{isKorean ? '응답 수' : 'Total Responses'}</p>
                   <p className="text-2xl font-semibold text-slate-900">
                     {rsvpSummary ? rsvpSummary.totals.responsesTotal : rsvpLoading ? '...' : '0'}
                   </p>
                 </div>
                 <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Guests</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">{isKorean ? '동반 인원' : 'Guests'}</p>
                   <p className="text-2xl font-semibold text-slate-900">
                     {rsvpSummary ? rsvpSummary.totals.guestsTotal : rsvpLoading ? '...' : '0'}
                   </p>
                 </div>
                 <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Kids</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">{isKorean ? '아동 인원' : 'Kids'}</p>
                   <p className="text-2xl font-semibold text-slate-900">
                     {rsvpSummary ? rsvpSummary.totals.kidsTotal : rsvpLoading ? '...' : '0'}
                   </p>
                 </div>
                 <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Recent Samples</p>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">{isKorean ? '최근 응답 샘플' : 'Recent Samples'}</p>
                   <p className="text-2xl font-semibold text-slate-900">
                     {rsvpSummary ? rsvpSummary.recentSampleCount ?? 0 : rsvpLoading ? '...' : '0'}
                   </p>
@@ -2151,7 +2271,7 @@ export default function InvitationBuilder({
               <div className="grid gap-3 md:grid-cols-3">
                 {(['yes', 'maybe', 'no'] as const).map((key) => (
                   <div key={key} className="rounded-lg border border-slate-100 p-4">
-                    <p className="text-xs uppercase tracking-wide text-slate-500">{key}</p>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">{attendanceLabels[key]}</p>
                     <p className="text-2xl font-semibold text-slate-900">
                       {rsvpSummary ? rsvpSummary.countsByAttendance[key] : rsvpLoading ? '...' : '0'}
                     </p>
@@ -2165,12 +2285,12 @@ export default function InvitationBuilder({
         <div data-tour="builder-preview-panel" className={`w-full lg:w-[48%] ${mobilePane === 'editor' ? 'hidden lg:block' : ''}`}>
           <div className="sticky top-6 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-medium text-slate-700">Live preview</p>
+              <p className="text-sm font-medium text-slate-700">{isKorean ? '실시간 미리보기' : 'Live preview'}</p>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
-                Draft
+                {isKorean ? '초안' : 'Draft'}
               </span>
             </div>
-            <p className="mb-3 text-xs text-slate-500 lg:hidden">Preview scrolls independently so the editor stays in place.</p>
+            <p className="mb-3 text-xs text-slate-500 lg:hidden">{isKorean ? '미리보기만 따로 스크롤되어 편집 위치가 흔들리지 않습니다.' : 'Preview scrolls independently so the editor stays in place.'}</p>
             <div
               ref={previewScrollContainerRef}
               className="h-[62vh] overflow-y-auto overscroll-contain rounded-2xl border border-slate-100 bg-slate-50/30 lg:h-[calc(100vh-7.5rem)]"
@@ -2194,8 +2314,8 @@ export default function InvitationBuilder({
 
       <GuidedWalkthrough
         open={walkthroughOpen}
-        title="Builder Guide"
-        subtitle="A fast tour of editing, preview, and publishing controls."
+        title={isKorean ? "빌더 가이드" : "Builder Guide"}
+        subtitle={isKorean ? "편집, 미리보기, 공개 설정 흐름을 빠르게 둘러봅니다." : "A fast tour of editing, preview, and publishing controls."}
         steps={builderWalkthroughSteps}
         onClose={() => {
           setWalkthroughOpen(false);

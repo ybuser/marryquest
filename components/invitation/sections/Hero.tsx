@@ -1,4 +1,5 @@
 import { format } from 'date-fns';
+import { useLanguage, getDateLocale } from '@/components/i18n/LanguageProvider';
 
 interface HeroSectionProps {
   groomName: string;
@@ -8,7 +9,8 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({ groomName, brideName, dateTime, venueName }: HeroSectionProps) {
-  const displayDate = format(new Date(dateTime), 'PPP');
+  const { language, isKorean } = useLanguage();
+  const displayDate = format(new Date(dateTime), 'PPP', { locale: getDateLocale(language) });
 
   return (
     <section className="mq-hero-card relative overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-b from-[var(--mq-muted)]/50 via-[var(--mq-muted)]/30 to-transparent p-6 text-center text-[var(--mq-fg)] shadow-[0_30px_80px_rgba(15,23,42,0.35)] backdrop-blur-2xl sm:p-10">
@@ -18,7 +20,7 @@ export function HeroSection({ groomName, brideName, dateTime, venueName }: HeroS
           className="uppercase tracking-[0.4em] text-xs text-[var(--mq-accent)]"
           style={{ letterSpacing: 'var(--mq-letter-spacing)' }}
         >
-          You are invited
+          {isKorean ? '소중한 분을 초대합니다' : 'You are invited'}
         </p>
         <h1
           className="font-semibold"

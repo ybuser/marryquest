@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Sparkles, X } from 'lucide-react';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 export type WalkthroughPlacement = 'auto' | 'top' | 'bottom' | 'left' | 'right' | 'center';
 
@@ -33,6 +34,7 @@ function clamp(value: number, min: number, max: number) {
 }
 
 export function GuidedWalkthrough({ open, title, subtitle, steps, onClose, onComplete }: GuidedWalkthroughProps) {
+  const { isKorean } = useLanguage();
   const [stepIndex, setStepIndex] = useState(0);
   const [targetBox, setTargetBox] = useState<TargetBox | null>(null);
 
@@ -55,6 +57,7 @@ export function GuidedWalkthrough({ open, title, subtitle, steps, onClose, onCom
     if (shouldScroll) {
       target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
     }
+
     const rect = target.getBoundingClientRect();
     setTargetBox({
       top: rect.top,
@@ -227,13 +230,13 @@ export function GuidedWalkthrough({ open, title, subtitle, steps, onClose, onCom
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={`${title} step ${stepIndex + 1}`}
+        aria-label={isKorean ? `${title} 단계 ${stepIndex + 1}` : `${title} step ${stepIndex + 1}`}
         className="fixed overflow-y-auto rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xl"
         style={panelStyle}
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700">Walkthrough</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700">{isKorean ? '가이드' : 'Walkthrough'}</p>
             <h3 className="mt-1 text-lg font-semibold text-slate-900">{title}</h3>
             {subtitle && <p className="mt-1 text-sm text-slate-600">{subtitle}</p>}
           </div>
@@ -241,7 +244,7 @@ export function GuidedWalkthrough({ open, title, subtitle, steps, onClose, onCom
             type="button"
             onClick={onClose}
             className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
-            aria-label="Close walkthrough"
+            aria-label={isKorean ? '가이드 닫기' : 'Close walkthrough'}
           >
             <X className="h-4 w-4" />
           </button>
@@ -254,13 +257,15 @@ export function GuidedWalkthrough({ open, title, subtitle, steps, onClose, onCom
         <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
           <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             <Sparkles className="h-3.5 w-3.5 text-cyan-600" />
-            Step {stepIndex + 1} of {totalSteps}
+            {isKorean ? `${stepIndex + 1} / ${totalSteps} 단계` : `Step ${stepIndex + 1} of ${totalSteps}`}
           </div>
           <p className="text-base font-semibold text-slate-900">{activeStep.title}</p>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">{activeStep.description}</p>
           {activeStep.selector && !targetBox && (
             <p className="mt-2 text-xs font-medium text-amber-700">
-              This target is currently hidden in the UI. Continue to the next step.
+              {isKorean
+                ? '이 단계의 대상 요소가 지금 화면에 보이지 않습니다. 다음 단계로 넘어가도 괜찮습니다.'
+                : 'This target is currently hidden in the UI. Continue to the next step.'}
             </p>
           )}
         </div>
@@ -271,7 +276,7 @@ export function GuidedWalkthrough({ open, title, subtitle, steps, onClose, onCom
             onClick={onClose}
             className="text-sm font-medium text-slate-500 transition hover:text-slate-700"
           >
-            Skip
+            {isKorean ? '건너뛰기' : 'Skip'}
           </button>
           <div className="flex items-center gap-2">
             <button
@@ -281,7 +286,7 @@ export function GuidedWalkthrough({ open, title, subtitle, steps, onClose, onCom
               className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-45"
             >
               <ChevronLeft className="h-4 w-4" />
-              Back
+              {isKorean ? '이전' : 'Back'}
             </button>
             {stepIndex < steps.length - 1 ? (
               <button
@@ -289,7 +294,7 @@ export function GuidedWalkthrough({ open, title, subtitle, steps, onClose, onCom
                 onClick={() => setStepIndex((prev) => clamp(prev + 1, 0, Math.max(steps.length - 1, 0)))}
                 className="inline-flex h-9 items-center justify-center gap-1.5 rounded-full bg-slate-900 px-3.5 text-sm font-semibold text-white transition hover:bg-slate-800"
               >
-                Next
+                {isKorean ? '다음' : 'Next'}
                 <ChevronRight className="h-4 w-4" />
               </button>
             ) : (
@@ -301,7 +306,7 @@ export function GuidedWalkthrough({ open, title, subtitle, steps, onClose, onCom
                 }}
                 className="inline-flex h-9 items-center justify-center rounded-full bg-cyan-600 px-3.5 text-sm font-semibold text-white transition hover:bg-cyan-500"
               >
-                Finish
+                {isKorean ? '마치기' : 'Finish'}
               </button>
             )}
           </div>

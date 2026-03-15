@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { SectionCard } from './SectionCard';
 
 interface AccountsSectionProps {
@@ -9,13 +10,14 @@ interface AccountsSectionProps {
 }
 
 export function AccountsSection({ groomName, brideName, accountGroom, accountBride }: AccountsSectionProps) {
+  const { isKorean } = useLanguage();
   const [revealed, setRevealed] = useState(false);
   const hasAccounts = Boolean(accountGroom || accountBride);
 
   return (
     <SectionCard
-      title="Gift Accounts"
-      eyebrow="Private"
+      title={isKorean ? '마음 전하실 곳' : 'Gift Accounts'}
+      eyebrow={isKorean ? '계좌 안내' : 'Private'}
       actions={
         hasAccounts ? (
           <button
@@ -23,16 +25,16 @@ export function AccountsSection({ groomName, brideName, accountGroom, accountBri
             onClick={() => setRevealed((prev) => !prev)}
             className="mq-toggle-btn rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold tracking-wide text-[var(--mq-fg)] transition hover:-translate-y-0.5 hover:shadow-lg"
           >
-            {revealed ? 'Hide' : 'Show'}
+            {revealed ? (isKorean ? '숨기기' : 'Hide') : isKorean ? '보기' : 'Show'}
           </button>
         ) : null
       }
     >
-      {!hasAccounts && <p className="opacity-80">Account details are not provided yet.</p>}
+      {!hasAccounts && <p className="opacity-80">{isKorean ? '계좌 정보가 아직 등록되지 않았습니다.' : 'Account details are not provided yet.'}</p>}
 
       {hasAccounts && !revealed && (
         <p className="text-sm opacity-80">
-          For privacy, bank details are hidden. Tap "Show" to reveal when you need them.
+          {isKorean ? '개인정보 보호를 위해 계좌 정보는 기본적으로 가려져 있습니다. 필요할 때만 보기 버튼을 눌러 확인해 주세요.' : 'For privacy, bank details are hidden. Tap "Show" to reveal when you need them.'}
         </p>
       )}
 

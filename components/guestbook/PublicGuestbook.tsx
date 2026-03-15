@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
+import { useLanguage, getDateLocale } from '@/components/i18n/LanguageProvider';
 import type { GuestbookEntryDto } from '@/types/guestbook';
 import type { InvitationDetails } from '@/types/invitation';
 import type { QuizDto } from '@/types/quiz';
@@ -26,6 +27,7 @@ export function PublicGuestbook({
   previewEntries = [],
   previewMode = false
 }: PublicGuestbookProps) {
+  const { language, isKorean } = useLanguage();
   const [entries, setEntries] = useState<GuestbookEntryDto[]>(previewEntries);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +47,7 @@ export function PublicGuestbook({
       setEntries(previewEntries.filter((entry) => !entry.hidden));
       return;
     }
+
     if (invitationStatus !== 'published') return;
 
     async function fetchEntries() {
@@ -53,21 +56,21 @@ export function PublicGuestbook({
       try {
         const response = await fetch(`/api/guestbook?slug=${encodeURIComponent(slug)}`);
         if (!response.ok) {
-          setError('Unable to load guestbook right now.');
+          setError(isKorean ? '방명록을 불러오지 못했습니다.' : 'Unable to load guestbook right now.');
           return;
         }
         const data: GuestbookEntryDto[] = await response.json();
         setEntries(data);
       } catch (err) {
         console.error(err);
-        setError('Unable to load guestbook right now.');
+        setError(isKorean ? '방명록을 불러오지 못했습니다.' : 'Unable to load guestbook right now.');
       } finally {
         setLoading(false);
       }
     }
 
     void fetchEntries();
-  }, [invitationStatus, previewEntries, previewMode, slug]);
+  }, [invitationStatus, isKorean, previewEntries, previewMode, slug]);
 
   useEffect(() => {
     if (!previewMode) return;
@@ -76,10 +79,12 @@ export function PublicGuestbook({
 
   async function submitEntry(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
     if (previewMode) {
-      setSuccessMessage('Preview mode: guestbook submission disabled.');
+      setSuccessMessage(isKorean ? '미리보기에서는 방명록 작성이 비활성화됩니다.' : 'Preview mode: guestbook submission disabled.');
       return;
     }
+
     setSubmitting(true);
     setError(null);
     setSuccessMessage(null);
@@ -107,14 +112,18 @@ export function PublicGuestbook({
           const attemptedBonus = Boolean(requestPayload.badgeToken || requestPayload.badge === 'quizPerfect');
           setError(
             attemptedBonus
-              ? 'This device cannot add any more guestbook messages.'
-              : 'This device can leave one guestbook message by default, plus one more after a perfect quiz score.'
+              ? isKorean
+                ? '이 기기에서는 더 이상 방명록을 남길 수 없습니다.'
+                : 'This device cannot add any more guestbook messages.'
+              : isKorean
+                ? '이 기기에서는 기본 1회, 퀴즈 만점 시 1회 추가로 방명록을 남길 수 있습니다.'
+                : 'This device can leave one guestbook message by default, plus one more after a perfect quiz score.'
           );
           return;
         }
 
         const errorPayload = await response.json().catch(() => null);
-        const messageText = errorPayload?.error ?? 'Unable to sign the guestbook.';
+        const messageText = errorPayload?.error ?? (isKorean ? '방명록을 등록하지 못했습니다.' : 'Unable to sign the guestbook.');
         setError(Array.isArray(messageText) ? messageText.join(', ') : messageText);
         return;
       }
@@ -123,10 +132,10 @@ export function PublicGuestbook({
       setEntries((prev) => [created, ...prev]);
       setNickname('');
       setMessage('');
-      setSuccessMessage('Thanks for leaving a message!');
+      setSuccessMessage(isKorean ? '축하 메시지가 등록되었습니다.' : 'Thanks for leaving a message!');
     } catch (err) {
       console.error(err);
-      setError('Unable to sign the guestbook.');
+      setError(isKorean ? '방명록을 등록하지 못했습니다.' : 'Unable to sign the guestbook.');
     } finally {
       setSubmitting(false);
     }
@@ -134,6 +143,9 @@ export function PublicGuestbook({
 
   const badgeLabel = (badge: GuestbookEntryDto['badge']) => {
     if (badge === 'none') return null;
+    if (badge === 'quizPerfect') {
+      return isKorean ? '퀴즈 만점 배지' : 'Quiz Perfect';
+    }
     const label = badge.replace(/_/g, ' ');
     return label.charAt(0).toUpperCase() + label.slice(1);
   };
@@ -146,9 +158,11 @@ export function PublicGuestbook({
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-[var(--mq-fg)]">Quiz challenge</p>
+              <p className="text-sm font-semibold text-[var(--mq-fg)]">{isKorean ? '축하 퀴즈' : 'Quiz challenge'}</p>
               <p className="text-xs text-[var(--mq-fg)]/70">
-                Solve the wedding quiz to unlock a special guestbook badge.
+                {isKorean
+                  ? '퀴즈를 모두 맞히면 방명록에 특별 배지를 함께 남길 수 있어요.'
+                  : 'Solve the wedding quiz to unlock a special guestbook badge.'}
               </p>
             </div>
             <button
@@ -157,7 +171,7 @@ export function PublicGuestbook({
               className="mq-toggle-btn rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-[var(--mq-fg)] transition hover:border-white/40"
               aria-expanded={quizOpen}
             >
-              {quizOpen ? 'Close quiz' : 'Open quiz'}
+              {quizOpen ? (isKorean ? '퀴즈 접기' : 'Close quiz') : isKorean ? '퀴즈 열기' : 'Open quiz'}
             </button>
           </div>
           {quizOpen && quiz && (
@@ -173,38 +187,39 @@ export function PublicGuestbook({
           )}
         </div>
       )}
+
       {invitationStatus !== 'published' && !previewMode ? (
-        <p className="opacity-80">Guestbook will be available once this invitation is published.</p>
+        <p className="opacity-80">{isKorean ? '청첩장이 공개되면 방명록이 열립니다.' : 'Guestbook will be available once this invitation is published.'}</p>
       ) : (
         <form onSubmit={submitEntry} className="space-y-4">
           {previewMode && (
             <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[var(--mq-fg)]/80">
-              Preview mode: guestbook submissions are disabled.
+              {isKorean ? '미리보기에서는 방명록 작성이 비활성화됩니다.' : 'Preview mode: guestbook submissions are disabled.'}
             </p>
           )}
           <div className="grid gap-3 md:grid-cols-2">
             <label className="space-y-1 text-sm font-medium">
-              <span className="opacity-80">Nickname</span>
+              <span className="opacity-80">{isKorean ? '성함 또는 닉네임' : 'Nickname'}</span>
               <input
                 required
                 maxLength={20}
                 value={nickname}
                 onChange={(event) => setNickname(event.target.value)}
-                placeholder="Your nickname"
+                placeholder={isKorean ? '이름이나 닉네임을 입력해 주세요' : 'Your nickname'}
                 className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-base text-[var(--mq-fg)] placeholder:text-white/70 focus:border-white/40 focus:outline-none"
                 disabled={previewMode}
               />
               <span className="block text-xs opacity-70">{characterCounts.nickname}/20</span>
             </label>
             <label className="space-y-1 text-sm font-medium">
-              <span className="opacity-80">Message</span>
+              <span className="opacity-80">{isKorean ? '축하 메시지' : 'Message'}</span>
               <textarea
                 required
                 maxLength={300}
                 rows={3}
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
-                placeholder="Share your wishes"
+                placeholder={isKorean ? '축하의 마음을 남겨 주세요' : 'Share your wishes'}
                 className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-base text-[var(--mq-fg)] placeholder:text-white/70 focus:border-white/40 focus:outline-none"
                 disabled={previewMode}
               />
@@ -217,11 +232,11 @@ export function PublicGuestbook({
               disabled={previewMode || submitting || !nickname.trim() || !message.trim()}
               className="mq-guestbook-submit rounded-full bg-[var(--mq-fg)] px-5 py-2 text-sm font-semibold text-[var(--mq-bg)] transition hover:opacity-90 disabled:opacity-50"
             >
-              {submitting ? 'Submitting…' : 'Sign guestbook'}
+              {submitting ? (isKorean ? '등록 중…' : 'Submitting…') : isKorean ? '방명록 남기기' : 'Sign guestbook'}
             </button>
             {badgeToken && (
               <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-[var(--mq-fg)]">
-                quizPerfect badge ready
+                {isKorean ? '퀴즈 배지가 준비되었어요' : 'quizPerfect badge ready'}
               </span>
             )}
             {successMessage && <span className="text-sm text-emerald-100">{successMessage}</span>}
@@ -231,8 +246,8 @@ export function PublicGuestbook({
       )}
 
       <div className="space-y-4">
-        {loading && <p className="opacity-80">Loading messages…</p>}
-        {!loading && entries.length === 0 && <p className="opacity-70">No guestbook entries yet.</p>}
+        {loading && <p className="opacity-80">{isKorean ? '방명록을 불러오는 중…' : 'Loading messages…'}</p>}
+        {!loading && entries.length === 0 && <p className="opacity-70">{isKorean ? '아직 남겨진 방명록이 없습니다.' : 'No guestbook entries yet.'}</p>}
         <ul className="space-y-3">
           {entries.map((entry) => {
             const isPerfect = entry.badge === 'quizPerfect';
@@ -248,7 +263,7 @@ export function PublicGuestbook({
               >
                 <div className="flex flex-wrap items-center justify-between gap-2 text-sm opacity-80">
                   <span className="font-semibold text-[var(--mq-fg)]">{entry.nickname}</span>
-                  <span>{format(new Date(entry.createdAt), 'PPP')}</span>
+                  <span>{format(new Date(entry.createdAt), 'PPP', { locale: getDateLocale(language) })}</span>
                 </div>
                 {badgeLabel(entry.badge) && (
                   <span className="mt-1 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-[var(--mq-fg)]">

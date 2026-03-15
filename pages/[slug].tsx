@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import type { GetServerSideProps } from 'next';
 import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import prisma from '@/lib/db';
 import { InvitationPage } from '@/components/invitation/InvitationPage';
 import type { GalleryPhoto, InvitationDetails, SectionConfig } from '@/types/invitation';
@@ -20,18 +21,18 @@ interface PublicInvitationPageProps {
 
 export default function PublicInvitationPage({ invitation, sections, photos, baseUrl, quiz, timelinePuzzle }: PublicInvitationPageProps) {
   const date = new Date(invitation.dateTime);
-  const description = `${invitation.venueName} • ${format(date, 'PPP')}`;
-  const fallbackOg = `${baseUrl}/api/og?title=${encodeURIComponent(`${invitation.groomName} & ${invitation.brideName}`)}&subtitle=${encodeURIComponent(format(date, 'PPP'))}`;
+  const description = `${invitation.venueName} · ${format(date, 'PPP', { locale: ko })} 결혼식 안내`;
+  const fallbackOg = `${baseUrl}/api/og?title=${encodeURIComponent(`${invitation.groomName} & ${invitation.brideName}`)}&subtitle=${encodeURIComponent(format(date, 'PPP', { locale: ko }))}`;
   const ogImage = photos[0]?.url ?? fallbackOg;
 
   return (
     <>
       <Head>
         <title>
-          {invitation.groomName} &amp; {invitation.brideName} - Wedding Invitation
+          {invitation.groomName} &amp; {invitation.brideName} | 모바일 청첩장
         </title>
         <meta name="description" content={description} />
-        <meta property="og:title" content={`${invitation.groomName} & ${invitation.brideName} - Wedding Invitation`} />
+        <meta property="og:title" content={`${invitation.groomName} & ${invitation.brideName} | 모바일 청첩장`} />
         <meta property="og:description" content={description} />
         <meta property="og:type" content="website" />
         <meta property="og:image" content={ogImage} />

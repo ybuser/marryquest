@@ -297,8 +297,12 @@ High-signal files for future sessions:
 - `pages/login.tsx`
 - `pages/dashboard/index.tsx`
 - `pages/builder/[id].tsx`
+- `components/i18n/LanguageProvider.tsx`
+- `components/i18n/LanguageToggle.tsx`
 - `components/walkthrough/GuidedWalkthrough.tsx`
 - `components/invitation/InvitationPage.tsx`
+- `components/invitation/sections/MapButtons.tsx`
+- `components/invitation/sections/TimelineSection.tsx`
 - `pages/api/upload/timeline-card.ts`
 - `pages/api/guestbook/[entryId].ts`
 - `components/theme/tokens.ts`
@@ -334,7 +338,8 @@ As of 2026-03-15:
 - Test-user login system is implemented
 - Mobile/layout polish pass is implemented across landing, builder, walkthrough, and public invitation sections
 - Builder and dashboard now expose sign-out actions for test-user sessions
-- Public interaction copy is cleaned up and standardized to English in the main guest-facing flows
+- Language system is implemented with Korean as the default, a sitewide English toggle, and hydration-safe restoration of the saved language after mount
+- Landing, login, dashboard, builder, walkthrough, public invitation sections, and guestbook quiz copy are localized for Korean-first UX with English fallback
 - Invitation mobile behavior now includes tighter spacing, responsive gallery columns, and better small-screen cards for RSVP, guestbook, food vote, and timeline sections
 
 There is no active in-progress feature branch state recorded in this file. New Codex sessions should start from the current codebase and this document.

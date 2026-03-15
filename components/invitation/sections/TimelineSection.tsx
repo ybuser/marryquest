@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 import type { InvitationDetails } from '@/types/invitation';
 import type { TimelineCardDto, TimelinePuzzleDto } from '@/types/timeline';
 import type { MusicResponseDto } from '@/types/music';
@@ -19,6 +20,7 @@ interface SortableCardProps {
 }
 
 function SortableCard({ card }: SortableCardProps) {
+  const { isKorean } = useLanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
 
   const style = {
@@ -37,13 +39,13 @@ function SortableCard({ card }: SortableCardProps) {
       {...listeners}
     >
       <div className="flex items-center gap-3">
-        <span className="cursor-grab text-slate-400">⋮⋮</span>
+        <span className="cursor-grab text-slate-400">↕</span>
         {card.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={card.photoUrl} alt="" className="h-14 w-14 rounded-xl object-cover" />
         ) : (
           <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-dashed border-slate-200 text-[10px] text-slate-400">
-            No photo
+            {isKorean ? '사진 없음' : 'No photo'}
           </div>
         )}
       </div>
@@ -56,6 +58,7 @@ function SortableCard({ card }: SortableCardProps) {
 }
 
 function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string }) {
+  const { isKorean } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [musicData, setMusicData] = useState<MusicResponseDto | null>(null);
@@ -69,16 +72,16 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
     try {
       const response = await fetch(`/api/music?slug=${encodeURIComponent(slug)}`);
       if (!response.ok) {
-        throw new Error('Unable to load music');
+        throw new Error(isKorean ? '음악 목록을 불러오지 못했습니다.' : 'Unable to load music');
       }
       const payload: MusicResponseDto = await response.json();
       setMusicData(payload);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load music');
+      setError(err instanceof Error ? err.message : isKorean ? '음악 목록을 불러오지 못했습니다.' : 'Unable to load music');
     } finally {
       setLoading(false);
     }
-  }, [slug]);
+  }, [isKorean, slug]);
 
   useEffect(() => {
     void loadMusic();
@@ -96,15 +99,15 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
       });
       if (response.status === 409) {
         const payload = await response.json().catch(() => null);
-        setError(payload?.error ?? 'Already used your vote');
+        setError(payload?.error ?? (isKorean ? '이 기기에서는 이미 음악 투표를 완료했습니다.' : 'Already used your vote'));
         return;
       }
       if (!response.ok) {
-        throw new Error('Unable to save vote');
+        throw new Error(isKorean ? '투표를 저장하지 못했습니다.' : 'Unable to save vote');
       }
       await loadMusic();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to save vote');
+      setError(err instanceof Error ? err.message : isKorean ? '투표를 저장하지 못했습니다.' : 'Unable to save vote');
     } finally {
       setSubmitting(false);
     }
@@ -126,17 +129,17 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
       });
       if (response.status === 409) {
         const payload = await response.json().catch(() => null);
-        setError(payload?.error ?? 'Already used your vote');
+        setError(payload?.error ?? (isKorean ? '이 기기에서는 이미 음악 투표를 완료했습니다.' : 'Already used your vote'));
         return;
       }
       if (!response.ok) {
-        throw new Error('Unable to add track');
+        throw new Error(isKorean ? '곡을 추가하지 못했습니다.' : 'Unable to add track');
       }
       setTitle('');
       setArtist('');
       await loadMusic();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to add track');
+      setError(err instanceof Error ? err.message : isKorean ? '곡을 추가하지 못했습니다.' : 'Unable to add track');
     } finally {
       setSubmitting(false);
     }
@@ -147,14 +150,16 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
   return (
     <div className="mt-6 space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-lg font-semibold text-slate-900">Music voting</p>
-        {alreadyUsed && <span className="text-xs font-medium text-slate-500">Vote used</span>}
+        <p className="text-lg font-semibold text-slate-900">{isKorean ? '식전 음악 투표' : 'Music voting'}</p>
+        {alreadyUsed && <span className="text-xs font-medium text-slate-500">{isKorean ? '투표 완료' : 'Vote used'}</span>}
       </div>
-      {loading && <p className="text-sm text-slate-500">Loading tracks…</p>}
+      {loading && <p className="text-sm text-slate-500">{isKorean ? '곡 목록을 불러오는 중…' : 'Loading tracks…'}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
       {!loading && musicData && (
         <div className="space-y-3">
-          {musicData.tracks.length === 0 && <p className="text-sm text-slate-600">No tracks yet. Add one below.</p>}
+          {musicData.tracks.length === 0 && (
+            <p className="text-sm text-slate-600">{isKorean ? '아직 등록된 곡이 없습니다. 아래에서 직접 추가해 주세요.' : 'No tracks yet. Add one below.'}</p>
+          )}
           {musicData.tracks.map((track) => (
             <div key={track.id} className="mq-music-track flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -169,7 +174,7 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
                   disabled={alreadyUsed || submitting}
                   className="mq-music-action rounded-md bg-slate-900 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
                 >
-                  Vote
+                  {isKorean ? '투표' : 'Vote'}
                 </button>
               </div>
             </div>
@@ -177,19 +182,19 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
         </div>
       )}
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-sm font-semibold text-slate-800">Add a song</p>
+        <p className="text-sm font-semibold text-slate-800">{isKorean ? '직접 곡 추가' : 'Add a song'}</p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Song title"
+            placeholder={isKorean ? '곡 제목' : 'Song title'}
             className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
             disabled={alreadyUsed || submitting}
           />
           <input
             value={artist}
             onChange={(e) => setArtist(e.target.value)}
-            placeholder="Artist (optional)"
+            placeholder={isKorean ? '가수명 (선택)' : 'Artist (optional)'}
             className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
             disabled={alreadyUsed || submitting}
           />
@@ -200,7 +205,7 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
           disabled={alreadyUsed || submitting || !title.trim()}
           className="mq-music-action mt-3 rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
         >
-          Add &amp; Vote
+          {isKorean ? '추가하고 투표하기' : 'Add & Vote'}
         </button>
       </div>
     </div>
@@ -208,6 +213,7 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
 }
 
 export function TimelineSection({ invitationId, slug, invitationStatus, puzzle, previewMode }: TimelineSectionProps) {
+  const { isKorean } = useLanguage();
   const previewing = previewMode && invitationStatus !== 'published';
   const [cards, setCards] = useState<TimelineCardDto[]>(() => puzzle?.cards ?? []);
   const [submitting, setSubmitting] = useState(false);
@@ -255,7 +261,7 @@ export function TimelineSection({ invitationId, slug, invitationStatus, puzzle, 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   if (!puzzle || !puzzle.enabled || displayCards.length === 0) {
-    return <p className="text-sm text-slate-600">Timeline puzzle is not available.</p>;
+    return <p className="text-sm text-slate-600">{isKorean ? '타임라인 퍼즐이 아직 준비되지 않았습니다.' : 'Timeline puzzle is not available.'}</p>;
   }
 
   const handleDragEnd = (event: any) => {
@@ -285,7 +291,7 @@ export function TimelineSection({ invitationId, slug, invitationStatus, puzzle, 
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        setMessage(payload?.error ?? 'Unable to check timeline');
+        setMessage(payload?.error ?? (isKorean ? '정답 확인에 실패했습니다.' : 'Unable to check timeline'));
         setResult('error');
         return;
       }
@@ -293,14 +299,14 @@ export function TimelineSection({ invitationId, slug, invitationStatus, puzzle, 
       const payload: { ok: boolean; success: boolean } = await response.json();
       if (payload.success) {
         setResult('success');
-        setMessage('Great job! Timeline solved.');
+        setMessage(isKorean ? '정답입니다. 타임라인 순서를 모두 맞혔어요.' : 'Great job! Timeline solved.');
       } else {
         setResult('error');
-        setMessage('Not quite. Try again!');
+        setMessage(isKorean ? '아쉽지만 아직 정답은 아니에요. 다시 맞춰 보세요.' : 'Not quite. Try again!');
       }
     } catch (err) {
       setResult('error');
-      setMessage('Unable to check timeline');
+      setMessage(isKorean ? '정답 확인에 실패했습니다.' : 'Unable to check timeline');
     } finally {
       setSubmitting(false);
     }
@@ -308,8 +314,10 @@ export function TimelineSection({ invitationId, slug, invitationStatus, puzzle, 
 
   return (
     <div>
-      <p className="text-sm leading-6 text-slate-600">Drag the moments into the correct order.</p>
-      {previewing && <p className="mt-2 text-xs text-slate-500">Preview mode: publish to play.</p>}
+      <p className="text-sm leading-6 text-slate-600">
+        {isKorean ? '우리 이야기 속 순간을 올바른 순서로 맞춰 보세요.' : 'Drag the moments into the correct order.'}
+      </p>
+      {previewing && <p className="mt-2 text-xs text-slate-500">{isKorean ? '미리보기에서는 플레이할 수 없습니다. 공개 후 확인해 주세요.' : 'Preview mode: publish to play.'}</p>}
       <div className="mt-4 space-y-2">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={displayCards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
@@ -325,11 +333,9 @@ export function TimelineSection({ invitationId, slug, invitationStatus, puzzle, 
         disabled={previewing || submitting}
         className="mq-timeline-submit mt-4 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
       >
-        {submitting ? 'Checking…' : 'Submit timeline'}
+        {submitting ? (isKorean ? '확인 중…' : 'Checking…') : isKorean ? '순서 확인하기' : 'Submit timeline'}
       </button>
-      {message && (
-        <p className={`mt-2 text-sm ${result === 'success' ? 'text-emerald-600' : 'text-slate-600'}`}>{message}</p>
-      )}
+      {message && <p className={`mt-2 text-sm ${result === 'success' ? 'text-emerald-600' : 'text-slate-600'}`}>{message}</p>}
       {result === 'success' && <MusicPanel invitationId={invitationId} slug={slug} />}
     </div>
   );

@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react';
 import { useMemo, useState } from 'react';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 interface RSVPSectionProps {
   invitationId: string;
@@ -9,6 +10,7 @@ interface RSVPSectionProps {
 type AttendanceOption = 'yes' | 'no' | 'maybe';
 
 export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps) {
+  const { isKorean } = useLanguage();
   const [attendance, setAttendance] = useState<AttendanceOption>('yes');
   const [attendeeName, setAttendeeName] = useState('');
   const [guestsCount, setGuestsCount] = useState(1);
@@ -40,11 +42,15 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
     });
 
     if (response.ok) {
-      setMessage('Thanks! Your RSVP has been recorded.');
+      setMessage(isKorean ? '참석 여부가 정상적으로 전달되었습니다.' : 'Thanks! Your RSVP has been recorded.');
     } else if (response.status === 429) {
-      setMessage('This device can submit up to two RSVP responses for this invitation.');
+      setMessage(
+        isKorean
+          ? '이 기기에서는 이 청첩장에 대해 최대 2번까지 참석 여부를 전달할 수 있습니다.'
+          : 'This device can submit up to two RSVP responses for this invitation.'
+      );
     } else {
-      setMessage('Unable to save RSVP. Please try again.');
+      setMessage(isKorean ? '참석 여부를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.' : 'Unable to save RSVP. Please try again.');
     }
 
     setSubmitting(false);
@@ -53,7 +59,7 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
   return (
     <form onSubmit={handleSubmit} className="space-y-4 text-sm text-slate-800">
       <label className="block space-y-2">
-        <span className="block text-xs uppercase tracking-wide text-slate-500">Name</span>
+        <span className="block text-xs uppercase tracking-wide text-slate-500">{isKorean ? '성함' : 'Name'}</span>
         <input
           type="text"
           value={attendeeName}
@@ -62,13 +68,13 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
           required
           maxLength={40}
           className="w-full rounded-lg border border-slate-200 px-3 py-2 shadow-sm"
-          placeholder="Your full name"
+          placeholder={isKorean ? '성함을 입력해 주세요' : 'Your full name'}
         />
       </label>
 
       <div className="grid gap-3 lg:grid-cols-3">
         <label className="space-y-2">
-          <span className="block text-xs uppercase tracking-wide text-slate-500">Attendance</span>
+          <span className="block text-xs uppercase tracking-wide text-slate-500">{isKorean ? '참석 여부' : 'Attendance'}</span>
           <div className="grid grid-cols-3 gap-2">
             {(['yes', 'no', 'maybe'] as AttendanceOption[]).map((option) => (
               <button
@@ -80,14 +86,14 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
                   attendance === option ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white'
                 } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
               >
-                {option}
+                {isKorean ? (option === 'yes' ? '참석' : option === 'no' ? '불참' : '미정') : option}
               </button>
             ))}
           </div>
         </label>
 
         <label className="space-y-2 sm:max-w-[14rem]">
-          <span className="block text-xs uppercase tracking-wide text-slate-500">Guests</span>
+          <span className="block text-xs uppercase tracking-wide text-slate-500">{isKorean ? '동반 인원' : 'Guests'}</span>
           <input
             type="number"
             min={0}
@@ -100,7 +106,7 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
         </label>
 
         <label className="space-y-2 sm:max-w-[14rem]">
-          <span className="block text-xs uppercase tracking-wide text-slate-500">Kids</span>
+          <span className="block text-xs uppercase tracking-wide text-slate-500">{isKorean ? '아동 인원' : 'Kids'}</span>
           <input
             type="number"
             min={0}
@@ -114,7 +120,7 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
       </div>
 
       <label className="block space-y-2">
-        <span className="block text-xs uppercase tracking-wide text-slate-500">Allergies / Notes</span>
+        <span className="block text-xs uppercase tracking-wide text-slate-500">{isKorean ? '알레르기 / 전달사항' : 'Allergies / Notes'}</span>
         <textarea
           maxLength={120}
           value={allergiesText}
@@ -122,12 +128,14 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
           disabled={disabled || submitting}
           rows={3}
           className="w-full rounded-lg border border-slate-200 px-3 py-2 shadow-sm"
-          placeholder="Optional notes (max 120 characters)"
+          placeholder={isKorean ? '전달할 내용이 있으면 적어 주세요 (최대 120자)' : 'Optional notes (max 120 characters)'}
         />
       </label>
 
       <p className="text-xs leading-5 text-slate-600">
-        This RSVP is only for planning the headcount, so guests do not need to provide final numbers yet.
+        {isKorean
+          ? '예식 준비를 위한 대략적인 인원 파악용이라 최종 인원과 조금 달라도 괜찮습니다.'
+          : 'This RSVP is only for planning the headcount, so guests do not need to provide final numbers yet.'}
       </p>
 
       <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -136,10 +144,12 @@ export function RSVPSection({ invitationId, invitationStatus }: RSVPSectionProps
           disabled={disabled || submitting}
           className="mq-rsvp-submit rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:bg-slate-400"
         >
-          {submitting ? 'Saving…' : 'Send RSVP'}
+          {submitting ? (isKorean ? '저장 중…' : 'Saving…') : isKorean ? '참석 여부 전달하기' : 'Send RSVP'}
         </button>
         {disabled && (
-          <span className="text-xs text-slate-500">RSVP opens when this invitation is published.</span>
+          <span className="text-xs text-slate-500">
+            {isKorean ? '청첩장이 공개되면 참석 여부 입력이 열립니다.' : 'RSVP opens when this invitation is published.'}
+          </span>
         )}
         {message && <span className="text-xs text-slate-700">{message}</span>}
       </div>

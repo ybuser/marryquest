@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { LanguageToggle } from '@/components/i18n/LanguageToggle';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 import type { GalleryPhoto, InvitationDetails, SectionConfig } from '@/types/invitation';
 import { DEFAULT_SECTIONS } from '@/types/invitation';
 import { PublicGuestbook } from '@/components/guestbook/PublicGuestbook';
@@ -59,6 +61,7 @@ export function InvitationPage({
   previewScrollContainerRef,
   foodVoteOptions = []
 }: InvitationPageProps) {
+  const { isKorean } = useLanguage();
   const orderedSections = useMemo(() => mergeSections(invitation.id, sections), [invitation.id, sections]);
   const sortedPhotos = useMemo(() => [...photos].sort((a, b) => a.order - b.order), [photos]);
   const quizData = quiz ?? invitation.quiz ?? null;
@@ -148,6 +151,11 @@ export function InvitationPage({
         {showHanokDecor && (
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_100%_0,rgba(139,94,52,0.12),transparent_42%)]" aria-hidden />
         )}
+        {!previewMode && (
+          <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
+            <LanguageToggle variant="glass" />
+          </div>
+        )}
 
         <main className="relative mx-auto flex min-h-screen max-w-5xl flex-col gap-[var(--mq-spacing-section)] px-4 py-10 sm:px-6 sm:py-14">
           {orderedSections.map((section, index) => {
@@ -193,7 +201,7 @@ export function InvitationPage({
                 break;
               case 'timeline':
                 sectionNode = (
-                  <SectionCard key={section.key} title="Timeline" eyebrow="Moments">
+                  <SectionCard key={section.key} title={isKorean ? '타임라인 퍼즐' : 'Timeline'} eyebrow={isKorean ? '우리 이야기' : 'Moments'}>
                     <TimelineSection
                       invitationId={invitation.id}
                       slug={invitation.slug}
@@ -206,7 +214,7 @@ export function InvitationPage({
                 break;
               case 'foodVote':
                 sectionNode = (
-                  <SectionCard key={section.key} title="Food Vote" eyebrow="Menu">
+                  <SectionCard key={section.key} title={isKorean ? '메뉴 투표' : 'Food Vote'} eyebrow={isKorean ? '식사 선택' : 'Menu'}>
                     <FoodVoteSection
                       slug={invitation.slug}
                       invitationStatus={invitation.status}
@@ -218,7 +226,7 @@ export function InvitationPage({
                 break;
               case 'guestbook':
                 sectionNode = (
-                  <SectionCard key={section.key} title="Guestbook" eyebrow="Messages">
+                  <SectionCard key={section.key} title={isKorean ? '방명록' : 'Guestbook'} eyebrow={isKorean ? '축하 메시지' : 'Messages'}>
                     <PublicGuestbook
                       invitationId={invitation.id}
                       slug={invitation.slug}
@@ -234,7 +242,7 @@ export function InvitationPage({
                 break;
               case 'rsvp':
                 sectionNode = (
-                  <SectionCard key={section.key} title="RSVP" eyebrow="Attendance">
+                  <SectionCard key={section.key} title={isKorean ? '참석 여부 전달' : 'RSVP'} eyebrow={isKorean ? '예식 참석' : 'Attendance'}>
                     <RSVPSection invitationId={invitation.id} invitationStatus={invitation.status} />
                   </SectionCard>
                 );
