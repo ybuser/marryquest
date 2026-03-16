@@ -275,21 +275,23 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
       <Head>
         <title>{pageTitle}</title>
       </Head>
-      <div className="mx-auto max-w-6xl space-y-6 px-4 py-10 sm:px-6">
-        <section data-tour="dashboard-summary" className="rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm">
+      <div className="mx-auto max-w-6xl space-y-5 px-4 py-6 sm:space-y-6 sm:px-6 sm:py-10">
+        <section data-tour="dashboard-summary" className="rounded-3xl border border-slate-200 bg-white px-4 py-5 shadow-sm sm:px-6 sm:py-6">
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">MarryQuest</p>
-              <h1 className="mt-2 text-3xl font-semibold text-slate-900">{isKorean ? '청첩장 대시보드' : 'Dashboard'}</h1>
+              <h1 className="mt-2 text-2xl font-semibold text-slate-900 sm:text-3xl">{isKorean ? '청첩장 대시보드' : 'Dashboard'}</h1>
               <p className="mt-1 text-slate-600">
                 {isKorean
                   ? '만든 청첩장을 한곳에서 보고, 새 초안을 만들고, 공개 상태를 정리할 수 있습니다.'
                   : 'Build, review, and manage your invitation publishing flow.'}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <LanguageToggle />
-              <Button variant="ghost" onClick={() => void signOut({ callbackUrl: '/login' })} disabled={creating} size="lg">
+            <div className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:flex-wrap md:items-center">
+              <div className="col-span-2 md:col-span-1">
+                <LanguageToggle className="w-full justify-center md:w-auto" />
+              </div>
+              <Button variant="ghost" onClick={() => void signOut({ callbackUrl: '/login' })} disabled={creating} size="lg" className="h-11 w-full md:w-auto">
                 {isKorean ? '로그아웃' : 'Sign out'}
               </Button>
               <Button
@@ -298,10 +300,11 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
                 onClick={() => setWalkthroughOpen(true)}
                 disabled={creating}
                 size="lg"
+                className="h-11 w-full md:w-auto"
               >
                 {isKorean ? '가이드 보기' : 'Walkthrough'}
               </Button>
-              <Button data-tour="dashboard-create" onClick={createInvitation} disabled={creating} size="lg">
+              <Button data-tour="dashboard-create" onClick={createInvitation} disabled={creating} size="lg" className="col-span-2 h-12 w-full md:col-span-1 md:w-auto">
                 {creating ? (isKorean ? '생성 중…' : 'Creating...') : isKorean ? '새 청첩장 만들기' : 'New invitation'}
               </Button>
             </div>
@@ -316,7 +319,7 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
           </div>
         </section>
 
-        <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <Card className="rounded-3xl border border-slate-200 bg-white shadow-sm">
           <CardHeader className="pb-4">
             <CardTitle>{isKorean ? '청첩장 목록' : 'Invitations'}</CardTitle>
             <CardDescription>
@@ -332,7 +335,7 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
                 placeholder={isKorean ? '제목, 이름, 링크 주소, 상태로 검색' : 'Search by title, couple names, slug...'}
                 className="h-11 max-w-lg"
               />
-              <div data-tour="dashboard-filters" className="flex flex-wrap gap-2">
+              <div data-tour="dashboard-filters" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0">
                 {(['all', 'draft', 'published', 'private'] as const).map((status) => (
                   <button
                     key={status}
@@ -342,7 +345,7 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
                       statusFilter === status
                         ? 'border-slate-900 bg-slate-900 text-white'
                         : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                    }`}
+                    } whitespace-nowrap`}
                   >
                     {statusLabels[status]}
                   </button>
@@ -369,10 +372,7 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
                   const publicHref = `/${invitation.slug}`;
 
                   return (
-                    <article
-                      key={invitation.id}
-                      className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                    >
+                    <article key={invitation.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1">
                           <h3 className="text-lg font-semibold text-slate-900">
@@ -406,8 +406,11 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
                         </div>
                       </div>
 
-                      <div data-tour={index === 0 ? 'dashboard-card-actions' : undefined} className="mt-4 flex flex-wrap gap-2">
-                        <Button size="sm" onClick={() => void router.push(builderHref)}>
+                      <div
+                        data-tour={index === 0 ? 'dashboard-card-actions' : undefined}
+                        className={`mt-4 grid gap-2 ${isPublished ? 'grid-cols-2' : 'grid-cols-1'}`}
+                      >
+                        <Button size="sm" onClick={() => void router.push(builderHref)} className="h-10 w-full">
                           {isKorean ? '편집 열기' : 'Open builder'}
                         </Button>
                         {isPublished && (
@@ -416,14 +419,14 @@ export default function Dashboard({ invitations: initialInvitations }: Dashboard
                               href={publicHref}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                              className="inline-flex h-10 w-full items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                             >
                               {isKorean ? '공개 페이지 보기' : 'Open public page'}
                             </a>
                             <button
                               type="button"
                               onClick={() => void copyPublicUrl(invitation.slug, invitation.id)}
-                              className="inline-flex h-9 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                              className="inline-flex h-10 w-full items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                             >
                               {copiedId === invitation.id ? (isKorean ? '복사됨' : 'Copied!') : isKorean ? '링크 복사' : 'Copy URL'}
                             </button>

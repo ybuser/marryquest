@@ -342,5 +342,6 @@ As of 2026-03-15:
 - Landing, login, dashboard, builder, walkthrough, public invitation sections, and guestbook quiz copy are localized for Korean-first UX with English fallback
 - Invitation mobile behavior now includes tighter spacing, responsive gallery columns, and better small-screen cards for RSVP, guestbook, food vote, and timeline sections
 - Walkthrough overlays now clamp to the viewport with internal scrolling, so guide controls stay reachable on short laptop screens and phones
+- Mobile builder now uses a dedicated small-screen workflow: icon-based tab grid, editor/preview mode switch, simplified header actions, and a sticky bottom save bar
 
 There is no active in-progress feature branch state recorded in this file. New Codex sessions should start from the current codebase and this document.

@@ -7,7 +7,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Copy, Ellipsis, HelpCircle, LogOut } from 'lucide-react';
+import {
+  BarChart3,
+  ChevronLeft,
+  ClipboardList,
+  Clock3,
+  Copy,
+  Ellipsis,
+  Eye,
+  HelpCircle,
+  LayoutGrid,
+  LogOut,
+  MessageSquare,
+  PencilLine,
+  Rocket,
+  type LucideIcon
+} from 'lucide-react';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
 import prisma from '@/lib/db';
@@ -299,6 +314,18 @@ export default function InvitationBuilder({
   const tabLabels: Record<TabKey, string> = isKorean
     ? { Basic: '기본 정보', Sections: '섹션', Guestbook: '방명록', Quiz: '퀴즈', Timeline: '타임라인', Publish: '공개 설정', Export: '참석 내역' }
     : { Basic: 'Basic', Sections: 'Sections', Guestbook: 'Guestbook', Quiz: 'Quiz', Timeline: 'Timeline', Publish: 'Publish', Export: 'Export' };
+  const mobileTabLabels: Record<TabKey, string> = isKorean
+    ? { Basic: '기본', Sections: '구성', Guestbook: '방명록', Quiz: '퀴즈', Timeline: '타임라인', Publish: '공개', Export: '응답' }
+    : { Basic: 'Basics', Sections: 'Sections', Guestbook: 'Guests', Quiz: 'Quiz', Timeline: 'Timeline', Publish: 'Publish', Export: 'RSVP' };
+  const tabIcons: Record<TabKey, LucideIcon> = {
+    Basic: ClipboardList,
+    Sections: LayoutGrid,
+    Guestbook: MessageSquare,
+    Quiz: HelpCircle,
+    Timeline: Clock3,
+    Publish: Rocket,
+    Export: BarChart3
+  };
   const tabDescriptionsLocalized: Record<TabKey, string> = isKorean
     ? {
         Basic: '신랑신부 정보와 예식 기본 정보를 정리합니다.',
@@ -1504,12 +1531,12 @@ export default function InvitationBuilder({
       <Head>
         <title>{isKorean ? '청첩장 편집실' : 'Invitation Builder'} | {draftInvitation.title ?? (isKorean ? '제목 없음' : 'Untitled')}</title>
       </Head>
-      <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6 lg:py-8">
-        <header data-tour="builder-header" className="rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="mx-auto max-w-[1280px] px-4 py-4 pb-28 sm:px-6 sm:py-6 sm:pb-32 lg:pb-8 lg:py-8">
+        <header data-tour="builder-header" className="rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-5 sm:py-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">{isKorean ? '청첩장 편집실' : 'Invitation Builder'}</p>
-              <h1 className="text-2xl font-semibold text-slate-900">{draftInvitation.title ?? (isKorean ? '제목 없는 청첩장' : 'Untitled invitation')}</h1>
+              <h1 className="text-xl font-semibold leading-tight text-slate-900 sm:text-2xl">{draftInvitation.title ?? (isKorean ? '제목 없는 청첩장' : 'Untitled invitation')}</h1>
               <p className="text-sm text-slate-600">
                 {draftInvitation.groomName} &amp; {draftInvitation.brideName}
               </p>
@@ -1528,31 +1555,34 @@ export default function InvitationBuilder({
                 </span>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <LanguageToggle />
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
               <Link
                 href="/dashboard"
-                className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                className="order-1 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 sm:w-auto lg:order-none lg:h-10"
               >
+                <ChevronLeft className="h-4 w-4 lg:hidden" />
                 {isKorean ? '대시보드로' : 'Back to dashboard'}
               </Link>
+              <div className="order-2 lg:order-none">
+                <LanguageToggle />
+              </div>
               {draftInvitation.status === 'published' && draftInvitation.slug && (
                 <a
                   data-tour="builder-public-page"
                   href={`/${draftInvitation.slug}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  className="order-4 inline-flex h-11 w-full items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 sm:w-auto lg:order-none lg:h-10"
                 >
                   {isKorean ? '공개 페이지 보기' : 'View public page'}
                 </a>
               )}
-              <div ref={moreMenuRef} className="relative">
+              <div ref={moreMenuRef} className="relative order-3 ml-auto lg:order-none lg:ml-0">
                 <button
                   type="button"
                   data-tour="builder-more-trigger"
                   onClick={() => setMoreMenuOpen((prev) => !prev)}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 lg:h-10 lg:w-10"
                   aria-expanded={moreMenuOpen}
                   aria-label={isKorean ? "추가 메뉴" : "More actions"}
                 >
@@ -1599,85 +1629,157 @@ export default function InvitationBuilder({
             </div>
           </div>
 
-          <div data-tour="builder-tabs" className="mt-5 flex gap-2 overflow-x-auto pb-1">
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-medium transition ${
-                  activeTab === tab
-                    ? 'border-slate-900 bg-slate-900 text-white'
-                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                }`}
-                onClick={() => trySwitchTab(tab)}
-              >
-                <span>{tabLabels[tab]}</span>
-                {tabHasChanges(tab) && (
-                  <span className={`h-1.5 w-1.5 rounded-full ${activeTab === tab ? 'bg-amber-300' : 'bg-amber-500'}`} />
-                )}
-              </button>
-            ))}
+          <div data-tour="builder-tabs" className="mt-5">
+            <div className="grid grid-cols-4 gap-2 lg:hidden">
+              {tabs.map((tab) => {
+                const TabIcon = tabIcons[tab];
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => trySwitchTab(tab)}
+                    className={`flex min-h-[86px] flex-col justify-between rounded-2xl border px-3 py-3 text-left transition ${
+                      activeTab === tab
+                        ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                        : 'border-slate-200 bg-slate-50/70 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${
+                      activeTab === tab ? 'bg-white/10 text-white' : 'bg-white text-slate-700'
+                    }`}>
+                      <TabIcon className="h-4 w-4" />
+                    </span>
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold leading-tight">{mobileTabLabels[tab]}</span>
+                      {tabHasChanges(tab) && (
+                        <span className={`h-1.5 w-1.5 rounded-full ${activeTab === tab ? 'bg-amber-300' : 'bg-amber-500'}`} />
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="hidden gap-2 overflow-x-auto pb-1 lg:flex">
+              {tabs.map((tab) => (
+                <button
+                  key={tab}
+                  className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-medium transition ${
+                    activeTab === tab
+                      ? 'border-slate-900 bg-slate-900 text-white'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                  onClick={() => trySwitchTab(tab)}
+                >
+                  <span>{tabLabels[tab]}</span>
+                  {tabHasChanges(tab) && (
+                    <span className={`h-1.5 w-1.5 rounded-full ${activeTab === tab ? 'bg-amber-300' : 'bg-amber-500'}`} />
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
-          <p className="mt-3 text-sm text-slate-600">{tabDescriptionsLocalized[activeTab]} {isKorean ? 'Ctrl/Cmd + S로 현재 탭을 저장할 수 있습니다.' : 'Press Ctrl/Cmd + S to save current tab.'}</p>
+          <p className="mt-3 hidden text-sm text-slate-600 lg:block">{tabDescriptionsLocalized[activeTab]} {isKorean ? 'Ctrl/Cmd + S로 현재 탭을 저장할 수 있습니다.' : 'Press Ctrl/Cmd + S to save current tab.'}</p>
         </header>
 
-        <div data-tour="builder-tab-actions" className="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          {statusMessage ? (
-            <div
-              className={`rounded-xl border px-4 py-2.5 text-sm ${
-                /fail|unable|error|못했습니다|실패|오류/i.test(statusMessage)
-                  ? 'border-red-200 bg-red-50 text-red-700'
-                  : /saved|deleted|copied|저장됨|삭제됨|복사/i.test(statusMessage)
-                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                    : 'border-slate-200 bg-white text-slate-700'
-              }`}
-            >
-              {statusMessage}
+        <div data-tour="builder-tab-actions" className="mt-4 space-y-3">
+          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm lg:hidden">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{isKorean ? '현재 단계' : 'Current step'}</p>
+                <p className="mt-2 text-lg font-semibold text-slate-900">{tabLabels[activeTab]}</p>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{tabDescriptionsLocalized[activeTab]}</p>
+              </div>
+              <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                tabHasChanges(activeTab)
+                  ? 'bg-amber-100 text-amber-700'
+                  : activeTab === 'Export'
+                    ? 'bg-slate-100 text-slate-600'
+                    : 'bg-emerald-100 text-emerald-700'
+              }`}>
+                {tabHasChanges(activeTab) ? (isKorean ? '저장 필요' : 'Needs save') : activeTab === 'Export' ? (isKorean ? '읽기 전용' : 'Read only') : isKorean ? '저장됨' : 'Saved'}
+              </span>
             </div>
-          ) : (
-            <div className="text-sm text-slate-500">{isKorean ? '현재 탭의 변경사항은 저장 버튼을 눌러야 실제로 반영됩니다.' : 'All changes in the current tab must be saved manually.'}</div>
-          )}
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => discardDraftChanges(activeTab)}
-              disabled={!tabHasChanges(activeTab)}
-              className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-            >
-              {isKorean ? '현재 탭 되돌리기' : 'Discard current tab'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                void saveActiveTab();
-              }}
-              disabled={!tabHasChanges(activeTab) || activeTabSaving || activeTab === 'Export'}
-              className="inline-flex h-10 items-center justify-center rounded-full bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
-            >
-              {activeTabSaving ? (isKorean ? '저장 중…' : 'Saving...') : isKorean ? '현재 탭 저장' : 'Save current tab'}
-            </button>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setMobilePane('editor')}
+                className={`inline-flex h-11 items-center justify-center gap-2 rounded-full border px-3 text-sm font-semibold ${
+                  mobilePane === 'editor' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50 text-slate-700'
+                }`}
+              >
+                <PencilLine className="h-4 w-4" />
+                {isKorean ? '편집 화면' : 'Editor'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobilePane('preview')}
+                className={`inline-flex h-11 items-center justify-center gap-2 rounded-full border px-3 text-sm font-semibold ${
+                  mobilePane === 'preview' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50 text-slate-700'
+                }`}
+              >
+                <Eye className="h-4 w-4" />
+                {isKorean ? '미리보기' : 'Preview'}
+              </button>
+            </div>
+
+            {statusMessage ? (
+              <div
+                className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${
+                  /fail|unable|error|못했습니다|실패|오류/i.test(statusMessage)
+                    ? 'border-red-200 bg-red-50 text-red-700'
+                    : /saved|deleted|copied|저장됨|삭제됨|복사/i.test(statusMessage)
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : 'border-slate-200 bg-slate-50 text-slate-700'
+                }`}
+              >
+                {statusMessage}
+              </div>
+            ) : (
+              <p className="mt-4 text-xs leading-5 text-slate-500">
+                {isKorean ? '편집과 미리보기를 오가며 확인하고, 저장은 아래 고정 버튼에서 빠르게 처리할 수 있습니다.' : 'Switch between editor and preview, then use the fixed action bar below to save quickly.'}
+              </p>
+            )}
           </div>
-        </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2 lg:hidden">
-          <button
-            type="button"
-            onClick={() => setMobilePane('editor')}
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide ${
-              mobilePane === 'editor' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700'
-            }`}
-          >
-            {isKorean ? '편집' : 'Editor'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setMobilePane('preview')}
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide ${
-              mobilePane === 'preview' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700'
-            }`}
-          >
-            {isKorean ? '미리보기' : 'Preview'}
-          </button>
+          <div className="hidden flex-col gap-3 lg:flex lg:flex-row lg:items-center lg:justify-between">
+            {statusMessage ? (
+              <div
+                className={`rounded-xl border px-4 py-2.5 text-sm ${
+                  /fail|unable|error|못했습니다|실패|오류/i.test(statusMessage)
+                    ? 'border-red-200 bg-red-50 text-red-700'
+                    : /saved|deleted|copied|저장됨|삭제됨|복사/i.test(statusMessage)
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : 'border-slate-200 bg-white text-slate-700'
+                }`}
+              >
+                {statusMessage}
+              </div>
+            ) : (
+              <div className="text-sm text-slate-500">{isKorean ? '현재 탭의 변경사항은 저장 버튼을 눌러야 실제로 반영됩니다.' : 'All changes in the current tab must be saved manually.'}</div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => discardDraftChanges(activeTab)}
+                disabled={!tabHasChanges(activeTab)}
+                className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                {isKorean ? '현재 탭 되돌리기' : 'Discard current tab'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void saveActiveTab();
+                }}
+                disabled={!tabHasChanges(activeTab) || activeTabSaving || activeTab === 'Export'}
+                className="inline-flex h-10 items-center justify-center rounded-full bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
+              >
+                {activeTabSaving ? (isKorean ? '저장 중…' : 'Saving...') : isKorean ? '현재 탭 저장' : 'Save current tab'}
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-col gap-6 lg:flex-row">
@@ -1688,7 +1790,7 @@ export default function InvitationBuilder({
 
           {activeTab === 'Basic' && (
             <div className="space-y-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 {unsavedLabel('Basic')}
                 <button
                   className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
@@ -1822,7 +1924,7 @@ export default function InvitationBuilder({
 
           {activeTab === 'Sections' && (
             <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 {unsavedLabel('Sections')}
                 <button
                   className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
@@ -1849,7 +1951,7 @@ export default function InvitationBuilder({
               </DndContext>
 
               <div className="mt-6 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-slate-800">{isKorean ? '식사 메뉴 투표' : 'Food vote options'}</p>
                     <p className="text-xs text-slate-600">{isKorean ? '항목은 2개에서 6개까지 등록할 수 있고, 순서도 직접 조정할 수 있습니다.' : 'Manage 2 to 6 options and drag to reorder.'}</p>
@@ -1874,7 +1976,7 @@ export default function InvitationBuilder({
 
           {activeTab === 'Guestbook' && (
             <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 {unsavedLabel('Guestbook')}
                 <button
                   className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
@@ -1946,7 +2048,7 @@ export default function InvitationBuilder({
 
           {activeTab === 'Quiz' && (
             <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 {unsavedLabel('Quiz')}
                 <button
                   className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
@@ -1957,7 +2059,7 @@ export default function InvitationBuilder({
                 </button>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-slate-800">{isKorean ? '퀴즈 사용' : 'Enable quiz'}</p>
                   <p className="text-xs text-slate-600">{isKorean ? '청첩장을 공개한 뒤에만 하객에게 퀴즈가 노출됩니다.' : 'Guests will only see the quiz once this invitation is published.'}</p>
@@ -1976,7 +2078,7 @@ export default function InvitationBuilder({
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-800">{isKorean ? '문제 목록' : 'Questions'}</h3>
                     <p className="text-xs text-slate-600">{isKorean ? '문제는 최대 5개까지 만들 수 있고, 각 문제는 보기 4개로 구성됩니다.' : 'Add up to 5 questions with exactly 4 options each.'}</p>
@@ -2004,7 +2106,7 @@ export default function InvitationBuilder({
                       >
                         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                           <label className="flex-1 space-y-1 text-sm font-medium text-slate-700">
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                               <span>{isKorean ? '문제 문구' : 'Prompt'}</span>
                               <span className="text-xs text-slate-500">{question.prompt.length}/120</span>
                             </div>
@@ -2071,7 +2173,7 @@ export default function InvitationBuilder({
 
           {activeTab === 'Timeline' && (
             <div className="space-y-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 {unsavedLabel('Timeline')}
                 <button
                   className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
@@ -2081,7 +2183,7 @@ export default function InvitationBuilder({
                   {timelineSaving ? (isKorean ? '저장 중…' : 'Saving...') : isKorean ? '타임라인 저장' : 'Save Timeline'}
                 </button>
               </div>
-              <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+              <div className="flex flex-col gap-3 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-slate-800">{isKorean ? '타임라인 퍼즐 사용' : 'Enable timeline puzzle'}</p>
                   <p className="text-xs text-slate-600">{isKorean ? '청첩장을 공개하면 하객이 타임라인 퍼즐을 볼 수 있습니다.' : 'Guests will only see the timeline after publishing.'}</p>
@@ -2100,7 +2202,7 @@ export default function InvitationBuilder({
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-800">{isKorean ? '타임라인 카드' : 'Timeline cards'}</h3>
                     <p className="text-xs text-slate-600">{isKorean ? '하객이 순서를 맞춰 볼 수 있도록 순간 카드 5~7장을 구성해 주세요.' : 'Add 5-7 moments for guests to reorder.'}</p>
@@ -2157,7 +2259,7 @@ export default function InvitationBuilder({
 
           {activeTab === 'Publish' && (
             <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 {unsavedLabel('Publish')}
                 <button
                   className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
@@ -2231,7 +2333,7 @@ export default function InvitationBuilder({
           {activeTab === 'Export' && (
             <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
               <p className="text-base font-semibold text-slate-900">{isKorean ? '참석 응답 요약' : 'RSVP Summary'}</p>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-slate-600">{isKorean ? '현재까지 접수된 참석 응답을 빠르게 확인할 수 있습니다.' : 'Quick attendance snapshot'}</p>
               </div>
               <a
@@ -2283,7 +2385,7 @@ export default function InvitationBuilder({
         </div>
 
         <div data-tour="builder-preview-panel" className={`w-full lg:w-[48%] ${mobilePane === 'editor' ? 'hidden lg:block' : ''}`}>
-          <div className="sticky top-6 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+          <div className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 lg:sticky lg:top-6">
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-medium text-slate-700">{isKorean ? '실시간 미리보기' : 'Live preview'}</p>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600">
@@ -2293,7 +2395,7 @@ export default function InvitationBuilder({
             <p className="mb-3 text-xs text-slate-500 lg:hidden">{isKorean ? '미리보기만 따로 스크롤되어 편집 위치가 흔들리지 않습니다.' : 'Preview scrolls independently so the editor stays in place.'}</p>
             <div
               ref={previewScrollContainerRef}
-              className="h-[62vh] overflow-y-auto overscroll-contain rounded-2xl border border-slate-100 bg-slate-50/30 lg:h-[calc(100vh-7.5rem)]"
+              className="h-[72svh] overflow-y-auto overscroll-contain rounded-2xl border border-slate-100 bg-slate-50/30 lg:h-[calc(100vh-7.5rem)]"
             >
               <InvitationPage
                 invitation={draftInvitation}
@@ -2311,6 +2413,37 @@ export default function InvitationBuilder({
           </div>
         </div>
       </div>
+
+      {activeTab !== 'Export' && (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-3 backdrop-blur lg:hidden">
+          <div className="mx-auto max-w-[1280px]">
+            <div className="mb-2 flex items-center justify-between text-xs text-slate-500">
+              <span>{tabLabels[activeTab]}</span>
+              <span>{tabHasChanges(activeTab) ? (isKorean ? '저장 필요' : 'Needs save') : isKorean ? '저장됨' : 'Saved'}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => discardDraftChanges(activeTab)}
+                disabled={!tabHasChanges(activeTab)}
+                className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                {isKorean ? '되돌리기' : 'Discard'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void saveActiveTab();
+                }}
+                disabled={!tabHasChanges(activeTab) || activeTabSaving}
+                className="inline-flex h-12 items-center justify-center rounded-2xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
+              >
+                {activeTabSaving ? (isKorean ? '저장 중…' : 'Saving...') : isKorean ? '저장하기' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <GuidedWalkthrough
         open={walkthroughOpen}
