@@ -327,7 +327,7 @@ npm run db:migrate
 
 ## 14. Current Project Status
 
-As of 2026-03-15:
+As of 2026-03-17:
 
 - Build is green
 - Dashboard walkthrough is implemented
@@ -342,6 +342,6 @@ As of 2026-03-15:
 - Landing, login, dashboard, builder, walkthrough, public invitation sections, and guestbook quiz copy are localized for Korean-first UX with English fallback
 - Invitation mobile behavior now includes tighter spacing, responsive gallery columns, and better small-screen cards for RSVP, guestbook, food vote, and timeline sections
 - Walkthrough overlays now clamp to the viewport with internal scrolling, so guide controls stay reachable on short laptop screens and phones
-- Mobile builder now uses a dedicated small-screen workflow: icon-based tab grid, editor/preview mode switch, simplified header actions, and a sticky bottom save bar
+- Mobile builder now uses a dedicated small-screen workflow: icon-based tab grid, simplified header actions, a sticky bottom save bar, a floating preview button that opens a separate mobile preview sheet, and arrow-button ordering controls for sections, food vote options, timeline cards, and correct-order cards
 
 There is no active in-progress feature branch state recorded in this file. New Codex sessions should start from the current codebase and this document.

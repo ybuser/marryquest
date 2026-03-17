@@ -1,4 +1,4 @@
-import { GetServerSideProps } from 'next';
+﻿import { GetServerSideProps } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
 import { signOut } from 'next-auth/react';
@@ -10,6 +10,8 @@ import { CSS } from '@dnd-kit/utilities';
 import {
   BarChart3,
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   ClipboardList,
   Clock3,
   Copy,
@@ -19,8 +21,8 @@ import {
   LayoutGrid,
   LogOut,
   MessageSquare,
-  PencilLine,
   Rocket,
+  X,
   type LucideIcon
 } from 'lucide-react';
 import { LanguageToggle } from '@/components/i18n/LanguageToggle';
@@ -89,6 +91,9 @@ interface SortableItemProps {
   section: SectionConfig;
   label: string;
   onToggle: (section: SectionConfig) => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMove: (direction: 'up' | 'down') => void;
 }
 
 interface SortableTimelineCardProps {
@@ -98,19 +103,71 @@ interface SortableTimelineCardProps {
   uploading: boolean;
   onRemove: (id: string) => void;
   onFocusPreview: (targetId: string) => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMove: (direction: 'up' | 'down') => void;
 }
 
 interface SortableTimelineOrderItemProps {
   card: TimelineCardDto;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMove: (direction: 'up' | 'down') => void;
 }
 
 interface SortableFoodOptionProps {
   option: FoodVoteOptionDto;
   onChange: (id: string, updates: Partial<FoodVoteOptionDto>) => void;
   onRemove: (id: string) => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMove: (direction: 'up' | 'down') => void;
 }
 
-function SortableItem({ section, label, onToggle }: SortableItemProps) {
+function MobileMoveControls({
+  canMoveUp,
+  canMoveDown,
+  onMove
+}: {
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMove: (direction: 'up' | 'down') => void;
+}) {
+  const { isKorean } = useLanguage();
+
+  return (
+    <div className="flex items-center gap-2 lg:hidden">
+      <button
+        type="button"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onMove('up');
+        }}
+        disabled={!canMoveUp}
+        aria-label={isKorean ? '위로 이동' : 'Move up'}
+        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-35"
+      >
+        <ChevronUp className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onMove('down');
+        }}
+        disabled={!canMoveDown}
+        aria-label={isKorean ? '아래로 이동' : 'Move down'}
+        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-35"
+      >
+        <ChevronDown className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+function SortableItem({ section, label, onToggle, canMoveUp, canMoveDown, onMove }: SortableItemProps) {
   const { isKorean } = useLanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id });
 
@@ -126,14 +183,25 @@ function SortableItem({ section, label, onToggle }: SortableItemProps) {
       style={style}
       className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between"
     >
-      <div className="flex items-center gap-3" {...attributes} {...listeners}>
-        <span className="cursor-grab text-slate-500">::</span>
-        <span className="font-medium">{label}</span>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <button
+            type="button"
+            aria-label={isKorean ? '드래그해 순서 바꾸기' : 'Drag to reorder'}
+            className="hidden cursor-grab text-slate-500 lg:inline-flex"
+            {...attributes}
+            {...listeners}
+          >
+            ::
+          </button>
+          <span className="font-medium">{label}</span>
+        </div>
+        <MobileMoveControls canMoveUp={canMoveUp} canMoveDown={canMoveDown} onMove={onMove} />
       </div>
       <button
         type="button"
         onClick={() => onToggle(section)}
-        className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
+        className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition sm:self-auto ${
           section.enabled
             ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
             : 'border-slate-200 bg-slate-100 text-slate-600'
@@ -151,7 +219,10 @@ function SortableTimelineCard({
   onPhotoUpload,
   uploading,
   onRemove,
-  onFocusPreview
+  onFocusPreview,
+  canMoveUp,
+  canMoveDown,
+  onMove
 }: SortableTimelineCardProps) {
   const { isKorean } = useLanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
@@ -169,8 +240,17 @@ function SortableTimelineCard({
       onClick={() => onFocusPreview(`timeline-card-${card.id}`)}
       className="flex cursor-pointer flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-start"
     >
-      <div className="flex items-center gap-3" {...attributes} {...listeners}>
-        <span className="cursor-grab text-slate-400">::</span>
+      <div className="flex items-start justify-between gap-3 sm:block">
+        <button
+          type="button"
+          aria-label={isKorean ? '드래그해 순서 바꾸기' : 'Drag to reorder'}
+          className="hidden cursor-grab pt-1 text-slate-400 lg:inline-flex"
+          {...attributes}
+          {...listeners}
+        >
+          ::
+        </button>
+        <MobileMoveControls canMoveUp={canMoveUp} canMoveDown={canMoveDown} onMove={onMove} />
       </div>
       <div className="flex-1 space-y-2">
         <input
@@ -246,7 +326,7 @@ function SortableTimelineCard({
   );
 }
 
-function SortableTimelineOrderItem({ card }: SortableTimelineOrderItemProps) {
+function SortableTimelineOrderItem({ card, canMoveUp, canMoveDown, onMove }: SortableTimelineOrderItemProps) {
   const { isKorean } = useLanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
 
@@ -260,26 +340,44 @@ function SortableTimelineOrderItem({ card }: SortableTimelineOrderItemProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm"
-      {...attributes}
-      {...listeners}
+      className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm"
     >
-      <span className="cursor-grab text-slate-400">::</span>
-      <span className="font-medium">{card.text || (isKorean ? '제목 없음' : 'Untitled')}</span>
+      <div className="flex min-w-0 items-center gap-3">
+        <button
+          type="button"
+          aria-label={isKorean ? '드래그해 순서 바꾸기' : 'Drag to reorder'}
+          className="hidden cursor-grab text-slate-400 lg:inline-flex"
+          {...attributes}
+          {...listeners}
+        >
+          ::
+        </button>
+        <span className="font-medium">{card.text || (isKorean ? '제목 없음' : 'Untitled')}</span>
+      </div>
+      <MobileMoveControls canMoveUp={canMoveUp} canMoveDown={canMoveDown} onMove={onMove} />
     </div>
   );
 }
 
 
-function SortableFoodOption({ option, onChange, onRemove }: SortableFoodOptionProps) {
+function SortableFoodOption({ option, onChange, onRemove, canMoveUp, canMoveDown, onMove }: SortableFoodOptionProps) {
   const { isKorean } = useLanguage();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: option.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1 };
 
   return (
     <div ref={setNodeRef} style={style} className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-start">
-      <div className="pt-2" {...attributes} {...listeners}>
-        <span className="cursor-grab text-slate-400">::</span>
+      <div className="flex items-start justify-between gap-3 sm:block">
+        <button
+          type="button"
+          aria-label={isKorean ? '드래그해 순서 바꾸기' : 'Drag to reorder'}
+          className="hidden cursor-grab pt-2 text-slate-400 lg:inline-flex"
+          {...attributes}
+          {...listeners}
+        >
+          ::
+        </button>
+        <MobileMoveControls canMoveUp={canMoveUp} canMoveDown={canMoveDown} onMove={onMove} />
       </div>
       <div className="flex-1 space-y-2">
         <input
@@ -370,7 +468,7 @@ export default function InvitationBuilder({
   const [savedFoodVoteOptions, setSavedFoodVoteOptions] = useState<FoodVoteOptionDto[]>(initialInvitation.foodVoteOptions ?? []);
   const [draftFoodVoteOptions, setDraftFoodVoteOptions] = useState<FoodVoteOptionDto[]>(initialInvitation.foodVoteOptions ?? []);
   const [activeTab, setActiveTab] = useState<TabKey>('Basic');
-  const [mobilePane, setMobilePane] = useState<'editor' | 'preview'>('editor');
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
   const [slugError, setSlugError] = useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const [origin, setOrigin] = useState('');
@@ -398,6 +496,7 @@ export default function InvitationBuilder({
 
   const lastErrorTimeRef = useRef(0);
   const previewScrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const mobilePreviewScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const moreMenuRef = useRef<HTMLDivElement | null>(null);
 
   const focusPreviewTarget = useCallback((targetId: string) => {
@@ -455,6 +554,35 @@ export default function InvitationBuilder({
       window.removeEventListener('keydown', handleEscape);
     };
   }, [moreMenuOpen]);
+
+  useEffect(() => {
+    if (!mobilePreviewOpen || typeof window === 'undefined') return;
+
+    const originalOverflow = document.body.style.overflow;
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setMobilePreviewOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobilePreviewOpen(false);
+      }
+    };
+
+    if (window.innerWidth < 1024) {
+      document.body.style.overflow = 'hidden';
+    }
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [mobilePreviewOpen]);
 
   const hasBasicChanges = useMemo(() => {
     const fields: (keyof InvitationDetails)[] = [
@@ -1030,6 +1158,71 @@ export default function InvitationBuilder({
     [draftTimeline.cards]
   );
 
+  function getMoveTargetIndex(currentIndex: number, length: number, direction: 'up' | 'down') {
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= length) {
+      return null;
+    }
+
+    return targetIndex;
+  }
+
+  function moveSectionByButton(sectionId: string, direction: 'up' | 'down') {
+    const currentIndex = orderedSections.findIndex((section) => section.id === sectionId);
+    const targetIndex = getMoveTargetIndex(currentIndex, orderedSections.length, direction);
+    if (targetIndex === null) return;
+
+    const nextSections = arrayMove(orderedSections, currentIndex, targetIndex).map((section, index) => ({
+      ...section,
+      order: index
+    }));
+
+    setDraftSections(nextSections);
+  }
+
+  function moveFoodVoteOptionByButton(optionId: string, direction: 'up' | 'down') {
+    const currentIndex = orderedFoodVoteOptions.findIndex((option) => option.id === optionId);
+    const targetIndex = getMoveTargetIndex(currentIndex, orderedFoodVoteOptions.length, direction);
+    if (targetIndex === null) return;
+
+    const nextOptions = arrayMove(orderedFoodVoteOptions, currentIndex, targetIndex).map((option, index) => ({
+      ...option,
+      order: index
+    }));
+
+    setDraftFoodVoteOptions(nextOptions);
+  }
+
+  function moveTimelineCardByButton(cardId: string, direction: 'up' | 'down') {
+    const currentIndex = orderedTimelineCards.findIndex((card) => card.id === cardId);
+    const targetIndex = getMoveTargetIndex(currentIndex, orderedTimelineCards.length, direction);
+    if (targetIndex === null) return;
+
+    const nextCards = arrayMove(orderedTimelineCards, currentIndex, targetIndex).map((card, index) => ({
+      ...card,
+      order: index
+    }));
+
+    setDraftTimeline((prev) => ({ ...prev, cards: nextCards }));
+  }
+
+  function moveCorrectOrderCardByButton(cardId: string, direction: 'up' | 'down') {
+    const currentIndex = orderedCorrectCards.findIndex((card) => card.id === cardId);
+    const targetIndex = getMoveTargetIndex(currentIndex, orderedCorrectCards.length, direction);
+    if (targetIndex === null) return;
+
+    const nextCards = arrayMove(orderedCorrectCards, currentIndex, targetIndex).map((card, index) => ({
+      ...card,
+      correctOrder: index
+    }));
+
+    setDraftTimeline((prev) => ({
+      ...prev,
+      cards: prev.cards.map((card) => nextCards.find((nextCard) => nextCard.id === card.id) ?? card)
+    }));
+  }
+
   function handleDragEnd(event: any) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -1406,12 +1599,14 @@ export default function InvitationBuilder({
   const trySwitchTab = (nextTab: TabKey) => {
     if (nextTab === activeTab) return;
     if (!tabHasChanges(activeTab)) {
+      setMobilePreviewOpen(false);
       setActiveTab(nextTab);
       return;
     }
 
     if (window.confirm(isKorean ? '이 탭에 저장되지 않은 수정사항이 있습니다. 버리고 다른 탭으로 이동할까요?' : 'You have unsaved changes in this tab. Discard them and switch tabs?')) {
       discardDraftChanges(activeTab);
+      setMobilePreviewOpen(false);
       setActiveTab(nextTab);
     }
   };
@@ -1452,7 +1647,7 @@ export default function InvitationBuilder({
               id: 'preview',
               title: '실시간 미리보기',
               description: '오른쪽 미리보기는 초안 변경을 즉시 반영하고, 편집한 위치로 자동 이동해 확인하기 쉽습니다.',
-              selector: '[data-tour="builder-preview-panel"]',
+              selector: '[data-tour="builder-preview-fab"], [data-tour="builder-preview-panel-desktop"]',
               placement: 'left'
             },
             {
@@ -1504,7 +1699,7 @@ export default function InvitationBuilder({
               id: 'preview',
               title: 'Live preview pane',
               description: 'The preview on the right updates from draft values and supports focused auto-scroll.',
-              selector: '[data-tour="builder-preview-panel"]',
+              selector: '[data-tour="builder-preview-fab"], [data-tour="builder-preview-panel-desktop"]',
               placement: 'left'
             },
             {
@@ -1700,27 +1895,14 @@ export default function InvitationBuilder({
               </span>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setMobilePane('editor')}
-                className={`inline-flex h-11 items-center justify-center gap-2 rounded-full border px-3 text-sm font-semibold ${
-                  mobilePane === 'editor' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50 text-slate-700'
-                }`}
-              >
-                <PencilLine className="h-4 w-4" />
-                {isKorean ? '편집 화면' : 'Editor'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setMobilePane('preview')}
-                className={`inline-flex h-11 items-center justify-center gap-2 rounded-full border px-3 text-sm font-semibold ${
-                  mobilePane === 'preview' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-slate-50 text-slate-700'
-                }`}
-              >
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
                 <Eye className="h-4 w-4" />
-                {isKorean ? '미리보기' : 'Preview'}
-              </button>
+                <span>{isKorean ? '미리보기는 화면 오른쪽 아래 버튼에서 열 수 있어요.' : 'Open preview from the floating button at the bottom right.'}</span>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                {isKorean ? '편집 위치는 그대로 두고, 미리보기만 별도 시트로 열려서 작은 화면에서도 흐름이 끊기지 않습니다.' : 'Your editor stays in place while preview opens in its own sheet for small screens.'}
+              </p>
             </div>
 
             {statusMessage ? (
@@ -1737,7 +1919,7 @@ export default function InvitationBuilder({
               </div>
             ) : (
               <p className="mt-4 text-xs leading-5 text-slate-500">
-                {isKorean ? '편집과 미리보기를 오가며 확인하고, 저장은 아래 고정 버튼에서 빠르게 처리할 수 있습니다.' : 'Switch between editor and preview, then use the fixed action bar below to save quickly.'}
+                {isKorean ? '저장은 아래 고정 바에서 빠르게 처리하고, 미리보기는 우측 하단 버튼으로 언제든 열어 확인할 수 있습니다.' : 'Save from the fixed bar below, and open preview anytime from the floating button.'}
               </p>
             )}
           </div>
@@ -1785,7 +1967,7 @@ export default function InvitationBuilder({
         <div className="mt-4 flex flex-col gap-6 lg:flex-row">
           <div
             data-tour="builder-editor-panel"
-            className={`w-full space-y-4 lg:w-[52%] ${mobilePane === 'preview' ? 'hidden lg:block' : ''}`}
+            className="w-full space-y-4 lg:w-[52%]"
           >
 
           {activeTab === 'Basic' && (
@@ -1934,7 +2116,7 @@ export default function InvitationBuilder({
                   {sectionsSaving ? (isKorean ? '저장 중…' : 'Saving...') : isKorean ? '섹션 저장' : 'Save Sections'}
                 </button>
               </div>
-              <p className="text-sm text-slate-700">{isKorean ? '드래그로 섹션 순서를 바꾸고, 필요한 항목만 노출할 수 있습니다.' : 'Drag to reorder sections. Toggle visibility as needed.'}</p>
+              <p className="text-sm text-slate-700">{isKorean ? '데스크톱에서는 드래그로, 모바일에서는 화살표 버튼으로 섹션 순서를 바꿀 수 있습니다.' : 'Drag to reorder on desktop, or use arrow buttons on mobile.'}</p>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={orderedSections.map((section) => section.id)} strategy={verticalListSortingStrategy}>
                   <div className="space-y-3">
@@ -1944,6 +2126,9 @@ export default function InvitationBuilder({
                         section={section}
                         label={sectionLabels[section.key] ?? section.key}
                         onToggle={handleToggle}
+                        canMoveUp={orderedSections.findIndex((item) => item.id === section.id) > 0}
+                        canMoveDown={orderedSections.findIndex((item) => item.id === section.id) < orderedSections.length - 1}
+                        onMove={(direction) => moveSectionByButton(section.id, direction)}
                       />
                     ))}
                   </div>
@@ -1954,7 +2139,7 @@ export default function InvitationBuilder({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-slate-800">{isKorean ? '식사 메뉴 투표' : 'Food vote options'}</p>
-                    <p className="text-xs text-slate-600">{isKorean ? '항목은 2개에서 6개까지 등록할 수 있고, 순서도 직접 조정할 수 있습니다.' : 'Manage 2 to 6 options and drag to reorder.'}</p>
+                    <p className="text-xs text-slate-600">{isKorean ? '메뉴는 2개부터 6개까지 만들 수 있고, 모바일에서는 화살표 버튼으로 순서를 정리할 수 있습니다.' : 'Create 2 to 6 options and use arrow buttons on mobile to reorder them.'}</p>
                   </div>
                   <div className="flex gap-2">
                     <button type="button" onClick={addFoodVoteOption} disabled={orderedFoodVoteOptions.length >= 6} className="rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 disabled:opacity-50">{isKorean ? "항목 추가" : "Add option"}</button>
@@ -1965,7 +2150,15 @@ export default function InvitationBuilder({
                   <SortableContext items={orderedFoodVoteOptions.map((option) => option.id)} strategy={verticalListSortingStrategy}>
                     <div className="space-y-3">
                       {orderedFoodVoteOptions.map((option) => (
-                        <SortableFoodOption key={option.id} option={option} onChange={updateFoodVoteOption} onRemove={removeFoodVoteOption} />
+                        <SortableFoodOption
+                          key={option.id}
+                          option={option}
+                          onChange={updateFoodVoteOption}
+                          onRemove={removeFoodVoteOption}
+                          canMoveUp={orderedFoodVoteOptions.findIndex((item) => item.id === option.id) > 0}
+                          canMoveDown={orderedFoodVoteOptions.findIndex((item) => item.id === option.id) < orderedFoodVoteOptions.length - 1}
+                          onMove={(direction) => moveFoodVoteOptionByButton(option.id, direction)}
+                        />
                       ))}
                     </div>
                   </SortableContext>
@@ -2228,6 +2421,9 @@ export default function InvitationBuilder({
                           uploading={timelineUploadingId === card.id}
                           onRemove={removeTimelineCard}
                           onFocusPreview={focusPreviewTarget}
+                          canMoveUp={orderedTimelineCards.findIndex((item) => item.id === card.id) > 0}
+                          canMoveDown={orderedTimelineCards.findIndex((item) => item.id === card.id) < orderedTimelineCards.length - 1}
+                          onMove={(direction) => moveTimelineCardByButton(card.id, direction)}
                         />
                       ))}
                     </div>
@@ -2242,13 +2438,19 @@ export default function InvitationBuilder({
               <div className="space-y-3">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-800">{isKorean ? '정답 순서' : 'Correct order'}</h3>
-                  <p className="text-xs text-slate-600">{isKorean ? '실제 순서대로 드래그해 정답 순서를 정해 주세요.' : 'Drag cards into the correct timeline sequence.'}</p>
+                  <p className="text-xs text-slate-600">{isKorean ? '정답 순서는 데스크톱에서 드래그하거나, 모바일에서는 화살표 버튼으로 맞춰 주세요.' : 'Set the correct sequence by dragging on desktop or using arrow buttons on mobile.'}</p>
                 </div>
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCorrectOrderDragEnd}>
                   <SortableContext items={orderedCorrectCards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
                     <div className="space-y-2">
                       {orderedCorrectCards.map((card) => (
-                        <SortableTimelineOrderItem key={card.id} card={card} />
+                        <SortableTimelineOrderItem
+                          key={card.id}
+                          card={card}
+                          canMoveUp={orderedCorrectCards.findIndex((item) => item.id === card.id) > 0}
+                          canMoveDown={orderedCorrectCards.findIndex((item) => item.id === card.id) < orderedCorrectCards.length - 1}
+                          onMove={(direction) => moveCorrectOrderCardByButton(card.id, direction)}
+                        />
                       ))}
                     </div>
                   </SortableContext>
@@ -2384,7 +2586,21 @@ export default function InvitationBuilder({
           )}
         </div>
 
-        <div data-tour="builder-preview-panel" className={`w-full lg:w-[48%] ${mobilePane === 'editor' ? 'hidden lg:block' : ''}`}>
+        <button
+          type="button"
+          data-tour="builder-preview-fab"
+          onClick={() => setMobilePreviewOpen(true)}
+          className={`fixed right-4 z-40 inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-[0_20px_45px_rgba(15,23,42,0.28)] transition hover:bg-slate-800 lg:hidden ${
+            activeTab !== 'Export'
+              ? 'bottom-[calc(env(safe-area-inset-bottom)+6.25rem)]'
+              : 'bottom-[calc(env(safe-area-inset-bottom)+1rem)]'
+          }`}
+        >
+          <Eye className="h-4 w-4" />
+          {isKorean ? '미리보기' : 'Preview'}
+        </button>
+
+        <div data-tour="builder-preview-panel-desktop" className="hidden w-full lg:block lg:w-[48%]">
           <div className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 lg:sticky lg:top-6">
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-medium text-slate-700">{isKorean ? '실시간 미리보기' : 'Live preview'}</p>
@@ -2392,10 +2608,9 @@ export default function InvitationBuilder({
                 {isKorean ? '초안' : 'Draft'}
               </span>
             </div>
-            <p className="mb-3 text-xs text-slate-500 lg:hidden">{isKorean ? '미리보기만 따로 스크롤되어 편집 위치가 흔들리지 않습니다.' : 'Preview scrolls independently so the editor stays in place.'}</p>
             <div
               ref={previewScrollContainerRef}
-              className="h-[72svh] overflow-y-auto overscroll-contain rounded-2xl border border-slate-100 bg-slate-50/30 lg:h-[calc(100vh-7.5rem)]"
+              className="h-[calc(100vh-7.5rem)] overflow-y-auto overscroll-contain rounded-2xl border border-slate-100 bg-slate-50/30"
             >
               <InvitationPage
                 invitation={draftInvitation}
@@ -2413,6 +2628,51 @@ export default function InvitationBuilder({
           </div>
         </div>
       </div>
+
+      {mobilePreviewOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-[1px] lg:hidden">
+          <button
+            type="button"
+            aria-label={isKorean ? '미리보기 닫기' : 'Close preview'}
+            className="absolute inset-0"
+            onClick={() => setMobilePreviewOpen(false)}
+          />
+          <div className="absolute inset-x-0 bottom-0 max-h-[88svh] overflow-hidden rounded-t-[28px] border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-4 pb-3 pt-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{isKorean ? '실시간 미리보기' : 'Live preview'}</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {isKorean ? '편집 화면은 그대로 두고, 초안 상태를 바로 확인할 수 있어요.' : 'Check the draft without losing your place in the editor.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobilePreviewOpen(false)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div
+              ref={mobilePreviewScrollContainerRef}
+              className="h-[min(72svh,calc(100vh-9rem))] overflow-y-auto overscroll-contain bg-slate-50/40 px-3 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-3"
+            >
+              <InvitationPage
+                invitation={draftInvitation}
+                sections={orderedSections}
+                photos={photos}
+                quiz={draftQuiz}
+                timelinePuzzle={draftTimeline}
+                previewGuestbookEntries={draftGuestbookEntries}
+                previewMode
+                previewFocusRequest={previewFocusRequest}
+                previewScrollContainerRef={mobilePreviewScrollContainerRef}
+                foodVoteOptions={draftFoodVoteOptions}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {activeTab !== 'Export' && (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-3 backdrop-blur lg:hidden">
