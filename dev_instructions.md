@@ -326,6 +326,7 @@ High-signal files for future sessions:
 - `pages/api/guestbook/[entryId].ts`
 - `components/theme/tokens.ts`
 - `prisma/schema.prisma`
+- `.eslintrc.json`
 - `next.config.js`
 
 ## 13. Validation Commands
@@ -348,13 +349,13 @@ npx prisma migrate deploy
 npx prisma migrate status
 ```
 
-Fresh-start validation on 2026-07-12 used disposable PostgreSQL 17.10. Migrations `000` through `011`, Prisma validation/generation/status, typecheck, and the production build succeeded; the final database-to-schema diff was empty. `npm run lint` did not run lint rules because Next.js 14 opened its first-time legacy ESLint configuration prompt and exited with code 1. Do not report lint as green or replace the lint configuration as part of database recovery.
+Fresh-start validation on 2026-07-12 used disposable PostgreSQL 17.10. Migrations `000` through `011`, Prisma validation/generation/status, typecheck, and the production build succeeded; the final database-to-schema diff was empty. Next.js 14 ESLint tooling was validated on 2026-07-12 with the root `.eslintrc.json` extending `next/core-web-vitals`; `npm run lint` executed lint rules non-interactively and exited with code `0` (`0` errors, `2` warnings).
 
 ## 14. Current Project Status
 
 As of 2026-07-12:
 
-- Build and TypeScript checks are green
+- Build, TypeScript, and non-interactive lint checks are green
 - The Fresh-start migration chain recreates the current Prisma schema in an empty PostgreSQL 17 database without importing legacy data or creating seed records
 - The Prisma datasource supports separate runtime and migration URLs; Neon remains the target provider, with staging/production provisioning and shared migration still outstanding
 - Dashboard walkthrough is implemented
