@@ -8,7 +8,7 @@ Production-ready baseline for the MarryQuest invitation experience using the **N
 
 ## Getting started
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -50,17 +50,23 @@ Templates are defined in `/components/theme/tokens.ts`:
 - Wrap API routes with `withRateLimit` from `/lib/security/rateLimit.ts` (in-memory, IP keyed; upgrade for distributed environments).
 
 ## Environment variables
-No required environment variables for the baseline. Add as needed for APIs or analytics.
+Normal application usage requires:
+
+- `DATABASE_URL` – pooled Neon PostgreSQL connection for the application runtime.
+- `DIRECT_URL` – direct Neon PostgreSQL connection for Prisma migrations.
+- `NEXTAUTH_SECRET` – NextAuth signing secret.
+
+Both database connections must use TLS (`sslmode=require`); `connect_timeout=15` is recommended. Keep all values in an approved secret store and never commit them.
 
 Timeline card uploads (builder-only) use Supabase Storage. Configure:
 - `SUPABASE_URL` – Supabase project URL.
 - `SUPABASE_SERVICE_ROLE_KEY` – service role key for server-side uploads.
 - `SUPABASE_STORAGE_BUCKET` – optional bucket name (defaults to `timeline`).
 
+Supabase Storage is still used by the current upload code. Its replacement is planned for a later Recovery PR and is not part of the database fresh-start work.
+
 ## Notes
 - The project intentionally omits the `/app` directory. Pages Router only.
 - Upgrade the in-memory rate limiter before deploying behind multiple instances.
-- Database migrations are not run during Vercel builds; apply them separately with `npm run db:migrate` using a direct database
-  connection (Supabase Transaction pooler may hang during migrations).
-- For Supabase deployments, **do not** use the Transaction Pooler (`6543`) with Prisma. Configure `DATABASE_URL` to use the
-  Session Pooler (`5432`) or the direct connection string instead.
+- Do not run database migrations in the Netlify build. Apply them separately with `npm run db:migrate` using `DIRECT_URL` after validating an empty staging database.
+- See [`docs/ops/fresh-start-database.md`](docs/ops/fresh-start-database.md) for the Fresh-start decision, staging procedure, prohibited commands, and rollback policy.
