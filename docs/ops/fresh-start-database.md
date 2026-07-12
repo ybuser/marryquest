@@ -27,7 +27,7 @@ Do not run `prisma migrate deploy` from the Netlify build. When Phase B is appro
 
 ## Shared staging promotion gate
 
-> **Shared Neon staging apply is not approved.** `npm run lint` does not currently succeed non-interactively because Next.js 14 opens its legacy ESLint configuration prompt. Do not run Phase B against shared Neon staging until a separate ESLint tooling fix has merged and every Phase A command succeeds non-interactively. The PostgreSQL 17 disposable-database migration-chain audit and approval to promote that chain to shared staging are separate gates.
+> **The ESLint tooling blocker is resolved, but shared Neon staging apply is not approved.** `npm run lint` now executes non-interactively. Before any Phase B operation, rerun every Phase A command against the exact commit selected for staging and require each command to succeed. Passing Phase A does not authorize Phase B: Neon staging provisioning and migration still require separate explicit operational approval. The PostgreSQL 17 disposable-database migration-chain audit and approval to promote that chain to shared staging are separate gates.
 
 ## Prohibited shortcuts
 
@@ -38,7 +38,7 @@ Do not run `prisma migrate deploy` from the Netlify build. When Phase B is appro
 
 ## Future empty Neon staging prerequisites
 
-1. Create a new, empty Neon staging project or branch. Do not point these steps at production.
+1. Obtain explicit operational approval to provision a new, empty Neon staging project or branch, then create it. Do not point these steps at production.
 2. Confirm that no MarryQuest application tables or seed records exist.
 3. Configure the staging pooled URL as `DATABASE_URL` and the staging direct URL as `DIRECT_URL` through the approved secret mechanism.
 4. Confirm that both variables target the same empty staging database and contain the required TLS option.
@@ -50,7 +50,7 @@ PowerShell is the primary future staging procedure. The commands assume the two 
 
 ### Phase A — Non-mutating preflight
 
-This phase does not mutate the database schema; `npm ci` and Prisma generation still update local dependencies and generated artifacts. Because `npm ci` runs `prisma generate` from `postinstall`, verify both variables before running it. Run the fenced block as one complete unit. Any nonzero exit stops the procedure and prohibits Phase B. If the lint setup prompt appears, do not answer it; treat the prompt as a failed preflight and stop.
+This phase does not mutate the database schema; `npm ci` and Prisma generation still update local dependencies and generated artifacts. Because `npm ci` runs `prisma generate` from `postinstall`, verify both variables before running it. Run the fenced block as one complete unit. Any nonzero exit stops the procedure and prohibits Phase B. If any command prompts for input, treat it as a failed non-interactive preflight and stop.
 
 ```powershell
 if ([string]::IsNullOrWhiteSpace($env:DATABASE_URL)) { throw 'DATABASE_URL is required.' }
@@ -75,7 +75,7 @@ $preflightPassed = $true
 
 ### Phase B — Empty staging database apply
 
-Run this phase only after Phase A completes with six exit-code `0` results. With the current branch, lint fails before that gate opens, so shared Neon staging apply remains blocked.
+Run this phase only after all six Phase A commands return `0` non-interactively against the exact commit selected for staging and explicit operational approval for the staging migration is recorded. Phase A success alone does not authorize Phase B.
 
 ```powershell
 if ($preflightPassed -ne $true) { throw 'Phase A did not complete successfully; Phase B is blocked.' }
@@ -109,7 +109,7 @@ As with PowerShell, load the two variables from an approved secret mechanism and
 
 ### Phase A — Non-mutating preflight
 
-This phase does not mutate the database schema; local dependencies and generated artifacts can still change. The environment guards precede `npm ci` because its `postinstall` runs `prisma generate`. Run the fenced block as one complete unit. `set -eu` stops this phase on any failed command, and Phase B must not run unless all six commands return `0` non-interactively. If the lint setup prompt appears, do not answer it; treat the prompt as a failed preflight and stop.
+This phase does not mutate the database schema; local dependencies and generated artifacts can still change. The environment guards precede `npm ci` because its `postinstall` runs `prisma generate`. Run the fenced block as one complete unit. `set -eu` stops this phase on any failed command, and Phase B must not run unless all six commands return `0` non-interactively. If any command prompts for input, treat it as a failed non-interactive preflight and stop.
 
 ```sh
 set -eu
@@ -128,7 +128,7 @@ preflight_passed=1
 
 ### Phase B — Empty staging database apply
 
-Run this phase only after Phase A succeeds. With the current branch, the non-interactive lint gate is closed, so shared Neon staging apply remains blocked.
+Run this phase only after all six Phase A commands return `0` non-interactively against the exact commit selected for staging and explicit operational approval for the staging migration is recorded. Phase A success alone does not authorize Phase B.
 
 ```sh
 if [ "${preflight_passed:-0}" -ne 1 ]; then
