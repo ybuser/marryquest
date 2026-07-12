@@ -13,14 +13,21 @@ The sources of truth are:
 
 Never edit a migration that has already been shared or applied. Add a new forward migration instead.
 
-## Neon connections
+## Target Neon connection design
 
-- `DATABASE_URL` is the pooled Neon connection used by the application runtime.
-- `DIRECT_URL` is the direct Neon connection used by Prisma migration operations.
-- Both URLs must include `sslmode=require`; `connect_timeout=15` is recommended.
+Neon is the approved target managed provider, but neither staging nor production is provisioned. No Neon connection strings have been issued or configured, and no shared Neon database has received this migration chain. The commands below are a future staging procedure to use only after provisioning and approval.
+
+- `prisma/schema.prisma` already supports separate runtime and migration URLs.
+- `DATABASE_URL` will be the pooled Neon connection used by the application runtime.
+- `DIRECT_URL` will be the direct Neon connection used by Prisma migration operations.
+- Once issued, both URLs must include `sslmode=require`; `connect_timeout=15` is recommended.
 - Store both values in an approved secret manager. Never put credentials or connection strings in source files, documentation, commits, PR text, screenshots, or command logs.
 
-Do not run `prisma migrate deploy` from the Netlify build. Migration is a separate, reviewed staging operation and is promoted independently from the application build.
+Do not run `prisma migrate deploy` from the Netlify build. When Phase B is approved, run it as a separate, reviewed staging operation independent from the application build.
+
+## Shared staging promotion gate
+
+> **Shared Neon staging apply is not approved.** `npm run lint` does not currently succeed non-interactively because Next.js 14 opens its legacy ESLint configuration prompt. Do not run Phase B against shared Neon staging until a separate ESLint tooling fix has merged and every Phase A command succeeds non-interactively. The PostgreSQL 17 disposable-database migration-chain audit and approval to promote that chain to shared staging are separate gates.
 
 ## Prohibited shortcuts
 
@@ -29,7 +36,7 @@ Do not run `prisma migrate deploy` from the Netlify build. Migration is a separa
 - Do not use `prisma migrate resolve` for routine deployment, drift, or Fresh-start setup.
 - `prisma migrate resolve` is allowed only to recover verified migration metadata after the exact database state and migration SQL have been inspected, and only with explicit approval from both a project maintainer and the database owner. Record the approval and incident separately without recording secrets.
 
-## Empty staging database prerequisites
+## Future empty Neon staging prerequisites
 
 1. Create a new, empty Neon staging project or branch. Do not point these steps at production.
 2. Confirm that no MarryQuest application tables or seed records exist.
@@ -39,7 +46,11 @@ Do not run `prisma migrate deploy` from the Netlify build. Migration is a separa
 
 ## Windows PowerShell procedure
 
-PowerShell is the primary staging procedure. The commands assume the two environment variables were injected by an approved secret mechanism; do not paste their literal values into a committed script or shell history.
+PowerShell is the primary future staging procedure. The commands assume the two environment variables were injected by an approved secret mechanism; do not paste their literal values into a committed script or shell history. Continue through both phases in the same PowerShell session.
+
+### Phase A — Non-mutating preflight
+
+This phase does not mutate the database schema; `npm ci` and Prisma generation still update local dependencies and generated artifacts. Because `npm ci` runs `prisma generate` from `postinstall`, verify both variables before running it. Run the fenced block as one complete unit. Any nonzero exit stops the procedure and prohibits Phase B. If the lint setup prompt appears, do not answer it; treat the prompt as a failed preflight and stop.
 
 ```powershell
 if ([string]::IsNullOrWhiteSpace($env:DATABASE_URL)) { throw 'DATABASE_URL is required.' }
@@ -48,12 +59,27 @@ if ([string]::IsNullOrWhiteSpace($env:DIRECT_URL)) { throw 'DIRECT_URL is requir
 function Invoke-CheckedNative {
   param([string]$Label, [scriptblock]$Command)
   & $Command
-  if ($LASTEXITCODE -ne 0) { throw "$Label failed with exit code $LASTEXITCODE." }
+  $exitCode = $LASTEXITCODE
+  if ($exitCode -ne 0) { throw "$Label failed with exit code $exitCode." }
 }
 
+$preflightPassed = $false
 Invoke-CheckedNative 'npm ci' { npm ci }
 Invoke-CheckedNative 'prisma validate' { npx prisma validate }
 Invoke-CheckedNative 'prisma generate' { npx prisma generate }
+Invoke-CheckedNative 'TypeScript' { npx tsc --noEmit }
+Invoke-CheckedNative 'lint' { npm run lint }
+Invoke-CheckedNative 'build' { npm run build }
+$preflightPassed = $true
+```
+
+### Phase B — Empty staging database apply
+
+Run this phase only after Phase A completes with six exit-code `0` results. With the current branch, lint fails before that gate opens, so shared Neon staging apply remains blocked.
+
+```powershell
+if ($preflightPassed -ne $true) { throw 'Phase A did not complete successfully; Phase B is blocked.' }
+
 Invoke-CheckedNative 'prisma migrate deploy' { npx prisma migrate deploy }
 Invoke-CheckedNative 'prisma migrate status' { npx prisma migrate status }
 
@@ -73,26 +99,43 @@ if ($diffCode -eq 2) {
   throw "Database-to-schema diff is not empty; inspect $diffPath before proceeding."
 }
 if ($diffCode -ne 0) { throw "Unexpected Prisma diff exit code: $diffCode" }
-
-Invoke-CheckedNative 'TypeScript' { npx tsc --noEmit }
-Invoke-CheckedNative 'lint' { npm run lint }
-Invoke-CheckedNative 'build' { npm run build }
 ```
 
 Prisma diff exit code `0` means empty, `2` means drift, and `1` means the comparison failed. Exit code `0` with no executable SQL is required before staging approval; Prisma 5 may still write the comment `-- This is an empty migration.` to the output file.
 
 ## POSIX procedure
 
-As with PowerShell, load the two variables from an approved secret mechanism and do not place literal URLs in a script.
+As with PowerShell, load the two variables from an approved secret mechanism and do not place literal URLs in a script. Continue through both phases in the same shell session.
+
+### Phase A — Non-mutating preflight
+
+This phase does not mutate the database schema; local dependencies and generated artifacts can still change. The environment guards precede `npm ci` because its `postinstall` runs `prisma generate`. Run the fenced block as one complete unit. `set -eu` stops this phase on any failed command, and Phase B must not run unless all six commands return `0` non-interactively. If the lint setup prompt appears, do not answer it; treat the prompt as a failed preflight and stop.
 
 ```sh
 set -eu
 : "${DATABASE_URL:?DATABASE_URL is required}"
 : "${DIRECT_URL:?DIRECT_URL is required}"
 
+preflight_passed=0
 npm ci
 npx prisma validate
 npx prisma generate
+npx tsc --noEmit
+npm run lint
+npm run build
+preflight_passed=1
+```
+
+### Phase B — Empty staging database apply
+
+Run this phase only after Phase A succeeds. With the current branch, the non-interactive lint gate is closed, so shared Neon staging apply remains blocked.
+
+```sh
+if [ "${preflight_passed:-0}" -ne 1 ]; then
+  echo "Phase A did not complete successfully; Phase B is blocked." >&2
+  exit 1
+fi
+
 npx prisma migrate deploy
 npx prisma migrate status
 
@@ -122,15 +165,11 @@ case "$diff_code" in
     exit "$diff_code"
     ;;
 esac
-
-npx tsc --noEmit
-npm run lint
-npm run build
 ```
 
-## Catalog verification
+## Phase B catalog verification and staging approval
 
-Run catalog queries through an approved database console without echoing the connection string. At minimum, record the PostgreSQL version, application tables, enums, columns, indexes, foreign keys, timestamp types, and migration state.
+After the Phase B diff returns exit code `0`, run catalog queries through an approved database console without echoing the connection string. Phase B is not complete, and staging is not approved, until the catalog invariants pass. At minimum, record the PostgreSQL version, application tables, enums, columns, indexes, foreign keys, timestamp types, and migration state.
 
 ```sql
 SELECT version();

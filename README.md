@@ -50,13 +50,15 @@ Templates are defined in `/components/theme/tokens.ts`:
 - Wrap API routes with `withRateLimit` from `/lib/security/rateLimit.ts` (in-memory, IP keyed; upgrade for distributed environments).
 
 ## Environment variables
+The Prisma datasource supports separate runtime and migration URLs. Neon is the target managed provider, but staging and production are not provisioned. No Neon connection strings have been issued or configured, and no shared Neon migration has run.
+
 Normal application usage requires:
 
-- `DATABASE_URL` – pooled Neon PostgreSQL connection for the application runtime.
-- `DIRECT_URL` – direct Neon PostgreSQL connection for Prisma migrations.
+- `DATABASE_URL` – PostgreSQL connection for application runtime access; the target Neon environment will use a pooled URL.
+- `DIRECT_URL` – PostgreSQL connection for Prisma migrations; the target Neon environment will use a direct URL.
 - `NEXTAUTH_SECRET` – NextAuth signing secret.
 
-Both database connections must use TLS (`sslmode=require`); `connect_timeout=15` is recommended. Keep all values in an approved secret store and never commit them.
+Once Neon is provisioned, both database connections must use TLS (`sslmode=require`); `connect_timeout=15` is recommended. Keep all values in an approved secret store and never commit them.
 
 Timeline card uploads (builder-only) use Supabase Storage. Configure:
 - `SUPABASE_URL` – Supabase project URL.
@@ -68,5 +70,5 @@ Supabase Storage is still used by the current upload code. Its replacement is pl
 ## Notes
 - The project intentionally omits the `/app` directory. Pages Router only.
 - Upgrade the in-memory rate limiter before deploying behind multiple instances.
-- Do not run database migrations in the Netlify build. Apply them separately with `npm run db:migrate` using `DIRECT_URL` after validating an empty staging database.
+- Do not run database migrations in the Netlify build. After Neon staging is provisioned and the full non-database-mutating preflight succeeds, apply migrations as a separate reviewed staging operation using `DIRECT_URL`.
 - See [`docs/ops/fresh-start-database.md`](docs/ops/fresh-start-database.md) for the Fresh-start decision, staging procedure, prohibited commands, and rollback policy.

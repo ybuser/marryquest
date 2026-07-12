@@ -32,7 +32,8 @@ Current guest-facing features:
 - Tailwind CSS
 - NextAuth
 - Prisma ORM
-- Neon PostgreSQL
+- PostgreSQL via Prisma
+- Target managed provider: Neon; staging and production are not provisioned yet
 - Supabase Storage for timeline card images
 - Zod for validation
 
@@ -221,15 +222,17 @@ If you change the database:
 
 1. Edit `prisma/schema.prisma`
 2. Create a proper Prisma migration
-3. Apply the complete migration chain to an empty staging database
-4. Confirm the database-to-schema Prisma diff is empty
+3. Complete the non-database-mutating preflight in `docs/ops/fresh-start-database.md`
+4. Only after every preflight command succeeds, apply the complete migration chain to an empty staging database
+5. Confirm the database-to-schema Prisma diff is empty
 
-Neon connection rule:
+Target Neon connection design:
 
-- `DATABASE_URL` is the pooled application runtime connection.
-- `DIRECT_URL` is the direct connection used by Prisma migration commands.
-- Both connections require TLS; include `sslmode=require`, with `connect_timeout=15` recommended.
-- Do not run migrations in the Netlify build. Apply them as a separate, reviewed staging operation.
+- `prisma/schema.prisma` already supports separate `DATABASE_URL` and `DIRECT_URL` values.
+- In a provisioned Neon environment, `DATABASE_URL` will be the pooled application runtime connection and `DIRECT_URL` will be the direct connection for Prisma migration commands.
+- Neon staging and production are not provisioned, no Neon connection strings have been issued or configured, and no shared Neon database has received this migration chain.
+- Once issued, both connections require TLS; include `sslmode=require`, with `connect_timeout=15` recommended.
+- Do not run migrations in the Netlify build. After the preflight gate passes, apply them as a separate, reviewed staging operation.
 - Never use `prisma db push` for shared environments. `prisma migrate resolve` requires explicit maintainer and database-owner approval after the database state is verified.
 - Follow `docs/ops/fresh-start-database.md` for the full staging procedure and rollback policy.
 
@@ -288,7 +291,7 @@ Required for normal local app usage:
 - `DIRECT_URL`
 - `NEXTAUTH_SECRET`
 
-`DATABASE_URL` is the pooled application connection. `DIRECT_URL` is the direct Prisma migration connection.
+The Prisma datasource supports `DATABASE_URL` for application runtime access and `DIRECT_URL` for migration access. In the target Neon environment, these will be pooled and direct connections respectively; no shared Neon values have been issued or configured yet.
 
 Required if using timeline uploads:
 
@@ -353,6 +356,7 @@ As of 2026-07-12:
 
 - Build and TypeScript checks are green
 - The Fresh-start migration chain recreates the current Prisma schema in an empty PostgreSQL 17 database without importing legacy data or creating seed records
+- The Prisma datasource supports separate runtime and migration URLs; Neon remains the target provider, with staging/production provisioning and shared migration still outstanding
 - Dashboard walkthrough is implemented
 - Builder walkthrough and `...` menu are implemented
 - Builder preview isolated scrolling is implemented
