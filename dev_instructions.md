@@ -1,6 +1,6 @@
 # MarryQuest Dev Instructions
 
-Last updated: 2026-07-12
+Last updated: 2026-07-15
 
 This file is the handoff document for new Codex sessions. Treat it as the current source of truth for project state, recent architectural decisions, and operational rules. Older logs and temporary drift-audit files were intentionally cleaned up.
 
@@ -33,7 +33,7 @@ Current guest-facing features:
 - NextAuth
 - Prisma ORM
 - PostgreSQL via Prisma
-- Target managed provider: Neon; staging and production are not provisioned yet
+- Managed provider: Neon; staging is provisioned and schema-validated, while production is not provisioned
 - Supabase Storage for timeline card images
 - Zod for validation
 
@@ -76,34 +76,15 @@ Main API areas:
 
 ## 4. Auth Model
 
-Authentication is currently test-user based. There is no signup flow.
+Authentication is single-owner only. There is no public signup flow or fixed development fallback credential.
 
-- `lib/auth.ts` uses a NextAuth Credentials provider.
-- Credentials are `loginId` and `password`.
-- Successful login upserts a Prisma `User` by stable email.
-- Protected pages and APIs use `requirePageAuth` and `requireApiAuth`.
-
-The test account source is `lib/testUsers.ts`.
-
-Current test accounts:
-
-| Login ID | Password |
-| --- | --- |
-| `guest1` | `wedding1` |
-| `guest2` | `wedding2` |
-| `guest3` | `wedding3` |
-| `guest4` | `wedding4` |
-| `guest5` | `wedding5` |
-| `guest6` | `wedding6` |
-| `guest7` | `wedding7` |
-| `guest8` | `wedding8` |
-| `guest9` | `wedding9` |
-| `guest10` | `wedding10` |
-
-Important distinction:
-
-- The normal app login uses test accounts.
-- `/api/admin/invitations/[id]/stats` still uses `x-admin-passphrase` against `ADMIN_PASSPHRASE`. That route is separate from the main login flow.
+- `lib/auth.ts` uses a NextAuth Credentials provider with `loginId` and `password`.
+- Owner identity and the versioned scrypt password hash come from server-only `OWNER_*` environment variables.
+- Successful login upserts a Prisma `User` by the normalized, stable `OWNER_EMAIL` only after both credential checks succeed.
+- Sessions continue to use the NextAuth JWT strategy, and protected pages/APIs use `requirePageAuth` and `requireApiAuth`.
+- Public test accounts, quick-login UI, and repository-stored plaintext credentials were removed.
+- `/api/admin/invitations/[id]/stats` and protected `/api/ready` use the shared exact-match `ADMIN_PASSPHRASE` verifier. This credential is separate from the main owner login.
+- See `docs/ops/single-owner-auth.md` for hash generation, rotation, and lockout recovery.
 
 ## 5. Dashboard and Builder State
 
@@ -226,13 +207,13 @@ If you change the database:
 4. Only after every preflight command succeeds, apply the complete migration chain to an empty staging database
 5. Confirm the database-to-schema Prisma diff is empty
 
-Target Neon connection design:
+Neon connection state and design:
 
 - `prisma/schema.prisma` already supports separate `DATABASE_URL` and `DIRECT_URL` values.
-- In a provisioned Neon environment, `DATABASE_URL` will be the pooled application runtime connection and `DIRECT_URL` will be the direct connection for Prisma migration commands.
-- Neon staging and production are not provisioned, no Neon connection strings have been issued or configured, and no shared Neon database has received this migration chain.
-- Once issued, both connections require TLS; include `sslmode=require`, with `connect_timeout=15` recommended.
-- Do not run migrations in the Netlify build. After the preflight gate passes, apply them as a separate, reviewed staging operation.
+- Neon staging PostgreSQL 17 is provisioned. Migrations `000` through `011`, migration checksums/history, catalog invariants, an empty DB-to-schema diff, pooled/direct connectivity, and zero application rows were validated at the Recovery-01 staging gate.
+- `DATABASE_URL` is the pooled application runtime connection and `DIRECT_URL` is the direct Prisma migration connection. Both require `sslmode=require`; `connect_timeout=15` is recommended.
+- Production Neon is not provisioned. Staging validation does not approve a production database or migration.
+- Do not rerun shared staging migrations as part of application builds or routine development. Any future database promotion requires the reviewed preflight and explicit environment-specific approval in the runbook.
 - Never use `prisma db push` for shared environments. `prisma migrate resolve` requires explicit maintainer and database-owner approval after the database state is verified.
 - Follow `docs/ops/fresh-start-database.md` for the full staging procedure and rollback policy.
 
@@ -255,7 +236,7 @@ Current patterns:
 Important behavior:
 
 - Guestbook can allow one extra entry when a valid `quizPerfect` badge token is present
-- Quiz badge token signing uses `QUIZ_BADGE_SECRET` or falls back to `NEXTAUTH_SECRET`
+- Quiz badge token signing requires its own `QUIZ_BADGE_SECRET`; it never falls back to `NEXTAUTH_SECRET`
 
 ## 10. Image and Storage Notes
 
@@ -289,9 +270,17 @@ Required for normal local app usage:
 
 - `DATABASE_URL`
 - `DIRECT_URL`
+- `NEXTAUTH_URL`
 - `NEXTAUTH_SECRET`
+- `OWNER_LOGIN_ID`
+- `OWNER_EMAIL`
+- `OWNER_PASSWORD_HASH`
+- `QUIZ_BADGE_SECRET`
+- `ADMIN_PASSPHRASE`
 
-The Prisma datasource supports `DATABASE_URL` for application runtime access and `DIRECT_URL` for migration access. In the target Neon environment, these will be pooled and direct connections respectively; no shared Neon values have been issued or configured yet.
+`OWNER_NAME` is optional. Treat `OWNER_PASSWORD_HASH` as sensitive configuration even though it is not plaintext. Generate every signing/passphrase secret independently; never reuse a value or expose these variables through `NEXT_PUBLIC_*`. See `.env.example` for names and placeholders only.
+
+The Prisma datasource uses `DATABASE_URL` for application runtime access and `DIRECT_URL` for migration access. The validated Neon staging environment uses pooled and direct connections respectively; production values do not exist yet.
 
 Required if using timeline uploads:
 
@@ -301,8 +290,7 @@ Required if using timeline uploads:
 Optional:
 
 - `SUPABASE_STORAGE_BUCKET` default is `timeline`
-- `QUIZ_BADGE_SECRET` falls back to `NEXTAUTH_SECRET`
-- `ADMIN_PASSPHRASE` only for the admin stats API
+- `OWNER_NAME` is optional and normalizes to `null` when missing or blank
 - `SKIP_PRISMA_GENERATION`
 
 Use quoted values in `.env` for safety, especially for URLs and secrets.
@@ -312,8 +300,12 @@ Use quoted values in `.env` for safety, especially for URLs and secrets.
 High-signal files for future sessions:
 
 - `lib/auth.ts`
-- `lib/testUsers.ts`
+- `lib/security/ownerAuth.ts`
+- `lib/security/passwordHash.js`
+- `lib/security/internalRedirect.ts`
+- `lib/security/adminPassphrase.ts`
 - `pages/login.tsx`
+- `pages/api/ready.ts`
 - `pages/dashboard/index.tsx`
 - `pages/builder/[id].tsx`
 - `components/i18n/LanguageProvider.tsx`
@@ -349,27 +341,31 @@ npx prisma migrate deploy
 npx prisma migrate status
 ```
 
-Fresh-start validation on 2026-07-12 used disposable PostgreSQL 17.10. Migrations `000` through `011`, Prisma validation/generation/status, typecheck, and the production build succeeded; the final database-to-schema diff was empty. Next.js 14 ESLint tooling was validated on 2026-07-12 with the root `.eslintrc.json` extending `next/core-web-vitals`; `npm run lint` executed lint rules non-interactively and exited with code `0` (`0` errors, `2` warnings).
+Fresh-start validation on 2026-07-12 used disposable PostgreSQL 17.10. Migrations `000` through `011`, Prisma validation/generation/status, typecheck, and the production build succeeded; the final database-to-schema diff was empty. The same chain was subsequently applied to the approved Neon PostgreSQL 17 staging database and its migration checksums, catalog, empty diff, pooled/direct access, and zero application rows were verified. Production Neon remains unprovisioned. Next.js 14 ESLint tooling was validated on 2026-07-12 with the root `.eslintrc.json` extending `next/core-web-vitals`; `npm run lint` executed lint rules non-interactively and exited with code `0` (`0` errors, `2` warnings).
+
+Recovery-02 validation on 2026-07-15 used a localhost-bound disposable PostgreSQL 17.10 container. The complete migration chain and single-owner HTTP flow passed, including generic credential failures, one-row owner upsert, JWT session/logout, redirect protection, protected readiness, and the admin statistics passphrase contract. TypeScript, non-interactive lint (`0` errors, the same `2` warnings), and the production build succeeded. This was local validation only; Netlify post-processing, HTTPS cookie behavior, and the platform 429 smoke remain post-merge staging gates.
 
 ## 14. Current Project Status
 
-As of 2026-07-12:
+As of 2026-07-15:
 
 - Build, TypeScript, and non-interactive lint checks are green
 - The Fresh-start migration chain recreates the current Prisma schema in an empty PostgreSQL 17 database without importing legacy data or creating seed records
-- The Prisma datasource supports separate runtime and migration URLs; Neon remains the target provider, with staging/production provisioning and shared migration still outstanding
+- Neon staging PostgreSQL 17 has the validated `000`-`011` schema and no application rows at the verification point; production Neon is not provisioned
 - Dashboard walkthrough is implemented
 - Builder walkthrough and `...` menu are implemented
 - Builder preview isolated scrolling is implemented
 - Guestbook delete with confirmation is implemented
 - Timeline image processing and display fixes are implemented
-- Test-user login system is implemented
+- Environment-backed single-owner authentication replaces the removed public test-user system
 - Mobile/layout polish pass is implemented across landing, builder, walkthrough, and public invitation sections
-- Builder and dashboard now expose sign-out actions for test-user sessions
+- Builder and dashboard expose sign-out actions for owner JWT sessions
 - Language system is implemented with Korean as the default, a sitewide English toggle, and hydration-safe restoration of the saved language after mount
 - Landing, login, dashboard, builder, walkthrough, public invitation sections, and guestbook quiz copy are localized for Korean-first UX with English fallback
 - Invitation mobile behavior now includes tighter spacing, responsive gallery columns, and better small-screen cards for RSVP, guestbook, food vote, and timeline sections
 - Walkthrough overlays now clamp to the viewport with internal scrolling, so guide controls stay reachable on short laptop screens and phones
 - Mobile builder now uses a dedicated small-screen workflow: icon-based tab grid, simplified header actions, a sticky bottom save bar, a floating preview button that opens a separate mobile preview sheet, and arrow-button ordering controls for sections, food vote options, timeline cards, and correct-order cards
 
-There is no active in-progress feature branch state recorded in this file. New Codex sessions should start from the current codebase and this document.
+The repository contains a Netlify build/rate-limit baseline only. No Netlify site, deployment, stable staging URL, custom domain, or production release has been created by this Recovery step. Supabase Storage remains in the timeline upload path and is scheduled for Recovery-03; R2 has not been implemented.
+
+There is no persisted deployment state in this file. New Codex sessions should confirm the current branch, commit, and approved operational gate before acting.

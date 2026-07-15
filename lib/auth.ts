@@ -1,56 +1,63 @@
+import { randomBytes } from 'node:crypto';
 import type { GetServerSidePropsContext, GetServerSidePropsResult } from 'next';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession, type NextAuthOptions } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import prisma from './db';
-import { findTestUserAccount } from './testUsers';
+import { isConfiguredServerSecret } from './security/configValue';
+import { verifyOwnerCredentials } from './security/ownerAuth';
+import { sanitizeInternalCallbackUrl, toSafeAbsoluteRedirect } from './security/internalRedirect';
+
+const configuredNextAuthSecret = process.env.NEXTAUTH_SECRET;
+const nextAuthSecretIsValid = isConfiguredServerSecret(configuredNextAuthSecret);
+// An invalid public/missing value must never become a usable JWT key. This process-local
+// key preserves generic failure responses while authorize/readiness remain fail-closed.
+const nextAuthSessionSecret = nextAuthSecretIsValid
+  ? configuredNextAuthSecret
+  : randomBytes(32).toString('base64url');
 
 export const authOptions: NextAuthOptions = {
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: nextAuthSessionSecret,
   providers: [
     CredentialsProvider({
-      name: 'Test Accounts',
+      name: 'MarryQuest Owner',
       credentials: {
         loginId: { label: 'Login ID', type: 'text' },
         password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials) {
-        const loginId = credentials?.loginId?.trim() ?? '';
-        const password = credentials?.password ?? '';
-        const account = findTestUserAccount(loginId, password);
+        const verification = await verifyOwnerCredentials(credentials?.loginId, credentials?.password);
 
-        if (!account) {
+        if (!verification.success || !nextAuthSecretIsValid) {
+          if (!verification.success && verification.reason === 'configuration') {
+            console.error('[auth] OWNER_CONFIGURATION_INVALID');
+          }
+          if (!nextAuthSecretIsValid) {
+            console.error('[auth] NEXTAUTH_SECRET_INVALID');
+          }
           return null;
         }
 
-        const user = await prisma.user
-          .upsert({
-            where: { email: account.email },
-            update: { name: account.name },
+        try {
+          const user = await prisma.user.upsert({
+            where: { email: verification.owner.email },
+            update: { name: verification.owner.name },
             create: {
-              email: account.email,
-              name: account.name
+              email: verification.owner.email,
+              name: verification.owner.name
             }
-          })
-          .catch((err) => {
-            const label = err?.constructor?.name || 'PrismaError';
-            const message = err instanceof Error ? err.message : 'Unknown error';
-            console.error(
-              `[auth] Failed to upsert test user (${label}): ${message}. Check database connectivity or pooling configuration.`
-            );
-            return null;
           });
 
-        if (!user) {
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name
+          };
+        } catch {
+          console.error('[auth] OWNER_USER_UPSERT_FAILED');
           return null;
         }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name
-        };
       }
     })
   ],
@@ -61,6 +68,9 @@ export const authOptions: NextAuthOptions = {
     signIn: '/login'
   },
   callbacks: {
+    redirect({ url, baseUrl }) {
+      return toSafeAbsoluteRedirect(url, baseUrl);
+    },
     async jwt({ token, user }) {
       if (user?.id) {
         const enrichedToken = token as JWT & { userId?: string };
@@ -97,9 +107,10 @@ export async function requirePageAuth<T>(
   const session = await getServerSession(context.req, context.res, authOptions);
 
   if (!session?.user?.id) {
+    const callbackUrl = sanitizeInternalCallbackUrl(context.resolvedUrl);
     return {
       redirect: {
-        destination: `/login?callbackUrl=${encodeURIComponent(context.resolvedUrl)}`,
+        destination: `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`,
         permanent: false
       }
     };

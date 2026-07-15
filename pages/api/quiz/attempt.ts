@@ -52,6 +52,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   const badgeToken = signBadgeToken(invitationId);
+  if (!badgeToken) {
+    return apiError(res, 500, 'INTERNAL_ERROR');
+  }
   return res.status(200).json({ success: true, badgeToken });
 }
 

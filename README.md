@@ -1,6 +1,6 @@
 # MarryQuest – Next.js Baseline
 
-Production-ready baseline for the MarryQuest invitation experience using the **Next.js Pages Router**, TypeScript, Tailwind CSS, and shadcn/ui-inspired primitives. Security headers, validation, and rate limiting are included by default.
+Recovery baseline for the MarryQuest invitation experience using the **Next.js Pages Router**, TypeScript, Tailwind CSS, and shadcn/ui-inspired primitives. Production database, storage migration, deployment, and domain gates are still outstanding.
 
 ## Requirements
 - Node 20 LTS (see `.nvmrc`)
@@ -20,6 +20,8 @@ Visit `http://localhost:3000`.
 - `npm run start` – serve the production build
 - `npm run lint` – lint with `next lint`
 - `npm run db:migrate` – apply database migrations (one-off)
+- `npm run auth:hash` – read an owner password from stdin and emit one versioned scrypt hash
+- `npm run secret:generate` – emit one random application secret
 
 ## Project structure
 - `/pages` – pages router entries (`index.tsx`, `api/health.ts`)
@@ -50,25 +52,32 @@ Templates are defined in `/components/theme/tokens.ts`:
 - Wrap API routes with `withRateLimit` from `/lib/security/rateLimit.ts` (in-memory, IP keyed; upgrade for distributed environments).
 
 ## Environment variables
-The Prisma datasource supports separate runtime and migration URLs. Neon is the target managed provider, but staging and production are not provisioned. No Neon connection strings have been issued or configured, and no shared Neon migration has run.
+The Prisma datasource supports separate runtime and migration URLs. The approved Neon PostgreSQL 17 staging database has migrations `000` through `011` applied and validated with zero application rows at the verification point. Production Neon is not provisioned.
 
 Normal application usage requires:
 
-- `DATABASE_URL` – PostgreSQL connection for application runtime access; the target Neon environment will use a pooled URL.
-- `DIRECT_URL` – PostgreSQL connection for Prisma migrations; the target Neon environment will use a direct URL.
+- `DATABASE_URL` – pooled PostgreSQL connection for application runtime access.
+- `DIRECT_URL` – direct PostgreSQL connection for separately approved Prisma migration operations.
+- `NEXTAUTH_URL` – canonical application URL.
 - `NEXTAUTH_SECRET` – NextAuth signing secret.
+- `OWNER_LOGIN_ID`, `OWNER_EMAIL`, `OWNER_PASSWORD_HASH` – server-only single-owner identity and credential configuration.
+- `QUIZ_BADGE_SECRET` – independent quiz badge signing secret.
+- `ADMIN_PASSPHRASE` – independent credential for protected readiness and the admin statistics route.
 
-Once Neon is provisioned, both database connections must use TLS (`sslmode=require`); `connect_timeout=15` is recommended. Keep all values in an approved secret store and never commit them.
+`OWNER_NAME` is optional. Both Neon URLs must use TLS (`sslmode=require`); `connect_timeout=15` is recommended. Keep all values in an approved secret store, generate unrelated secrets independently, and never commit them. Copy `.env.example` for variable names and placeholders only; see [`docs/ops/single-owner-auth.md`](docs/ops/single-owner-auth.md) for secure hash generation and rotation.
 
-Timeline card uploads (builder-only) use Supabase Storage. Configure:
+Timeline card uploads (builder-only) still use the legacy Supabase Storage path. Local testing of that legacy path would require:
 - `SUPABASE_URL` – Supabase project URL.
 - `SUPABASE_SERVICE_ROLE_KEY` – service role key for server-side uploads.
 - `SUPABASE_STORAGE_BUCKET` – optional bucket name (defaults to `timeline`).
 
-Supabase Storage is still used by the current upload code. Its replacement is planned for a later Recovery PR and is not part of the database fresh-start work.
+Do not reuse recovered Supabase secrets or configure these legacy values for production. Timeline upload may remain unavailable until Recovery-03 replaces this code with R2; it is not an acceptance gate for the current baseline.
 
 ## Notes
 - The project intentionally omits the `/app` directory. Pages Router only.
 - Upgrade the in-memory rate limiter before deploying behind multiple instances.
-- Do not run database migrations in the Netlify build. After Neon staging is provisioned and the full non-database-mutating preflight succeeds, apply migrations as a separate reviewed staging operation using `DIRECT_URL`.
+- Public fixed test credentials and quick-login UI have been removed; local and deployed environments use the same server-configured single-owner flow.
+- A minimal Netlify build baseline and one code-based credentials-callback rate-limit rule are present, but no Netlify site, deploy, custom domain, or production release has been created. Follow [`docs/ops/netlify-staging.md`](docs/ops/netlify-staging.md) after merge and explicit approval.
+- Do not run database migrations in the Netlify build. Any future environment apply is a separate reviewed operation using `DIRECT_URL`.
+- Supabase Storage is still used by the timeline upload code. R2 replacement and upload acceptance are Recovery-03 work.
 - See [`docs/ops/fresh-start-database.md`](docs/ops/fresh-start-database.md) for the Fresh-start decision, staging procedure, prohibited commands, and rollback policy.

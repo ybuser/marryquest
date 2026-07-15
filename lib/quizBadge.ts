@@ -1,21 +1,30 @@
 import crypto from 'crypto';
+import { isConfiguredServerSecret } from './security/configValue';
 
 const EXPIRATION_MS = 10 * 60 * 1000;
 
 function getSecret() {
-  const secret = process.env.QUIZ_BADGE_SECRET || process.env.NEXTAUTH_SECRET;
-  if (!secret) {
-    throw new Error('Missing QUIZ_BADGE_SECRET');
+  const secret = process.env.QUIZ_BADGE_SECRET;
+  if (!isConfiguredServerSecret(secret)) {
+    console.error('[quiz-badge] QUIZ_BADGE_SECRET_INVALID');
+    return null;
   }
   return secret;
 }
 
-export function signBadgeToken(invitationId: string): string {
-  const timestamp = Date.now();
-  const payload = `${invitationId}:${timestamp}`;
-  const secret = getSecret();
-  const hmac = crypto.createHmac('sha256', secret).update(payload).digest('hex');
-  return Buffer.from(`${payload}:${hmac}`).toString('base64url');
+export function signBadgeToken(invitationId: string): string | null {
+  try {
+    const secret = getSecret();
+    if (!secret) return null;
+
+    const timestamp = Date.now();
+    const payload = `${invitationId}:${timestamp}`;
+    const hmac = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+    return Buffer.from(`${payload}:${hmac}`).toString('base64url');
+  } catch {
+    console.error('[quiz-badge] BADGE_TOKEN_SIGNING_FAILED');
+    return null;
+  }
 }
 
 export function verifyBadgeToken(token: string, invitationId: string): boolean {
@@ -32,14 +41,15 @@ export function verifyBadgeToken(token: string, invitationId: string): boolean {
 
     const payload = `${tokenInvitationId}:${timestamp}`;
     const secret = getSecret();
+    if (!secret) return false;
     const expected = crypto.createHmac('sha256', secret).update(payload).digest('hex');
     const providedBuffer = Buffer.from(signature);
     const expectedBuffer = Buffer.from(expected);
     if (providedBuffer.length !== expectedBuffer.length) return false;
 
     return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
-  } catch (error) {
-    console.error('Failed to verify badge token', error);
+  } catch {
+    console.error('[quiz-badge] BADGE_TOKEN_VERIFICATION_FAILED');
     return false;
   }
 }

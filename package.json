@@ -11,7 +11,9 @@
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
-    "db:migrate": "prisma migrate deploy"
+    "db:migrate": "prisma migrate deploy",
+    "auth:hash": "node scripts/generate-owner-password-hash.mjs",
+    "secret:generate": "node scripts/generate-secret.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
