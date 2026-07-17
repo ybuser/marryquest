@@ -18,6 +18,12 @@ Never prefix these variables with `NEXT_PUBLIC_`. Generate separate staging and 
 
 The public `replace-with-*` strings in `.env.example` are deliberately rejected by authentication, quiz signing, admin-passphrase verification, and readiness checks. They are labels, not development fallbacks. An invalid or missing `NEXTAUTH_SECRET` is never used as a JWT key; the process substitutes a non-persisted random fail-closed key while owner authorization remains disabled and readiness returns `503`.
 
+## Netlify deploy-context placement
+
+This repository is public. On the staging-only Netlify site, actual `OWNER_*`, `NEXTAUTH_SECRET`, `QUIZ_BADGE_SECRET`, `ADMIN_PASSPHRASE`, and database values belong only in the stable staging site's `Production` deploy context and sensitive entries must be marked `Contains secret values`. Never place actual values in `All deploys`, `Deploy Previews`, `Branch deploys`, `Local development`, `netlify.toml`, or a bulk `.env` import.
+
+Preview and branch contexts use only public `replace-with-*` sentinels and a non-routable database placeholder. Those placeholders are compile-time inputs that intentionally fail closed at runtime; they do not create a usable preview login. The sensitive-variable policy is an additional control, not a substitute for deploy-context isolation. Follow [the Netlify staging runbook](./netlify-staging.md#public-repository-secret-isolation) for the exact context, policy, and Netlify-only `DIRECT_URL` rules.
+
 ## Stable owner identity
 
 `OWNER_EMAIL` is the Prisma identity key, not merely contact metadata. After the owner has created operational data, do not change it during routine rotation. A changed email causes the next successful login to upsert a different `User`; it does not transfer existing invitations or ownership. Recover an incorrectly configured email through a reviewed data-repair procedure rather than deleting users or changing ownership ad hoc.

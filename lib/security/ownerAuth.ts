@@ -15,7 +15,13 @@ const ownerConfigSchema = z.object({
     .max(OWNER_LOGIN_ID_MAX_LENGTH)
     .refine((value) => !isPublicConfigurationPlaceholder(value))
     .transform((value) => value.toLowerCase()),
-  OWNER_EMAIL: z.string().trim().toLowerCase().email().max(320),
+  OWNER_EMAIL: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email()
+    .max(320)
+    .refine((value) => !isPublicConfigurationPlaceholder(value)),
   OWNER_NAME: z
     .string()
     .optional()

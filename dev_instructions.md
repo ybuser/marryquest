@@ -282,6 +282,8 @@ Required for normal local app usage:
 
 The Prisma datasource uses `DATABASE_URL` for application runtime access and `DIRECT_URL` for migration access. The validated Neon staging environment uses pooled and direct connections respectively; production values do not exist yet.
 
+Netlify is a deliberate exception: do not store the actual direct endpoint there. Configure its stable staging `Production` context with the pooled `DATABASE_URL` value duplicated as `DIRECT_URL` only for Prisma generation/build compatibility; keep actual migration credentials in a separately approved operator environment. Actual staging secrets must not be placed in Netlify Preview, branch, local, or all-deploy contexts.
+
 Required if using timeline uploads:
 
 - `SUPABASE_URL`

@@ -79,5 +79,6 @@ Do not reuse recovered Supabase secrets or configure these legacy values for pro
 - Public fixed test credentials and quick-login UI have been removed; local and deployed environments use the same server-configured single-owner flow.
 - A minimal Netlify build baseline and one code-based credentials-callback rate-limit rule are present, but no Netlify site, deploy, custom domain, or production release has been created. Follow [`docs/ops/netlify-staging.md`](docs/ops/netlify-staging.md) after merge and explicit approval.
 - Do not run database migrations in the Netlify build. Any future environment apply is a separate reviewed operation using `DIRECT_URL`.
+- Netlify must not store the actual direct endpoint: its Production context duplicates the pooled `DATABASE_URL` as a `DIRECT_URL` build-compatibility alias, while actual migration credentials remain in a separately approved operator environment. On Free this alias may also be visible to Functions, but application queries continue to use only `DATABASE_URL`.
 - Supabase Storage is still used by the timeline upload code. R2 replacement and upload acceptance are Recovery-03 work.
 - See [`docs/ops/fresh-start-database.md`](docs/ops/fresh-start-database.md) for the Fresh-start decision, staging procedure, prohibited commands, and rollback policy.
