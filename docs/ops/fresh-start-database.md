@@ -13,21 +13,23 @@ The sources of truth are:
 
 Never edit a migration that has already been shared or applied. Add a new forward migration instead.
 
-## Target Neon connection design
+## Neon connection state and design
 
-Neon is the approved target managed provider, but neither staging nor production is provisioned. No Neon connection strings have been issued or configured, and no shared Neon database has received this migration chain. The commands below are a future staging procedure to use only after provisioning and approval.
+The approved Neon PostgreSQL 17 staging database has received migrations `000` through `011`. The release audit verified migration names/order/checksums, the expected catalog, an empty database-to-schema diff, pooled/direct connectivity, and zero application rows at the verification point. Keep that staging project; do not rerun this runbook against it during routine application work. Production Neon is not provisioned, and the staging result is not production approval.
+
+The commands below remain the controlled procedure for a newly approved empty staging replacement/branch or another future environment-specific promotion. They are not authorization to mutate the existing staging database.
 
 - `prisma/schema.prisma` already supports separate runtime and migration URLs.
-- `DATABASE_URL` will be the pooled Neon connection used by the application runtime.
-- `DIRECT_URL` will be the direct Neon connection used by Prisma migration operations.
-- Once issued, both URLs must include `sslmode=require`; `connect_timeout=15` is recommended.
+- `DATABASE_URL` is the pooled Neon connection used by the application runtime.
+- `DIRECT_URL` is the direct Neon connection used by Prisma migration operations.
+- Both URLs must include `sslmode=require`; `connect_timeout=15` is recommended.
 - Store both values in an approved secret manager. Never put credentials or connection strings in source files, documentation, commits, PR text, screenshots, or command logs.
 
 Do not run `prisma migrate deploy` from the Netlify build. When Phase B is approved, run it as a separate, reviewed staging operation independent from the application build.
 
 ## Shared staging promotion gate
 
-> **The ESLint tooling blocker is resolved, but shared Neon staging apply is not approved.** `npm run lint` now executes non-interactively. Before any Phase B operation, rerun every Phase A command against the exact commit selected for staging and require each command to succeed. Passing Phase A does not authorize Phase B: Neon staging provisioning and migration still require separate explicit operational approval. The PostgreSQL 17 disposable-database migration-chain audit and approval to promote that chain to shared staging are separate gates.
+> **The original Neon staging promotion completed for migrations `000` through `011`; it is not a standing approval for another apply.** Before any future Phase B operation, rerun every Phase A command against the exact selected commit and require each command to succeed. Passing Phase A does not authorize Phase B: every new staging replacement, branch, or migration requires separate explicit operational approval. Disposable-database auditing and shared-environment promotion remain separate gates.
 
 ## Prohibited shortcuts
 
@@ -36,7 +38,7 @@ Do not run `prisma migrate deploy` from the Netlify build. When Phase B is appro
 - Do not use `prisma migrate resolve` for routine deployment, drift, or Fresh-start setup.
 - `prisma migrate resolve` is allowed only to recover verified migration metadata after the exact database state and migration SQL have been inspected, and only with explicit approval from both a project maintainer and the database owner. Record the approval and incident separately without recording secrets.
 
-## Future empty Neon staging prerequisites
+## Future empty Neon staging replacement or promotion prerequisites
 
 1. Obtain explicit operational approval to provision a new, empty Neon staging project or branch, then create it. Do not point these steps at production.
 2. Confirm that no MarryQuest application tables or seed records exist.
@@ -46,7 +48,7 @@ Do not run `prisma migrate deploy` from the Netlify build. When Phase B is appro
 
 ## Windows PowerShell procedure
 
-PowerShell is the primary future staging procedure. The commands assume the two environment variables were injected by an approved secret mechanism; do not paste their literal values into a committed script or shell history. Continue through both phases in the same PowerShell session.
+PowerShell is the primary future empty-environment procedure. The commands assume the two environment variables were injected by an approved secret mechanism; do not paste their literal values into a committed script or shell history. Continue through both phases in the same PowerShell session.
 
 ### Phase A — Non-mutating preflight
 
@@ -83,25 +85,45 @@ if ($preflightPassed -ne $true) { throw 'Phase A did not complete successfully; 
 Invoke-CheckedNative 'prisma migrate deploy' { npx prisma migrate deploy }
 Invoke-CheckedNative 'prisma migrate status' { npx prisma migrate status }
 
-$diffPath = Join-Path $env:TEMP 'marryquest-staging-diff.sql'
-npx prisma migrate diff `
-  --from-url $env:DIRECT_URL `
-  --to-schema-datamodel prisma/schema.prisma `
-  --script `
-  --exit-code `
-  --output $diffPath
+$prismaCli = (Resolve-Path '.\node_modules\prisma\build\index.js').Path
+$diffStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+$diffStartInfo.FileName = (Get-Command node).Source
+$diffStartInfo.Arguments = "`"$prismaCli`" migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --script --exit-code"
+$diffStartInfo.UseShellExecute = $false
+$diffStartInfo.RedirectStandardOutput = $true
+$diffStartInfo.RedirectStandardError = $true
+$diffStartInfo.EnvironmentVariables['DATABASE_URL'] = $env:DIRECT_URL
 
-$diffCode = $LASTEXITCODE
+$diffProcess = [System.Diagnostics.Process]::new()
+$diffProcess.StartInfo = $diffStartInfo
+[void]$diffProcess.Start()
+$diffOutputTask = $diffProcess.StandardOutput.ReadToEndAsync()
+$diffErrorTask = $diffProcess.StandardError.ReadToEndAsync()
+if (-not $diffProcess.WaitForExit(120000)) {
+  try { $diffProcess.Kill() } catch {}
+  throw 'Database-to-schema comparison timed out after 120 seconds.'
+}
+$diffOutput = $diffOutputTask.GetAwaiter().GetResult()
+$diffError = $diffErrorTask.GetAwaiter().GetResult()
+$diffCode = $diffProcess.ExitCode
 if ($diffCode -eq 1) {
-  throw 'Database-to-schema comparison failed; fix the error before proceeding.'
+  throw 'Database-to-schema comparison failed; redact the captured $diffError value before reviewing it.'
 }
 if ($diffCode -eq 2) {
-  throw "Database-to-schema diff is not empty; inspect $diffPath before proceeding."
+  throw 'Database-to-schema diff is not empty; review the captured $diffOutput SQL without executing it.'
 }
 if ($diffCode -ne 0) { throw "Unexpected Prisma diff exit code: $diffCode" }
+
+$executableSql = @($diffOutput -split "`r?`n" | Where-Object {
+  $line = $_.Trim()
+  $line.Length -gt 0 -and -not $line.StartsWith('--')
+})
+if ($executableSql.Count -ne 0) { throw 'Diff exited 0 but emitted executable SQL.' }
+$diffOutput = $null
+$diffError = $null
 ```
 
-Prisma diff exit code `0` means empty, `2` means drift, and `1` means the comparison failed. Exit code `0` with no executable SQL is required before staging approval; Prisma 5 may still write the comment `-- This is an empty migration.` to the output file.
+The schema-datasource mode above gives only the child Prisma process the direct URL and keeps it out of the argument list. The staging D1 audit also proved canonical `--from-url` mode with the direct local CLI and no output file; the cause of an earlier output-file comparison error was not isolated. Prisma diff exit code `0` means empty, `2` means drift, and `1` means the comparison failed. Exit code `0` with no executable SQL is required before staging approval; Prisma 5 may still emit the comment `-- This is an empty migration.`. Never print captured diagnostics before redacting connection identifiers.
 
 ## POSIX procedure
 
@@ -139,25 +161,33 @@ fi
 npx prisma migrate deploy
 npx prisma migrate status
 
-diff_path="${TMPDIR:-/tmp}/marryquest-staging-diff.sql"
+diff_capture_dir=$(mktemp -d "${TMPDIR:-/tmp}/marryquest-diff.XXXXXX")
+chmod 700 "$diff_capture_dir"
+diff_stdout="$diff_capture_dir/stdout"
+diff_stderr="$diff_capture_dir/stderr"
+cleanup_diff_capture() { rm -rf -- "$diff_capture_dir"; }
+trap cleanup_diff_capture EXIT HUP INT TERM
+
 set +e
-npx prisma migrate diff \
-  --from-url "$DIRECT_URL" \
+DATABASE_URL="$DIRECT_URL" node node_modules/prisma/build/index.js migrate diff \
+  --from-schema-datasource prisma/schema.prisma \
   --to-schema-datamodel prisma/schema.prisma \
   --script \
-  --exit-code \
-  --output "$diff_path"
+  --exit-code >"$diff_stdout" 2>"$diff_stderr"
 diff_code=$?
 set -e
 
 case "$diff_code" in
   0) ;;
   1)
-    echo "Database-to-schema comparison failed; fix the error before proceeding." >&2
+    trap - EXIT HUP INT TERM
+    echo "Database-to-schema comparison failed. Redact diagnostics under $diff_capture_dir before review, then delete that directory." >&2
     exit 1
     ;;
   2)
-    echo "Database-to-schema diff is not empty; inspect the protected diff output." >&2
+    rm -f -- "$diff_stderr"
+    trap - EXIT HUP INT TERM
+    echo "Database-to-schema diff is not empty. Review $diff_stdout without executing it, then delete $diff_capture_dir." >&2
     exit 2
     ;;
   *)
@@ -165,6 +195,16 @@ case "$diff_code" in
     exit "$diff_code"
     ;;
 esac
+
+executable_sql=$(sed '/^[[:space:]]*$/d; /^[[:space:]]*--/d' "$diff_stdout")
+if [ -n "$executable_sql" ]; then
+  trap - EXIT HUP INT TERM
+  echo "Diff exited 0 but emitted executable SQL. Review $diff_stdout without executing it, then delete $diff_capture_dir." >&2
+  exit 1
+fi
+unset executable_sql
+cleanup_diff_capture
+trap - EXIT HUP INT TERM
 ```
 
 ## Phase B catalog verification and staging approval

@@ -1,26 +1,14 @@
-import crypto from 'crypto';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/db';
 import { apiError, methodNotAllowed } from '@/lib/apiError';
-
-function isAdmin(req: NextApiRequest): boolean {
-  const configured = process.env.ADMIN_PASSPHRASE;
-  const providedHeader = req.headers['x-admin-passphrase'];
-  const provided = typeof providedHeader === 'string' ? providedHeader.trim() : '';
-
-  if (!configured || !provided || provided.length !== configured.length) {
-    return false;
-  }
-
-  return crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(configured));
-}
+import { verifyAdminPassphrase } from '@/lib/security/adminPassphrase';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return methodNotAllowed(res, 'GET');
   }
 
-  if (!isAdmin(req)) {
+  if (!verifyAdminPassphrase(req.headers['x-admin-passphrase'])) {
     return apiError(res, 401, 'UNAUTHORIZED');
   }
 

@@ -161,7 +161,7 @@ export default function Home({ isAuthenticated }: HomeProps) {
                   href="/login?callbackUrl=%2Fdashboard"
                   className="inline-flex items-center justify-center rounded-full border border-white/25 bg-white/5 px-5 py-3 text-sm font-medium text-white/90 backdrop-blur transition hover:bg-white/10"
                 >
-                  {isKorean ? '테스트 계정으로 둘러보기' : 'Open test-user login'}
+                  {isKorean ? '관리자 로그인' : 'Owner sign-in'}
                 </Link>
               </div>
 
