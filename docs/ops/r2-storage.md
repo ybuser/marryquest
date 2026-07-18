@@ -2,15 +2,12 @@
 
 ## Scope and current state
 
-Recovery-03 replaces the Netlify Function multipart upload with a two-bucket, browser-direct R2 flow. The repository now contains the storage provider, presign/finalize APIs, image validation, readiness check, and upload rate-limit declaration. It does not create or configure Cloudflare or Netlify resources.
+Recovery-03 replaced the Netlify Function multipart upload with a two-bucket, browser-direct R2 flow. The repository contains the storage provider, presign/finalize APIs, image validation, readiness check, and upload rate-limit declaration. Recovery-03A does not redesign or reconfigure this storage architecture.
 
 At the time of this change:
 
-- The existing Netlify staging deployment, `/api/health`, protected `/api/ready`, and owner login were validated before the R2 change.
-- No R2 staging bucket or API token has been created by this change.
-- The R2 custom domain has not been connected.
-- Netlify does not yet have the R2 variables.
-- No upload has been sent to Cloudflare R2 and no stable Recovery-03 Netlify upload smoke has run.
+- The Netlify staging deployment, `/api/health`, protected `/api/ready`, owner login, two-bucket readiness, and browser-direct Timeline upload flow were validated before Recovery-03A.
+- Recovery-03A creates no R2 resource or token, changes no Netlify environment value, and performs no deploy.
 - Production Neon, production R2 resources, the production domain, and a production release remain unprovisioned and unapproved.
 
 The recovered Supabase backup and Storage objects are not imported. Do not restore old Supabase credentials as a fallback.
@@ -27,6 +24,15 @@ Use two distinct Standard-storage buckets:
 The authenticated browser requests a five-minute presigned PUT, sends the original directly to the private bucket, and sends only a small JSON finalize request to Next.js. The server checks the stored size and content type, reads at most 10 MiB through a bounded stream, decodes the actual image with Sharp, and writes a metadata-free 640×640 WebP to the public bucket.
 
 The application never gives an R2 access key to browser code. A presigned URL is a short-lived bearer token: do not log it, persist it, or include it in tickets or screenshots.
+
+## Timeline readiness and rendering contract
+
+- The Timeline switch in the Builder's Sections tab controls whether the public invitation may show the section.
+- `TimelinePuzzle.enabled` is stored for compatibility but is derived by the Timeline save API: zero cards saves as disabled, while a valid 5–7-card set saves as enabled. One to four cards, more than seven cards, blank titles, and invalid correct-order sets are rejected without a partial write.
+- Finalizing an R2 image updates only the Builder draft. The owner must still press Save Timeline to persist the `photoUrl` and derived readiness.
+- Builder preview shows incomplete draft cards and images with a non-interactive pre-publication callout. It never submits a Timeline attempt or unlocks Music in preview mode.
+- Public SSR includes Timeline cards only when the section is enabled and the stored puzzle and card set are ready. It omits incomplete configuration instead of exposing a readiness placeholder to guests.
+- A legacy ready card set stored with `enabled=false` is repaired only by an explicit Builder Timeline save. GET/SSR requests never mutate the database.
 
 ## Object and image policy
 
@@ -46,7 +52,7 @@ Finalize is idempotent. The deterministic final key means a repeated request ret
 
 ## Staging resource setup
 
-This is manual Cloudflare Dashboard work to complete after the Recovery-03 review fix and before merge. Merging to `master` automatically creates the stable staging deploy, so the required buckets, token, custom domain, and Netlify `Production`-context values must already be ready. The currently deployed pre-Recovery-03 code does not use these R2 values before the merge.
+Use this section when recreating staging or provisioning a new environment. The current staging R2 baseline was completed before Recovery-03A; this hotfix performs none of these Dashboard actions. For a future storage rollout, prepare the buckets, token, custom domain, and Netlify `Production`-context values before the merge that first consumes them because merging to `master` automatically starts the stable deploy.
 
 Recommended staging resources:
 
@@ -142,7 +148,7 @@ Use this rollout order:
 10. Confirm that the merge commit's automatic stable staging `Production`-context deploy succeeds.
 11. Run protected readiness, upload/finalize/save/render, and controlled rate-limit smoke tests against that stable deploy.
 
-Cloudflare resources and Netlify `Production`-context values are deliberately prepared before merge. The already deployed pre-Recovery-03 application does not consume them until the Recovery-03 code reaches `master`.
+For a new or replacement environment, Cloudflare resources and Netlify `Production`-context values are deliberately prepared before the first consuming merge. Existing deployed code does not consume them until that code reaches `master`.
 
 After the automatic stable deploy:
 
@@ -152,10 +158,11 @@ After the automatic stable deploy:
 4. Sign in as the configured owner on the stable staging URL.
 5. Upload JPEG, PNG, and WebP timeline photos and confirm the browser sends JSON to presign, binary directly to R2, and JSON to finalize.
 6. Confirm the public URL uses the staging asset domain and the object is a 640×640 WebP.
-7. Save the Timeline tab, reload the Builder, and open the public invitation.
-8. Remove a saved photo, save again, and confirm the database/UI no longer references it while its public object is retained for Recovery-04 reconciliation.
-9. Perform a controlled upload-rate test and confirm requests above 20 POSTs in 60 seconds receive 429. Local testing is not evidence that Netlify accepted this rule.
-10. Inspect deploy and Function logs for accidental presigned URL, endpoint, bucket, or credential disclosure.
+7. Enable the Timeline section, complete 5–7 valid cards, save the Timeline tab, and confirm Builder preview shows image cards with guest interactions disabled.
+8. Reload the Builder and open the public invitation. Confirm the image Timeline renders, the readiness placeholder is absent, and a real puzzle attempt succeeds.
+9. Remove a saved photo, save again, and confirm the database/UI no longer references it while its public object is retained for Recovery-04 reconciliation.
+10. Perform a controlled upload-rate test and confirm requests above 20 POSTs in 60 seconds receive 429. Local testing is not evidence that Netlify accepted this rule.
+11. Inspect deploy and Function logs for accidental presigned URL, endpoint, bucket, or credential disclosure.
 
 Do not run Prisma migration commands, seed commands, or R2 administration from a Netlify build or Function.
 

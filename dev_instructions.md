@@ -34,7 +34,7 @@ Current guest-facing features:
 - Prisma ORM
 - PostgreSQL via Prisma
 - Managed provider: Neon; staging is provisioned and schema-validated, while production is not provisioned
-- Cloudflare R2 two-bucket timeline storage code; staging resources are not provisioned yet
+- Cloudflare R2 two-bucket Timeline storage; the staging browser-direct flow was validated before Recovery-03A
 - Zod for validation
 
 Do not introduce App Router patterns unless explicitly requested. The current app is Pages Router only.
@@ -111,6 +111,8 @@ Current builder extras:
 - Guestbook moderation supports hide/show and delete with confirmation
 - Builder interactions can auto-focus related preview content
 - Timeline builder uploads originals directly to a private S3-compatible bucket and applies the server-finalized public WebP URL to the draft
+- Timeline visibility is controlled only by the Timeline entry in the Sections tab. `TimelinePuzzle.enabled` is a server-derived readiness flag, not a user toggle.
+- A Timeline explicit save accepts either zero cards or a ready set of 5–7 valid cards. Builder preview displays incomplete draft cards without enabling guest Timeline or Music APIs.
 
 ## 6. Walkthrough System
 
@@ -259,8 +261,8 @@ Current code behavior:
 
 Current operational state and limitations:
 
-- The Cloudflare R2 staging buckets, API token, custom domain, and Netlify R2 environment values have not been created/configured by Recovery-03. They must be prepared before merge because a `master` merge automatically starts the stable staging deploy.
-- Before merge, the PR-head Deploy Preview must pass Next.js/OpenNext packaging, secret scanning, and post-processing for both rate-limit rules with public fail-closed Preview values. After merge, verify the automatic stable deploy and run readiness, upload/finalize/save/render, and controlled 429 smoke tests.
+- The two-bucket R2 staging flow, server readiness, and browser-direct upload baseline were completed before Recovery-03A. Production R2 remains a separate gate.
+- Recovery-03A changes Timeline activation/readiness and rendering only. Before merge, its PR-head Deploy Preview must pass Next.js/OpenNext packaging, secret scanning, and post-processing for both existing rate-limit rules. After merge, verify the automatic stable deploy and rerun readiness plus Timeline save/preview/public/attempt smoke.
 - Gallery photos continue to render from DB URLs; there is no Gallery upload flow.
 - Finalized-before-save objects and images removed by a later Timeline save are retained as orphan candidates; live-asset preservation takes priority over immediate storage reclamation. Invitation soft-delete and Gallery cleanup also require later reconciliation work.
 - Follow `docs/ops/r2-storage.md` before provisioning or deploying storage.
@@ -358,6 +360,8 @@ Recovery-02 validation on 2026-07-15 used a localhost-bound disposable PostgreSQ
 
 Recovery-03 validation on 2026-07-18 used localhost-bound disposable PostgreSQL 17.10 and MinIO `RELEASE.2025-09-07T16-13-09Z`. The API and real-browser checks covered direct browser/S3 upload, server-side image validation, idempotent finalize, temporary-object retry/deletion policy, explicit Timeline save, the absence of request-time public-object deletion, and two-bucket readiness without accessing Neon, Supabase, Cloudflare R2, or production. `git diff --check`, clean `npm ci`, Prisma validate/generate, TypeScript, non-interactive lint, and a fail-closed Preview-placeholder production build all exited `0`; lint and build reported only the same two existing `react-hooks/exhaustive-deps` warnings. Cloudflare staging resources and Netlify `Production`-context R2 values must be prepared before merge, and the PR-head Deploy Preview must be green. Stable readiness, upload/render, and controlled 429 smoke remain post-merge gates after the automatic merge-commit deploy.
 
+Recovery-03A validation on 2026-07-18 used localhost-bound disposable PostgreSQL 17.10 and local HTTP/browser harnesses; no R2 upload retest or MinIO was required because storage contracts were unchanged. The matrix reproduced the old `enabled=false` mismatch, then verified empty/5/7-card saves, rejection and transaction invariance for incomplete or invalid sets, explicit legacy-row repair with `photoUrl` preservation, non-interactive incomplete/ready Builder preview, public SSR omission for disabled/not-ready Timeline data, and guarded public attempts. `git diff --check`, clean `npm ci`, Prisma validate/generate, TypeScript, non-interactive lint, and the production build exited `0`; lint and build reported only the same two existing `react-hooks/exhaustive-deps` warnings. The PR-head Deploy Preview and merge-commit staging smoke are still separate gates.
+
 ## 14. Current Project Status
 
 As of 2026-07-18:
@@ -369,7 +373,8 @@ As of 2026-07-18:
 - Builder walkthrough and `...` menu are implemented
 - Builder preview isolated scrolling is implemented
 - Guestbook delete with confirmation is implemented
-- Timeline upload code uses authenticated browser-direct private uploads and server-finalized public WebP assets; R2 staging pre-provisioning and deployment verification are pending
+- Timeline upload uses authenticated browser-direct private uploads and server-finalized public WebP assets; its staging baseline was validated before Recovery-03A
+- Timeline public visibility comes from the Sections tab, while puzzle readiness is derived from the saved 5–7-card configuration; incomplete public Timelines are omitted and incomplete Builder drafts remain previewable
 - Environment-backed single-owner authentication replaces the removed public test-user system
 - Mobile/layout polish pass is implemented across landing, builder, walkthrough, and public invitation sections
 - Builder and dashboard expose sign-out actions for owner JWT sessions
@@ -379,6 +384,6 @@ As of 2026-07-18:
 - Walkthrough overlays now clamp to the viewport with internal scrolling, so guide controls stay reachable on short laptop screens and phones
 - Mobile builder now uses a dedicated small-screen workflow: icon-based tab grid, simplified header actions, a sticky bottom save bar, a floating preview button that opens a separate mobile preview sheet, and arrow-button ordering controls for sections, food vote options, timeline cards, and correct-order cards
 
-The Netlify staging application baseline exists and its health/readiness/owner-login checks were completed before Recovery-03. Recovery-03 adds code/config only: it does not perform Cloudflare or Netlify Dashboard work. Before merge, operators must create the approved staging buckets/token/custom domain, configure only the Netlify `Production`-context R2 values, retain public fail-closed Preview values, and confirm the PR-head Deploy Preview is green. Merging then triggers the stable staging deploy automatically; runtime smoke follows that deploy. Production Neon, production storage, the production domain, and public launch remain unapproved.
+The Netlify staging application and two-bucket R2 upload baseline exist, and their health/readiness/owner/upload checks were completed before Recovery-03A. Recovery-03A performs no Dashboard work and no deploy. Its PR-head Deploy Preview remains a pre-merge gate; merging then triggers the stable staging deploy automatically, after which operators must verify the existing affected invitation can be explicitly saved and rendered without the old readiness placeholder. Production Neon, production storage, the production domain, and public launch remain unapproved.
 
 There is no persisted deployment state in this file. New Codex sessions should confirm the current branch, commit, and approved operational gate before acting.

@@ -2,9 +2,9 @@
 
 ## Current state and scope
 
-The stable Netlify staging site has been deployed, and public health, protected readiness, and owner login were validated before Recovery-03. Neon PostgreSQL 17 staging was also validated separately. Production Neon, the production domain, and a production release are not provisioned or approved, and this runbook does not authorize a database migration.
+The stable Netlify staging site, public health, protected readiness, owner login, and browser-direct two-bucket R2 Timeline flow were validated before Recovery-03A. Neon PostgreSQL 17 staging was also validated separately. Production Neon, production R2, the production domain, and a production release are not provisioned or approved, and this runbook does not authorize a database migration.
 
-Recovery-03 adds the browser-direct/two-bucket R2 code path only. It does not perform Cloudflare or Netlify Dashboard work. Because a merge to `master` automatically starts the stable staging deploy, Cloudflare resources and Netlify `Production`-context R2 values must be prepared before merge. The PR-head Deploy Preview is also a pre-merge packaging, secret-scanning, and rate-rule post-processing gate; stable upload acceptance follows the automatic merge-commit deploy. Do not reuse recovered Supabase credentials.
+Recovery-03A fixes Timeline readiness and rendering without changing R2, Netlify environment values, rate-limit rules, or Dashboard resources. Its PR-head Deploy Preview is a pre-merge packaging, secret-scanning, and rate-rule post-processing gate; the affected Timeline flow must then be rechecked after the automatic merge-commit staging deploy. Do not reuse recovered Supabase credentials.
 
 ## Repository baseline
 
@@ -61,7 +61,7 @@ The Netlify `DIRECT_URL` alias exists only so `npm ci` postinstall can run `pris
 
 Do not use a Deploy Preview URL as the canonical `NEXTAUTH_URL`. Authentication smoke tests must use the stable staging site URL. Environment-variable changes require a redeploy.
 
-R2 credentials are server-only and must never use a `NEXT_PUBLIC_*` name. Mark the access key, secret key, and any value treated as sensitive by the team as `Contains secret values`. Configure them only after the two staging buckets, bucket-scoped token, lifecycle, CORS, and custom domain in `r2-storage.md` have been created and verified, and do so before merge. Unlike Prisma's Netlify-only `DIRECT_URL` pooled alias, `R2_ENDPOINT` is the actual staging S3 API endpoint required by server Functions; it is not a migration credential.
+R2 credentials are server-only and must never use a `NEXT_PUBLIC_*` name. Mark the access key, secret key, and any value treated as sensitive by the team as `Contains secret values`. For a new or replacement environment, configure them only after the two staging buckets, bucket-scoped token, lifecycle, CORS, and custom domain in `r2-storage.md` have been created and verified, and do so before the first consuming merge. Unlike Prisma's Netlify-only `DIRECT_URL` pooled alias, `R2_ENDPOINT` is the actual staging S3 API endpoint required by server Functions; it is not a migration credential.
 
 ## Deploy Preview and branch-deploy policy
 
@@ -86,9 +86,9 @@ The `.invalid` hostnames are deliberately non-routable, and every `replace-with-
 
 If this fail-closed placeholder environment cannot build, do not provide staging secrets to make the Preview pass. Record the failure and disable Deploy Previews and branch deploys until a preview-safe database or configuration is explicitly approved.
 
-## Continuous-deployment rollout procedure
+## Initial or replacement R2 rollout procedure
 
-The site/authentication baseline above is already present. Follow this order because merging to `master` automatically starts the stable staging `Production`-context deploy:
+For a new or replacement storage environment, follow this order because merging to `master` automatically starts the stable staging `Production`-context deploy:
 
 1. Complete the focused PR review fix.
 2. Create the private upload and public asset staging buckets.
@@ -104,7 +104,20 @@ The site/authentication baseline above is already present. Follow this order bec
 
 During both Preview and stable deploys, inspect build, post-processing, Edge, and Function logs for connection strings, credentials, bucket/endpoint details, and presigned URLs. For the stable upload smoke, confirm the original binary never appears in a Netlify Function request and the returned asset is a 640×640 WebP on the staging custom domain. When a saved image is removed, confirm only the DB/UI reference is removed; the public final object remains an orphan candidate for Recovery-04 reconciliation. Record temp/final orphan and readiness behavior without exposing object keys or signed URLs.
 
-Cloudflare resources and stable Netlify `Production`-context values are intentionally prepared before merge. The currently deployed pre-Recovery-03 code does not consume them until the merge triggers the Recovery-03 staging deploy. Keep the build command `npm run build`, publish directory blank, and Node.js 20 throughout this procedure.
+Cloudflare resources and stable Netlify `Production`-context values are intentionally prepared before the first consuming merge. Existing deployed code does not consume them until that code reaches `master`. Keep the build command `npm run build`, publish directory blank, and Node.js 20 throughout this procedure.
+
+## Recovery-03A Timeline hotfix rollout
+
+The current staging R2 resources and Production-context values remain unchanged:
+
+1. Require the PR-head Deploy Preview to pass Next.js/OpenNext packaging, secret scanning, and both existing code-based rate-limit declarations.
+2. Merge only after that Preview is green; do not treat Preview DB-backed SSR as acceptance.
+3. Confirm the merge commit's automatic stable staging deploy succeeds.
+4. Verify `/api/health` and protected `/api/ready` return 200, then sign in as the owner.
+5. Open the affected invitation, confirm the Timeline section is enabled, complete 5–7 valid cards, and press Save Timeline. A legacy ready set stored disabled must repair without editing its cards or `photoUrl`.
+6. Confirm live preview shows image cards but performs no Timeline attempt or Music request.
+7. Confirm the published page shows the image Timeline, contains no readiness placeholder, and accepts a real Timeline attempt.
+8. Confirm the R2 object and persisted `photoUrl` remain intact and smoke other invitation features.
 
 Also review the team's billing controls before enabling continuous deploys. Keep automatic recharge disabled unless explicitly approved, enable usage notifications, and monitor Edge Function and serverless-function usage.
 

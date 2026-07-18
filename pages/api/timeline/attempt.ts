@@ -5,6 +5,7 @@ import { withRateLimit, getClientKey } from '@/lib/security/rateLimit';
 import { validate } from '@/lib/validate';
 import { getOrSetGuestKey } from '@/lib/guestKey';
 import { apiError, methodNotAllowed } from '@/lib/apiError';
+import { isTimelineReady } from '@/lib/timeline/readiness';
 
 const attemptSchema = z.object({
   invitationId: z.string().min(1),
@@ -33,12 +34,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
   });
 
-  if (!puzzle || !puzzle.enabled || puzzle.invitation.status !== 'published' || puzzle.invitation.deletedAt) {
+  if (
+    !puzzle ||
+    !puzzle.enabled ||
+    puzzle.invitation.status !== 'published' ||
+    puzzle.invitation.deletedAt ||
+    !isTimelineReady(puzzle.cards)
+  ) {
     return apiError(res, 404, 'NOT_FOUND', 'Timeline not available');
-  }
-
-  if (puzzle.cards.length === 0) {
-    return apiError(res, 400, 'BAD_REQUEST', 'Timeline is not configured');
   }
 
   const correctOrder = puzzle.cards.map((card) => card.id);

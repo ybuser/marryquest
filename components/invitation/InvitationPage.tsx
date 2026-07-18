@@ -7,6 +7,7 @@ import { PublicGuestbook } from '@/components/guestbook/PublicGuestbook';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import type { QuizDto } from '@/types/quiz';
 import type { TimelinePuzzleDto } from '@/types/timeline';
+import { getTimelineReadiness } from '@/lib/timeline/readiness';
 import type { GuestbookEntryDto } from '@/types/guestbook';
 import { HeroSection } from './sections/Hero';
 import { InfoSection } from './sections/Info';
@@ -44,9 +45,7 @@ function mergeSections(invitationId: string, sections: SectionConfig[]) {
     keyed.set(section.key, section);
   });
 
-  return Array.from(keyed.values())
-    .filter((section) => section.enabled)
-    .sort((a, b) => a.order - b.order);
+  return Array.from(keyed.values()).sort((a, b) => a.order - b.order);
 }
 
 export function InvitationPage({
@@ -62,7 +61,22 @@ export function InvitationPage({
   foodVoteOptions = []
 }: InvitationPageProps) {
   const { isKorean } = useLanguage();
-  const orderedSections = useMemo(() => mergeSections(invitation.id, sections), [invitation.id, sections]);
+  const timelineData = timelinePuzzle ?? invitation.timelinePuzzle ?? null;
+  const orderedSections = useMemo(() => {
+    const timelineReadiness = getTimelineReadiness(timelineData?.cards ?? []);
+
+    return mergeSections(invitation.id, sections).filter((section) => {
+      if (section.key !== 'timeline') {
+        return section.enabled;
+      }
+
+      if (previewMode) {
+        return section.enabled || (timelineData?.cards.length ?? 0) > 0;
+      }
+
+      return section.enabled && Boolean(timelineData?.enabled) && timelineReadiness.status === 'ready';
+    });
+  }, [invitation.id, previewMode, sections, timelineData]);
   const sortedPhotos = useMemo(() => [...photos].sort((a, b) => a.order - b.order), [photos]);
   const quizData = quiz ?? invitation.quiz ?? null;
   const [quizBadgeToken, setQuizBadgeToken] = useState<string | null>(null);
@@ -205,8 +219,7 @@ export function InvitationPage({
                     <TimelineSection
                       invitationId={invitation.id}
                       slug={invitation.slug}
-                      invitationStatus={invitation.status}
-                      puzzle={timelinePuzzle ?? invitation.timelinePuzzle ?? null}
+                      puzzle={timelineData}
                       previewMode={previewMode}
                     />
                   </SectionCard>
