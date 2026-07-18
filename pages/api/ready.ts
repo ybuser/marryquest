@@ -3,6 +3,7 @@ import prisma from '@/lib/db';
 import { verifyAdminPassphrase } from '@/lib/security/adminPassphrase';
 import { isConfiguredServerSecret } from '@/lib/security/configValue';
 import { loadOwnerConfig } from '@/lib/security/ownerAuth';
+import { createStorageProvider } from '@/lib/storage';
 
 function hasValidNextAuthUrl(value: string | undefined): boolean {
   if (!value) return false;
@@ -59,9 +60,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     await prisma.user.findFirst({ select: { id: true } });
-    return res.status(200).json({ status: 'ready' });
   } catch {
     console.error('[ready] READINESS_DATABASE_UNAVAILABLE');
     return res.status(503).json({ status: 'not_ready' });
   }
+
+  try {
+    const storage = createStorageProvider();
+    await storage.readiness();
+  } catch {
+    console.error('[ready] READINESS_STORAGE_UNAVAILABLE');
+    return res.status(503).json({ status: 'not_ready' });
+  }
+
+  return res.status(200).json({ status: 'ready' });
 }

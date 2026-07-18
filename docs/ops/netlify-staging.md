@@ -2,30 +2,29 @@
 
 ## Current state and scope
 
-This repository contains only a Netlify deployment baseline. A Netlify site has not been created or deployed by this change, no production domain is connected, and production Neon is not provisioned. The existing Neon PostgreSQL 17 staging schema was validated separately; this runbook does not authorize a database migration or production release.
+The stable Netlify staging site has been deployed, and public health, protected readiness, and owner login were validated before Recovery-03. Neon PostgreSQL 17 staging was also validated separately. Production Neon, the production domain, and a production release are not provisioned or approved, and this runbook does not authorize a database migration.
 
-The current timeline upload implementation still targets Supabase Storage. Do not reuse recovered Supabase credentials. Upload acceptance is excluded until Recovery-03 replaces that implementation with R2.
+Recovery-03 adds the browser-direct/two-bucket R2 code path only. No R2 bucket, API token, custom asset domain, Netlify R2 variable, or Recovery-03 deploy has been created by this change. Upload acceptance remains a post-merge staging gate. Do not reuse recovered Supabase credentials.
 
 ## Repository baseline
 
 `netlify.toml` runs `npm run build` with Node.js 20. It intentionally has no publish directory, adapter pin, migration command, region, or secret. Netlify should detect this Next.js 14 project and apply its maintained OpenNext adapter automatically.
 
-The code-based Edge rule protects only `POST /api/auth/callback/credentials`:
+The repository now declares exactly two Netlify Free code-based Edge rate-limit rules:
 
-- 10 requests per 60 seconds
-- aggregated by client IP and domain
-- default block behavior, returning HTTP 429 above the limit
-- no request or response body transformation
+- `POST /api/auth/callback/credentials`: 10 requests per 60 seconds.
+- `POST /api/upload/timeline-card/*`: 20 requests per 60 seconds, covering presign and finalize together.
+- Both aggregate by client IP and domain, use the default 429 block behavior, and pass allowed requests through without reading or changing request/response bodies.
 
-This rule is evaluated by Netlify, not by `next dev` or `next start`. A successful local TypeScript check or Next.js build does not prove that the platform accepted the rule. Netlify validates code-based rate limits during deploy post-processing, and an invalid rule does not necessarily fail the deploy. Always inspect the post-processing log and perform a controlled 429 smoke test after deployment.
+These rules are evaluated by Netlify, not by `next dev` or `next start`. A successful local TypeScript check or Next.js build does not prove that the platform accepted the rules. Netlify validates code-based rate limits during deploy post-processing, and an invalid rule does not necessarily fail the deploy. Always inspect the post-processing log and perform a controlled 429 smoke test after deployment.
 
-The credentials rule consumes one of the two Netlify Free code-based rate-limit rules. Keep the second rule unused in this Recovery step; it is reserved for Recovery-03 upload protection.
+The two available code-based rule slots are now consumed. Do not add another code rule without changing the approved platform plan or replacing an existing rule. Both declarations still require deploy post-processing inspection and controlled staging 429 tests.
 
 ## Public-repository secret isolation
 
 This GitHub repository is public. On the staging-only Netlify site, the `Production` deploy context means the stable staging deployment; it does not mean that production infrastructure exists or is approved.
 
-- Set actual staging database, owner, signing, and admin values only for the `Production` deploy context.
+- Set actual staging database, owner, signing, admin, and R2 values only for the `Production` deploy context.
 - Never set those actual values for `All deploys`, `Deploy Previews`, `Branch deploys`, or `Local development`.
 - Mark every sensitive value as `Contains secret values` in the Netlify UI.
 - Prefer the `Deploy without sensitive variables` policy for untrusted deploys. The minimum acceptable policy is `Require approval`. Never select `Deploy without restrictions`.
@@ -49,17 +48,24 @@ Configure values through the Netlify environment-variable UI or another approved
 - `OWNER_PASSWORD_HASH`
 - `QUIZ_BADGE_SECRET`: independent from `NEXTAUTH_SECRET`.
 - `ADMIN_PASSPHRASE`: independent from every other secret.
+- `R2_ACCOUNT_ID`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_ENDPOINT`: the explicit HTTPS staging R2 S3 endpoint.
+- `R2_UPLOAD_BUCKET`: the private staging temporary-upload bucket.
+- `R2_PUBLIC_BUCKET`: the distinct staging optimized-asset bucket.
+- `R2_PUBLIC_BASE_URL`: the staging public asset custom-domain base URL.
 - `SKIP_PRISMA_GENERATION=false`
 
 The Netlify `DIRECT_URL` alias exists only so `npm ci` postinstall can run `prisma generate` and `npm run build` can parse and generate from the Prisma schema. It does not authorize a migration. Keep the actual Neon direct URL only in an approved operator secret store or a future explicitly approved migration environment. Never run `npm run db:migrate`, `prisma migrate deploy`, `prisma db push`, or `prisma migrate resolve` from a Netlify build or Function. Application queries continue to use only `DATABASE_URL`.
 
 Do not use a Deploy Preview URL as the canonical `NEXTAUTH_URL`. Authentication smoke tests must use the stable staging site URL. Environment-variable changes require a redeploy.
 
-Do not configure R2 variables before Recovery-03. The legacy Supabase variables in `.env.example` document the remaining upload code only; they are not approval to place old Supabase secrets into Netlify.
+R2 credentials are server-only and must never use a `NEXT_PUBLIC_*` name. Mark the access key, secret key, and any value treated as sensitive by the team as `Contains secret values`. Configure them only after the two staging buckets, bucket-scoped token, lifecycle, CORS, and custom domain in `r2-storage.md` have been reviewed. Unlike Prisma's Netlify-only `DIRECT_URL` pooled alias, `R2_ENDPOINT` is the actual staging S3 API endpoint required by server Functions; it is not a migration credential.
 
 ## Deploy Preview and branch-deploy policy
 
-Deploy Previews and branch deploys must never receive actual staging database, owner, signing, or admin values. The initial policy is to give those contexts public fail-closed placeholders only:
+Deploy Previews and branch deploys must never receive actual staging database, owner, signing, admin, or R2 values. The initial policy is to give those contexts public fail-closed placeholders only:
 
 ```text
 DATABASE_URL=postgresql://preview_user:preview_password@preview-pooler.invalid/preview_db?sslmode=require&connect_timeout=15
@@ -72,45 +78,41 @@ OWNER_NAME=Preview Placeholder
 OWNER_PASSWORD_HASH=replace-with-preview-generated-scrypt-hash
 QUIZ_BADGE_SECRET=replace-with-preview-quiz-badge-secret
 ADMIN_PASSPHRASE=replace-with-preview-admin-passphrase
+R2_ACCOUNT_ID=replace-with-preview-r2-account-id
+R2_ACCESS_KEY_ID=replace-with-preview-r2-access-key-id
+R2_SECRET_ACCESS_KEY=replace-with-preview-r2-secret-access-key
+R2_ENDPOINT=https://replace-with-preview-r2-account-id.r2.cloudflarestorage.com
+R2_UPLOAD_BUCKET=replace-with-preview-upload-bucket
+R2_PUBLIC_BUCKET=replace-with-preview-public-bucket
+R2_PUBLIC_BASE_URL=https://assets-preview.invalid
 SKIP_PRISMA_GENERATION=false
 ```
 
-The `.invalid` database hostname is deliberately non-routable, and every `replace-with-*` value is deliberately rejected at runtime. These values exist only to let dependency installation, Prisma generation, type checking, linting, and compilation run without a shared database or private secret. Preview authentication, DB-backed SSR, and readiness are not acceptance targets. Run the actual authentication and readiness smoke tests only against the stable staging `Production` deploy.
+The `.invalid` hostnames are deliberately non-routable, and every `replace-with-*` value is deliberately rejected at runtime. The build-time CSP/image parser also ignores invalid and placeholder R2 URLs. These values exist only to let dependency installation, Prisma generation, type checking, linting, and compilation run without a shared database, R2 request, or private secret. Preview authentication, direct upload, DB-backed SSR, and readiness are not acceptance targets. Run actual authentication, readiness, and upload smoke only against the stable staging `Production` deploy.
 
 If this fail-closed placeholder environment cannot build, do not provide staging secrets to make the Preview pass. Record the failure and disable Deploy Previews and branch deploys until a preview-safe database or configuration is explicitly approved.
 
 ## Dashboard procedure after merge
 
-This is manual work for an explicitly approved staging deployment:
+The site/authentication baseline above is already present. The following is manual Recovery-03 work after merge and explicit staging approval:
 
-1. Create a staging-only Netlify site and connect the GitHub repository.
-2. Select `master` as the production branch for that staging site.
-3. Confirm the build command is `npm run build`.
-4. Leave the publish directory blank so the Next.js adapter owns its output configuration.
-5. Confirm the build uses Node.js 20.
-6. Reserve a stable Netlify staging subdomain before setting authentication variables.
-7. Set that stable HTTPS URL as `NEXTAUTH_URL`.
-8. Set the actual pooled staging URL as `DATABASE_URL` in the `Production` deploy context only, then duplicate that same pooled value as the Netlify-only `DIRECT_URL` alias.
-9. Configure the owner and application-security values in the `Production` deploy context only, and mark sensitive entries as `Contains secret values`.
-10. Set the sensitive-variable policy to `Deploy without sensitive variables`, or at minimum `Require approval`; verify `Deploy without restrictions` is not selected.
-11. Configure only the public fail-closed placeholders for Deploy Previews and branch deploys. Do not set actual values for Local development or All deploys.
-12. Enter actual values only in the approved secret UI; do not bulk-import them or place them in `netlify.toml`, screenshots, tickets, or deploy notes.
-13. Trigger the first staging deploy.
-14. Confirm the deploy log detects Next.js and applies the OpenNext adapter without a pinned plugin.
-15. Confirm Netlify generated the SSR/API function required by Pages Router routes.
-16. Inspect deploy post-processing and confirm the credentials callback rate-limit rule was accepted with the intended path, method, window, and aggregation.
-17. Check the deploy log for accidental secret or connection-string disclosure.
-18. Check public `/api/health` liveness.
-19. Check protected `/api/ready` with missing, wrong, and correct admin passphrases.
-20. Confirm an incorrect owner login fails with the generic message.
-21. Confirm removed public test credentials and quick-login UI are unavailable.
-22. Confirm the configured owner can sign in on the stable staging URL.
-23. Verify dashboard access, session persistence, sign-out, and post-sign-out protection.
-24. Inspect the HTTPS session cookie for the expected Secure, HttpOnly, and SameSite behavior.
-25. Confirm external, scheme-relative, malformed, and backslash callback targets cannot redirect away from the staging origin; confirm an internal callback still works.
-26. Perform a controlled credentials-callback rate-limit test and confirm excess requests receive HTTP 429. Do not treat local behavior as evidence.
-27. Confirm the first successful login creates exactly one owner `User` with the configured `OWNER_EMAIL`, and a second login does not create a duplicate.
-28. Record timeline upload as excluded until Recovery-03; do not add a recovered Supabase credential merely to make this check pass.
+1. Complete the two staging buckets, lifecycle, CORS, bucket-scoped token, and asset custom-domain procedure in `r2-storage.md`.
+2. Keep the build command `npm run build`, publish directory blank, and Node.js 20.
+3. Add the seven actual R2 values to the stable staging `Production` context only. Never place them in All deploys, Deploy Preview, Branch deploy, or Local development contexts.
+4. Mark sensitive values as `Contains secret values` and retain `Deploy without sensitive variables`, or at minimum `Require approval`; never use `Deploy without restrictions`.
+5. Keep Preview/branch contexts on the public fail-closed placeholders above. Do not bulk-import an environment file.
+6. Verify the private bucket CORS origin exactly matches the stable staging origin, without a path or trailing slash.
+7. Deploy the exact merged Recovery-03 commit. This is a code deploy, not a database migration.
+8. Confirm Netlify applies its maintained Next.js adapter and generates the required Pages Router SSR/API Functions.
+9. Inspect deploy post-processing and confirm both rate-limit declarations: credentials 10/60 and upload wildcard 20/60, each grouped by IP and domain.
+10. Check build, post-processing, Edge, and Function logs for connection strings, credentials, bucket/endpoint details, and presigned URLs.
+11. Check public `/api/health` and protected `/api/ready` with missing, wrong, and correct admin passphrases. Correct auth is 200 only when the DB and both R2 buckets are ready.
+12. Reconfirm owner login/session behavior on the stable HTTPS URL.
+13. Upload JPEG, PNG, and WebP timeline images and verify the browser sequence is presign JSON → direct R2 PUT → finalize JSON; no original binary may appear in a Netlify Function request.
+14. Confirm the returned asset uses the staging custom domain, is 640×640 WebP, persists after explicit Timeline save/reload, and renders on the public invitation.
+15. Remove a recognized saved image and confirm its final object is deleted without affecting external/legacy URLs.
+16. Perform controlled 429 tests for both credentials and upload rules. Do not treat local behavior or a successful build as platform acceptance.
+17. Record any temp/final orphan and readiness behavior without exposing object keys or signed URLs.
 
 Also review the team's billing controls before enabling continuous deploys. Keep automatic recharge disabled unless explicitly approved, enable usage notifications, and monitor Edge Function and serverless-function usage.
 
@@ -120,11 +122,12 @@ Also review the team's billing controls before enabling continuous deploys. Keep
 - The staging migration chain was validated as a separate release operation. A Netlify deploy must not repeat it.
 - Netlify's `DIRECT_URL` is the pooled build-compatibility alias, not an application runtime connection or an actual direct endpoint.
 - A successful Deploy Preview is not canonical authentication validation.
+- A local MinIO upload or successful Netlify build is not proof that R2 CORS, the asset domain, or the upload Edge rule was accepted in staging.
 - A successful staging deploy does not approve production Neon, a production migration, a custom production domain, DNS changes, or public launch.
 - Connect the final production domain, `marryquest.shimyunbo.com`, only in the later production gate. Do not point staging `NEXTAUTH_URL` at that domain.
 
 ## Rollback
 
-For a code or deploy regression, roll back to the previous known-good deploy or revert the PR. Do not restore public test credentials, reuse an old `NEXTAUTH_SECRET`, or revert to an old owner password. Correct the target environment variables through the secret store, redeploy, and verify readiness.
+For a code or deploy regression, roll back to the previous known-good deploy or revert the PR. Do not restore public test credentials, Supabase secrets, the old multipart route, reuse an old `NEXTAUTH_SECRET`, or revert to an old owner password. Correct the target environment variables through the secret store, redeploy, and verify readiness. Do not bulk-delete public R2 objects until their Timeline DB URLs have been compared.
 
 No database rollback is part of this baseline: it changes neither the Prisma schema nor migrations. A successful staging login may create or update the single owner `User`; it does not migrate or seed application data.

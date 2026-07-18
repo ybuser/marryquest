@@ -1,6 +1,6 @@
 # MarryQuest – Next.js Baseline
 
-Recovery baseline for the MarryQuest invitation experience using the **Next.js Pages Router**, TypeScript, Tailwind CSS, and shadcn/ui-inspired primitives. Production database, storage migration, deployment, and domain gates are still outstanding.
+Recovery baseline for the MarryQuest invitation experience using the **Next.js Pages Router**, TypeScript, Tailwind CSS, and shadcn/ui-inspired primitives. Neon staging and the Netlify staging application baseline are validated; R2 staging provisioning, production infrastructure, and production-domain gates remain outstanding.
 
 ## Requirements
 - Node 20 LTS (see `.nvmrc`)
@@ -66,19 +66,22 @@ Normal application usage requires:
 
 `OWNER_NAME` is optional. Both Neon URLs must use TLS (`sslmode=require`); `connect_timeout=15` is recommended. Keep all values in an approved secret store, generate unrelated secrets independently, and never commit them. Copy `.env.example` for variable names and placeholders only; see [`docs/ops/single-owner-auth.md`](docs/ops/single-owner-auth.md) for secure hash generation and rotation.
 
-Timeline card uploads (builder-only) still use the legacy Supabase Storage path. Local testing of that legacy path would require:
-- `SUPABASE_URL` – Supabase project URL.
-- `SUPABASE_SERVICE_ROLE_KEY` – service role key for server-side uploads.
-- `SUPABASE_STORAGE_BUCKET` – optional bucket name (defaults to `timeline`).
+Timeline card storage requires the following server-only R2 values:
 
-Do not reuse recovered Supabase secrets or configure these legacy values for production. Timeline upload may remain unavailable until Recovery-03 replaces this code with R2; it is not an acceptance gate for the current baseline.
+- `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY` – bucket-scoped S3 credentials.
+- `R2_ENDPOINT` – explicit R2 S3 endpoint.
+- `R2_UPLOAD_BUCKET` – private, lifecycle-managed original-upload bucket.
+- `R2_PUBLIC_BUCKET` – distinct public optimized-asset bucket.
+- `R2_PUBLIC_BASE_URL` – public asset origin/custom-domain base URL.
+
+The browser requests a presigned URL, sends the original directly to the private bucket, and calls a small finalize JSON API. Only server-validated 640×640 WebP output is written to the public bucket. No R2 value is a `NEXT_PUBLIC_*` variable. See [`docs/ops/r2-storage.md`](docs/ops/r2-storage.md); the Cloudflare staging resources and Netlify R2 values are still manual post-merge work.
 
 ## Notes
 - The project intentionally omits the `/app` directory. Pages Router only.
 - Upgrade the in-memory rate limiter before deploying behind multiple instances.
 - Public fixed test credentials and quick-login UI have been removed; local and deployed environments use the same server-configured single-owner flow.
-- A minimal Netlify build baseline and one code-based credentials-callback rate-limit rule are present, but no Netlify site, deploy, custom domain, or production release has been created. Follow [`docs/ops/netlify-staging.md`](docs/ops/netlify-staging.md) after merge and explicit approval.
+- The Netlify staging baseline has been deployed and its health, protected readiness, and owner login were validated before Recovery-03. This PR does not deploy the R2 change or create Cloudflare resources; follow [`docs/ops/netlify-staging.md`](docs/ops/netlify-staging.md) and [`docs/ops/r2-storage.md`](docs/ops/r2-storage.md) after merge and explicit approval.
 - Do not run database migrations in the Netlify build. Any future environment apply is a separate reviewed operation using `DIRECT_URL`.
 - Netlify must not store the actual direct endpoint: its Production context duplicates the pooled `DATABASE_URL` as a `DIRECT_URL` build-compatibility alias, while actual migration credentials remain in a separately approved operator environment. On Free this alias may also be visible to Functions, but application queries continue to use only `DATABASE_URL`.
-- Supabase Storage is still used by the timeline upload code. R2 replacement and upload acceptance are Recovery-03 work.
+- Timeline upload code no longer has a Supabase runtime path or a Netlify multipart body. The repository declares exactly two Netlify code-based rate limits: credentials callback and timeline-upload wildcard. Platform acceptance and controlled 429 tests remain post-merge staging gates.
 - See [`docs/ops/fresh-start-database.md`](docs/ops/fresh-start-database.md) for the Fresh-start decision, staging procedure, prohibited commands, and rollback policy.

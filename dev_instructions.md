@@ -1,6 +1,6 @@
 # MarryQuest Dev Instructions
 
-Last updated: 2026-07-15
+Last updated: 2026-07-18
 
 This file is the handoff document for new Codex sessions. Treat it as the current source of truth for project state, recent architectural decisions, and operational rules. Older logs and temporary drift-audit files were intentionally cleaned up.
 
@@ -34,7 +34,7 @@ Current guest-facing features:
 - Prisma ORM
 - PostgreSQL via Prisma
 - Managed provider: Neon; staging is provisioned and schema-validated, while production is not provisioned
-- Supabase Storage for timeline card images
+- Cloudflare R2 two-bucket timeline storage code; staging resources are not provisioned yet
 - Zod for validation
 
 Do not introduce App Router patterns unless explicitly requested. The current app is Pages Router only.
@@ -72,7 +72,8 @@ Main API areas:
 - `/api/food-vote`
 - `/api/food-vote/[invitationId]`
 - `/api/food-vote/vote`
-- `/api/upload/timeline-card`
+- `/api/upload/timeline-card/presign`
+- `/api/upload/timeline-card/finalize`
 
 ## 4. Auth Model
 
@@ -109,7 +110,7 @@ Current builder extras:
 
 - Guestbook moderation supports hide/show and delete with confirmation
 - Builder interactions can auto-focus related preview content
-- Timeline builder uploads images through the server and stores optimized square WebP files
+- Timeline builder uploads originals directly to a private S3-compatible bucket and applies the server-finalized public WebP URL to the draft
 
 ## 6. Walkthrough System
 
@@ -242,27 +243,27 @@ Important behavior:
 
 Timeline image upload is implemented in:
 
-- `pages/api/upload/timeline-card.ts`
+- `lib/storage/*`
+- `pages/api/upload/timeline-card/presign.ts`
+- `pages/api/upload/timeline-card/finalize.ts`
 
-Current behavior:
+Current code behavior:
 
-- Upload requires auth
-- Accepts jpeg/png/webp
-- Max upload size is 10 MB
-- Server converts to square `640x640` WebP with `sharp`
-- Upload path is under the timeline bucket
-- Public URL is returned from Supabase Storage
+- Upload requires owner authentication and a non-deleted owned invitation.
+- The browser sends JSON to the presign API, PUTs the original directly to the private bucket, then sends JSON to finalize. The original binary does not cross a Netlify Function body.
+- Inputs are limited to jpeg/png/webp and 10 MiB, then rechecked from stored object metadata and actual Sharp decode.
+- The server applies an 80-megapixel input limit and creates a metadata-free square `640x640` WebP at quality 82.
+- Temporary and final keys are server-derived; finalize is idempotent for one upload ID.
+- Saved Timeline cleanup recognizes only the configured public origin and the current invitation prefix. External, legacy, and other-invitation URLs are not deleted.
+- `next.config.js` derives narrow R2 CSP origins and a public `timeline/**` image pattern from validated build-time values. Supabase image/connect patterns were removed.
 
-Security and rendering support:
+Current operational state and limitations:
 
-- `next.config.js` allows Supabase image hosts in CSP
-- `next.config.js` also allows Supabase Storage in Next image remote patterns
-
-Current limitation:
-
-- Gallery photos render from DB URLs
-- There is no dedicated gallery upload flow in the current builder codebase
-- Supabase Storage remains in the current timeline upload code and is planned for replacement in a later Recovery PR; it has not been migrated to R2 in this recovery step.
+- The Cloudflare R2 staging buckets, API token, custom domain, and Netlify R2 environment values have not been created/configured by Recovery-03.
+- Post-merge Netlify upload, readiness, post-processing, and 429 smoke tests remain required.
+- Gallery photos continue to render from DB URLs; there is no Gallery upload flow.
+- Finalized assets abandoned before Timeline save, invitation soft-delete cleanup, and Gallery cleanup require later reconciliation work.
+- Follow `docs/ops/r2-storage.md` before provisioning or deploying storage.
 
 ## 11. Environment Variables
 
@@ -286,12 +287,18 @@ Netlify is a deliberate exception: do not store the actual direct endpoint there
 
 Required if using timeline uploads:
 
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `R2_ACCOUNT_ID`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_ENDPOINT`
+- `R2_UPLOAD_BUCKET`
+- `R2_PUBLIC_BUCKET`
+- `R2_PUBLIC_BASE_URL`
+
+The two bucket names must differ. R2 credentials stay server-only and must never use `NEXT_PUBLIC_*`. Production endpoints/base URLs require HTTPS; an HTTP loopback MinIO endpoint is allowed only in development/test.
 
 Optional:
 
-- `SUPABASE_STORAGE_BUCKET` default is `timeline`
 - `OWNER_NAME` is optional and normalizes to `null` when missing or blank
 - `SKIP_PRISMA_GENERATION`
 
@@ -316,7 +323,9 @@ High-signal files for future sessions:
 - `components/invitation/InvitationPage.tsx`
 - `components/invitation/sections/MapButtons.tsx`
 - `components/invitation/sections/TimelineSection.tsx`
-- `pages/api/upload/timeline-card.ts`
+- `lib/storage/index.ts`
+- `pages/api/upload/timeline-card/presign.ts`
+- `pages/api/upload/timeline-card/finalize.ts`
 - `pages/api/guestbook/[entryId].ts`
 - `components/theme/tokens.ts`
 - `prisma/schema.prisma`
@@ -345,11 +354,13 @@ npx prisma migrate status
 
 Fresh-start validation on 2026-07-12 used disposable PostgreSQL 17.10. Migrations `000` through `011`, Prisma validation/generation/status, typecheck, and the production build succeeded; the final database-to-schema diff was empty. The same chain was subsequently applied to the approved Neon PostgreSQL 17 staging database and its migration checksums, catalog, empty diff, pooled/direct access, and zero application rows were verified. Production Neon remains unprovisioned. Next.js 14 ESLint tooling was validated on 2026-07-12 with the root `.eslintrc.json` extending `next/core-web-vitals`; `npm run lint` executed lint rules non-interactively and exited with code `0` (`0` errors, `2` warnings).
 
-Recovery-02 validation on 2026-07-15 used a localhost-bound disposable PostgreSQL 17.10 container. The complete migration chain and single-owner HTTP flow passed, including generic credential failures, one-row owner upsert, JWT session/logout, redirect protection, protected readiness, and the admin statistics passphrase contract. TypeScript, non-interactive lint (`0` errors, the same `2` warnings), and the production build succeeded. This was local validation only; Netlify post-processing, HTTPS cookie behavior, and the platform 429 smoke remain post-merge staging gates.
+Recovery-02 validation on 2026-07-15 used a localhost-bound disposable PostgreSQL 17.10 container. The complete migration chain and single-owner HTTP flow passed, including generic credential failures, one-row owner upsert, JWT session/logout, redirect protection, protected readiness, and the admin statistics passphrase contract. TypeScript, non-interactive lint (`0` errors, the same `2` warnings), and the production build succeeded. Netlify staging was subsequently deployed and its health, protected readiness, and owner login were validated; production remains unprovisioned.
+
+Recovery-03 validation on 2026-07-18 used localhost-bound disposable PostgreSQL 17.10 and MinIO `RELEASE.2025-09-07T16-13-09Z`. The API and real-browser checks covered direct browser/S3 upload, server-side image validation, idempotent finalize, temporary-object retry/deletion policy, explicit Timeline save, recognized saved-asset cleanup, external/legacy URL preservation, and two-bucket readiness without accessing Neon, Supabase, Cloudflare R2, or production. `git diff --check`, clean `npm ci`, Prisma validate/generate, TypeScript, non-interactive lint, and a fail-closed Preview-placeholder production build all exited `0`; lint and build reported only the same two existing `react-hooks/exhaustive-deps` warnings. Cloudflare resources, Netlify R2 variables, deploy post-processing, and staging upload/429 smoke remain post-merge gates.
 
 ## 14. Current Project Status
 
-As of 2026-07-15:
+As of 2026-07-18:
 
 - Build, TypeScript, and non-interactive lint checks are green
 - The Fresh-start migration chain recreates the current Prisma schema in an empty PostgreSQL 17 database without importing legacy data or creating seed records
@@ -358,7 +369,7 @@ As of 2026-07-15:
 - Builder walkthrough and `...` menu are implemented
 - Builder preview isolated scrolling is implemented
 - Guestbook delete with confirmation is implemented
-- Timeline image processing and display fixes are implemented
+- Timeline upload code uses authenticated browser-direct private uploads and server-finalized public WebP assets; R2 staging provisioning and deployment are pending
 - Environment-backed single-owner authentication replaces the removed public test-user system
 - Mobile/layout polish pass is implemented across landing, builder, walkthrough, and public invitation sections
 - Builder and dashboard expose sign-out actions for owner JWT sessions
@@ -368,6 +379,6 @@ As of 2026-07-15:
 - Walkthrough overlays now clamp to the viewport with internal scrolling, so guide controls stay reachable on short laptop screens and phones
 - Mobile builder now uses a dedicated small-screen workflow: icon-based tab grid, simplified header actions, a sticky bottom save bar, a floating preview button that opens a separate mobile preview sheet, and arrow-button ordering controls for sections, food vote options, timeline cards, and correct-order cards
 
-The repository contains a Netlify build/rate-limit baseline only. No Netlify site, deployment, stable staging URL, custom domain, or production release has been created by this Recovery step. Supabase Storage remains in the timeline upload path and is scheduled for Recovery-03; R2 has not been implemented.
+The Netlify staging application baseline exists and its health/readiness/owner-login checks were completed before Recovery-03. Recovery-03 adds code/config only: no Cloudflare bucket, R2 API token, asset custom domain, Netlify R2 value, or new deploy has been created by this step. Production Neon, production storage, the production domain, and public launch remain unapproved.
 
 There is no persisted deployment state in this file. New Codex sessions should confirm the current branch, commit, and approved operational gate before acting.
