@@ -484,7 +484,7 @@ export default function InvitationBuilder({
   const [quizSaving, setQuizSaving] = useState(false);
   const [timelineSaving, setTimelineSaving] = useState(false);
   const [foodVoteSaving, setFoodVoteSaving] = useState(false);
-  const [timelineUploadingId, setTimelineUploadingId] = useState<string | null>(null);
+  const [timelineUploadingIds, setTimelineUploadingIds] = useState<Set<string>>(() => new Set());
   const [timelineUploadError, setTimelineUploadError] = useState<string | null>(null);
   const [publishSaving, setPublishSaving] = useState(false);
   const [deleteSaving, setDeleteSaving] = useState(false);
@@ -1031,32 +1031,68 @@ export default function InvitationBuilder({
   }
 
   async function uploadTimelineCardPhoto(cardId: string, file: File) {
-    setTimelineUploadingId(cardId);
+    const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+    const maxBytes = 10 * 1024 * 1024;
+    const genericError = isKorean ? '사진을 업로드하지 못했습니다.' : 'Unable to upload photo';
+
+    if (!allowedTypes.has(file.type) || file.size < 1 || file.size > maxBytes) {
+      setTimelineUploadError(genericError);
+      return;
+    }
+
+    setTimelineUploadingIds((current) => new Set(current).add(cardId));
     setTimelineUploadError(null);
     try {
-      const formData = new FormData();
-      formData.append('invitationId', savedInvitation.id);
-      formData.append('cardId', cardId);
-      formData.append('file', file);
-
-      const response = await fetch('/api/upload/timeline-card', {
+      const presignResponse = await fetch('/api/upload/timeline-card/presign', {
         method: 'POST',
-        body: formData
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invitationId: savedInvitation.id,
+          cardId,
+          contentType: file.type,
+          size: file.size
+        })
       });
+      if (!presignResponse.ok) throw new Error('PRESIGN_FAILED');
 
-      if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        setTimelineUploadError(payload?.error ?? (isKorean ? '사진을 업로드하지 못했습니다.' : 'Unable to upload photo'));
-        return;
+      const presigned: {
+        uploadKey: string;
+        uploadUrl: string;
+        headers: Record<string, string>;
+      } = await presignResponse.json();
+      if (!presigned.uploadKey || !presigned.uploadUrl || !presigned.headers) {
+        throw new Error('PRESIGN_RESPONSE_INVALID');
       }
 
-      const payload: { url: string } = await response.json();
-      updateTimelineCard(cardId, { photoUrl: payload.url });
-    } catch (error) {
-      console.error(error);
-      setTimelineUploadError(isKorean ? '사진을 업로드하지 못했습니다.' : 'Unable to upload photo');
+      const uploadResponse = await fetch(presigned.uploadUrl, {
+        method: 'PUT',
+        headers: presigned.headers,
+        body: file
+      });
+      if (!uploadResponse.ok) throw new Error('DIRECT_UPLOAD_FAILED');
+
+      const finalizeResponse = await fetch('/api/upload/timeline-card/finalize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invitationId: savedInvitation.id,
+          cardId,
+          uploadKey: presigned.uploadKey
+        })
+      });
+      if (!finalizeResponse.ok) throw new Error('FINALIZE_FAILED');
+
+      const finalized: { url?: string } = await finalizeResponse.json();
+      if (!finalized.url) throw new Error('FINALIZE_RESPONSE_INVALID');
+      updateTimelineCard(cardId, { photoUrl: finalized.url });
+    } catch {
+      setTimelineUploadError(genericError);
     } finally {
-      setTimelineUploadingId(null);
+      setTimelineUploadingIds((current) => {
+        const next = new Set(current);
+        next.delete(cardId);
+        return next;
+      });
     }
   }
 
@@ -2418,7 +2454,7 @@ export default function InvitationBuilder({
                           card={card}
                           onChange={updateTimelineCard}
                           onPhotoUpload={uploadTimelineCardPhoto}
-                          uploading={timelineUploadingId === card.id}
+                          uploading={timelineUploadingIds.has(card.id)}
                           onRemove={removeTimelineCard}
                           onFocusPreview={focusPreviewTarget}
                           canMoveUp={orderedTimelineCards.findIndex((item) => item.id === card.id) > 0}

@@ -6,7 +6,7 @@
 - Neon staging PostgreSQL 17에는 migration `000`–`011`이 적용됐고 checksum, catalog, empty diff, pooled/direct connection 및 검증 시점 application row 0건을 확인했다.
 - production Neon은 아직 provision되지 않았으며 staging 검증은 production 접근 또는 migration 승인이 아니다.
 - Next.js API route에는 Supabase JS client + anon key를 통한 database query 경로가 없다.
-- Timeline upload의 Supabase Storage 사용은 database RLS와 별개이며, 다음 Recovery PR에서 교체할 범위다.
+- Timeline upload 코드는 별도의 R2 two-bucket 경로를 사용하며 database RLS와 무관하다. R2 staging provisioning과 deploy smoke는 별도 운영 gate다.
 
 ## 결론: 이 프로젝트는 RLS에 의존하지 않음
 - 현재 서버 기반 Prisma 구조에서는 provider의 RLS 설정을 기본 보호선으로 가정하지 않는다.

@@ -4,7 +4,7 @@
 
 Fresh-start is approved for MarryQuest. The available Supabase backup did not contain the `public` application schema or application data, so User, Invitation, RSVP, Guestbook, Quiz, Timeline, MusicVote, and FoodVote records are not imported. Do not import the Supabase backup, create seed data, or create a sample invitation as part of database recovery.
 
-Supabase Storage objects are also outside this database step. The current timeline upload code still uses Supabase Storage; replacing it is work for a later Recovery PR.
+Supabase Storage objects are also outside this database step and are not imported. Timeline upload code now targets a separate R2 two-bucket flow; provisioning or validating storage remains independent from every database migration gate.
 
 The sources of truth are:
 
