@@ -119,6 +119,24 @@ The current staging R2 resources and Production-context values remain unchanged:
 7. Confirm the published page shows the image Timeline, contains no readiness placeholder, and accepts a real Timeline attempt.
 8. Confirm the R2 object and persisted `photoUrl` remain intact and smoke other invitation features.
 
+## Recovery-03B save and Guestbook hotfix rollout
+
+The code change does not alter the staging database schema, R2 configuration, or the two existing Netlify code-based Edge rules. Keep the PR Draft until its fail-closed Deploy Preview completes build, secret scanning, Next.js/OpenNext packaging, and rule post-processing.
+
+After merge, use the automatic stable staging deploy for this manual smoke:
+
+1. Confirm the merge commit's automatic deploy, then verify `/api/health` and protected `/api/ready` return 200.
+2. Open an existing ready Timeline, change one photo, and then change a second photo without saving between the edits.
+3. Use the common current-tab save, reload, and confirm both latest photo URLs remain.
+4. Repeat with `Ctrl/Cmd+S`, reload, and confirm the latest text, description, and photo changes remain.
+5. Confirm the dedicated Timeline Save produces the same saved payload/result and that repeated shortcuts during an in-flight save do not create duplicate PATCH requests.
+6. Open a published invitation and record the Guestbook network traffic. Expect one initial `GET /api/guestbook?slug=...` only.
+7. Leave the page idle for at least 30 seconds. Confirm there is no additional Guestbook GET, no automatic retry, no 429 loop, and no request storm in Function logs.
+8. Submit one allowed Guestbook entry and confirm it is prepended locally without a follow-up GET. Confirm RSVP, Timeline attempt, Music Vote, and other guest APIs still respond normally.
+9. Confirm Guestbook GET traffic does not consume Guestbook POST/PATCH quota or another wrapped API route's quota. The application limiter is process-local, so this is scope isolation—not distributed global protection.
+
+Do not supply actual database, owner, signing, admin, or R2 values to Deploy Preview. DB-backed Preview behavior is not an acceptance target; perform the checks above only on the stable staging `Production`-context deploy after merge.
+
 Also review the team's billing controls before enabling continuous deploys. Keep automatic recharge disabled unless explicitly approved, enable usage notifications, and monitor Edge Function and serverless-function usage.
 
 ## Database and deployment gates

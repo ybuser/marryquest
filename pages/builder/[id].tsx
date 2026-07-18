@@ -499,6 +499,8 @@ export default function InvitationBuilder({
   const previewScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const mobilePreviewScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const moreMenuRef = useRef<HTMLDivElement | null>(null);
+  const saveActiveTabRef = useRef<() => Promise<void>>(async () => undefined);
+  const saveActiveTabInFlightRef = useRef(false);
 
   const focusPreviewTarget = useCallback((targetId: string) => {
     setPreviewFocusRequest({ targetId, requestId: Date.now() + Math.random() });
@@ -1602,57 +1604,57 @@ export default function InvitationBuilder({
     tab === 'Timeline' ? hasTimelineDraftChanges : tabHasChanges(tab);
   const activeTabSaveBlocked = activeTab === 'Timeline' && draftTimelineReadiness.status === 'incomplete';
 
-  const saveActiveTab = useCallback(async () => {
-    if (activeTab === 'Basic' && hasBasicChanges && !basicSaving) {
-      await saveBasic();
+  async function saveActiveTab() {
+    if (
+      saveActiveTabInFlightRef.current ||
+      activeTabSaving ||
+      activeTab === 'Export' ||
+      activeTabSaveBlocked
+    ) {
       return;
     }
 
-    if (activeTab === 'Sections') {
-      if (hasSectionsChanges && !sectionsSaving) {
-        await saveSections();
+    saveActiveTabInFlightRef.current = true;
+    try {
+      if (activeTab === 'Basic' && hasBasicChanges && !basicSaving) {
+        await saveBasic();
+        return;
       }
-      if (hasFoodVoteChanges && !foodVoteSaving) {
-        await saveFoodVoteOptions();
+
+      if (activeTab === 'Sections') {
+        if (hasSectionsChanges && !sectionsSaving) {
+          await saveSections();
+        }
+        if (hasFoodVoteChanges && !foodVoteSaving) {
+          await saveFoodVoteOptions();
+        }
+        return;
       }
-      return;
-    }
 
-    if (activeTab === 'Guestbook' && hasGuestbookChanges && !guestbookSaving) {
-      await saveGuestbook();
-      return;
-    }
+      if (activeTab === 'Guestbook' && hasGuestbookChanges && !guestbookSaving) {
+        await saveGuestbook();
+        return;
+      }
 
-    if (activeTab === 'Quiz' && hasQuizChanges && !quizSaving) {
-      await saveQuiz();
-      return;
-    }
+      if (activeTab === 'Quiz' && hasQuizChanges && !quizSaving) {
+        await saveQuiz();
+        return;
+      }
 
-    if (activeTab === 'Timeline' && hasTimelineChanges && !timelineSaving) {
-      await saveTimeline();
-      return;
-    }
+      if (activeTab === 'Timeline' && hasTimelineChanges && !timelineSaving) {
+        await saveTimeline();
+        return;
+      }
 
-    if (activeTab === 'Publish' && hasPublishChanges && !publishSaving) {
-      await savePublish();
+      if (activeTab === 'Publish' && hasPublishChanges && !publishSaving) {
+        await savePublish();
+      }
+    } finally {
+      saveActiveTabInFlightRef.current = false;
     }
-  }, [
-    activeTab,
-    basicSaving,
-    foodVoteSaving,
-    guestbookSaving,
-    hasBasicChanges,
-    hasFoodVoteChanges,
-    hasGuestbookChanges,
-    hasPublishChanges,
-    hasQuizChanges,
-    hasSectionsChanges,
-    hasTimelineChanges,
-    publishSaving,
-    quizSaving,
-    sectionsSaving,
-    timelineSaving
-  ]);
+  }
+
+  saveActiveTabRef.current = saveActiveTab;
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -1660,12 +1662,12 @@ export default function InvitationBuilder({
         return;
       }
       event.preventDefault();
-      void saveActiveTab();
+      void saveActiveTabRef.current();
     };
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [saveActiveTab]);
+  }, []);
 
   const trySwitchTab = (nextTab: TabKey) => {
     if (nextTab === activeTab) return;
@@ -2441,7 +2443,9 @@ export default function InvitationBuilder({
                 {unsavedLabel('Timeline')}
                 <button
                   className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-                  onClick={saveTimeline}
+                  onClick={() => {
+                    void saveActiveTab();
+                  }}
                   disabled={!hasTimelineChanges || timelineSaving || draftTimelineReadiness.status === 'incomplete'}
                 >
                   {timelineSaving ? (isKorean ? '저장 중…' : 'Saving...') : isKorean ? '타임라인 저장' : 'Save Timeline'}

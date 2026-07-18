@@ -113,6 +113,7 @@ Current builder extras:
 - Timeline builder uploads originals directly to a private S3-compatible bucket and applies the server-finalized public WebP URL to the draft
 - Timeline visibility is controlled only by the Timeline entry in the Sections tab. `TimelinePuzzle.enabled` is a server-derived readiness flag, not a user toggle.
 - A Timeline explicit save accepts either zero cards or a ready set of 5–7 valid cards. Builder preview displays incomplete draft cards without enabling guest Timeline or Music APIs.
+- Dedicated tab saves, the common current-tab save, and `Ctrl/Cmd+S` dispatch from the latest rendered draft state. The keyboard listener is registered once and calls the current dispatcher through a ref.
 
 ## 6. Walkthrough System
 
@@ -240,6 +241,9 @@ Important behavior:
 
 - Guestbook can allow one extra entry when a valid `quizPerfect` badge token is present
 - Quiz badge token signing requires its own `QUIZ_BADGE_SECRET`; it never falls back to `NEXTAUTH_SECRET`
+- Public Guestbook entries are fetched once when a published slug/status becomes active. Loading, entry, language, or unrelated parent rerenders do not poll or retry the endpoint; Preview mode only synchronizes its supplied entries and performs no network fetch.
+- Each `withRateLimit()` wrapper owns its own request store, and keys within that store include the HTTP method. One handler's traffic cannot consume another handler's quota, and a Guestbook GET cannot consume Guestbook POST/PATCH quota.
+- These stores remain process-memory only. They are independent per serverless instance and reset on cold start/redeploy, so they are not distributed abuse protection. Guestbook/RSVP counts and MusicVote/FoodVote database constraints remain the final integrity boundary; the separate Netlify auth/upload rules remain platform controls.
 
 ## 10. Image and Storage Notes
 
@@ -375,6 +379,7 @@ As of 2026-07-18:
 - Guestbook delete with confirmation is implemented
 - Timeline upload uses authenticated browser-direct private uploads and server-finalized public WebP assets; its staging baseline was validated before Recovery-03A
 - Timeline public visibility comes from the Sections tab, while puzzle readiness is derived from the saved 5–7-card configuration; incomplete public Timelines are omitted and incomplete Builder drafts remain previewable
+- Active-tab save actions use the latest draft across dedicated save, common save, and `Ctrl/Cmd+S`; Public Guestbook has no polling loop, and API in-memory quotas are isolated by wrapped handler and HTTP method
 - Environment-backed single-owner authentication replaces the removed public test-user system
 - Mobile/layout polish pass is implemented across landing, builder, walkthrough, and public invitation sections
 - Builder and dashboard expose sign-out actions for owner JWT sessions
@@ -384,6 +389,6 @@ As of 2026-07-18:
 - Walkthrough overlays now clamp to the viewport with internal scrolling, so guide controls stay reachable on short laptop screens and phones
 - Mobile builder now uses a dedicated small-screen workflow: icon-based tab grid, simplified header actions, a sticky bottom save bar, a floating preview button that opens a separate mobile preview sheet, and arrow-button ordering controls for sections, food vote options, timeline cards, and correct-order cards
 
-The Netlify staging application and two-bucket R2 upload baseline exist, and their health/readiness/owner/upload checks were completed before Recovery-03A. Recovery-03A performs no Dashboard work and no deploy. Its PR-head Deploy Preview remains a pre-merge gate; merging then triggers the stable staging deploy automatically, after which operators must verify the existing affected invitation can be explicitly saved and rendered without the old readiness placeholder. Production Neon, production storage, the production domain, and public launch remain unapproved.
+The Netlify staging application and two-bucket R2 upload baseline exist, and their health/readiness/owner/upload checks were completed before Recovery-03A. Recovery-03B performs no Dashboard configuration or deploy. Its PR-head Deploy Preview is a pre-merge gate; merging then triggers the stable staging deploy automatically, after which operators must verify latest-draft saves and the absence of an idle Guestbook request storm. Production Neon, production storage, the production domain, and public launch remain unapproved.
 
 There is no persisted deployment state in this file. New Codex sessions should confirm the current branch, commit, and approved operational gate before acting.

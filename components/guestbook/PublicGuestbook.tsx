@@ -17,6 +17,31 @@ interface PublicGuestbookProps {
   previewMode?: boolean;
 }
 
+type GuestbookLoadError = 'load_failed' | 'rate_limited';
+
+const EMPTY_PREVIEW_ENTRIES = Object.freeze([]) as readonly GuestbookEntryDto[];
+
+function guestbookEntriesEqual(
+  current: readonly GuestbookEntryDto[],
+  next: readonly GuestbookEntryDto[]
+): boolean {
+  return (
+    current.length === next.length &&
+    current.every((entry, index) => {
+      const candidate = next[index];
+      if (!candidate) return false;
+      return (
+        candidate.id === entry.id &&
+        candidate.nickname === entry.nickname &&
+        candidate.message === entry.message &&
+        candidate.badge === entry.badge &&
+        candidate.hidden === entry.hidden &&
+        candidate.createdAt === entry.createdAt
+      );
+    })
+  );
+}
+
 export function PublicGuestbook({
   invitationId,
   slug,
@@ -24,12 +49,16 @@ export function PublicGuestbook({
   badgeToken,
   quiz,
   onBadgeEarned,
-  previewEntries = [],
+  previewEntries,
   previewMode = false
 }: PublicGuestbookProps) {
   const { language, isKorean } = useLanguage();
-  const [entries, setEntries] = useState<GuestbookEntryDto[]>(previewEntries);
+  const resolvedPreviewEntries = previewEntries ?? EMPTY_PREVIEW_ENTRIES;
+  const [entries, setEntries] = useState<GuestbookEntryDto[]>(() =>
+    previewMode ? resolvedPreviewEntries.filter((entry) => !entry.hidden) : []
+  );
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<GuestbookLoadError | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [nickname, setNickname] = useState('');
   const [message, setMessage] = useState('');
@@ -43,34 +72,58 @@ export function PublicGuestbook({
   );
 
   useEffect(() => {
-    if (previewMode) {
-      setEntries(previewEntries.filter((entry) => !entry.hidden));
+    if (!previewMode) return;
+
+    const visibleEntries = resolvedPreviewEntries.filter((entry) => !entry.hidden);
+    setEntries((current) => (guestbookEntriesEqual(current, visibleEntries) ? current : visibleEntries));
+    setLoading(false);
+    setLoadError(null);
+  }, [previewMode, resolvedPreviewEntries]);
+
+  useEffect(() => {
+    if (previewMode) return;
+    if (invitationStatus !== 'published' || !slug.trim()) {
+      setEntries((current) => (current.length === 0 ? current : []));
+      setLoading(false);
+      setLoadError(null);
       return;
     }
 
-    if (invitationStatus !== 'published') return;
+    const abortController = new AbortController();
+    setEntries((current) => (current.length === 0 ? current : []));
 
     async function fetchEntries() {
       setLoading(true);
       setError(null);
+      setLoadError(null);
       try {
-        const response = await fetch(`/api/guestbook?slug=${encodeURIComponent(slug)}`);
+        const response = await fetch(`/api/guestbook?slug=${encodeURIComponent(slug)}`, {
+          signal: abortController.signal
+        });
+        if (abortController.signal.aborted) return;
         if (!response.ok) {
-          setError(isKorean ? '방명록을 불러오지 못했습니다.' : 'Unable to load guestbook right now.');
+          setLoadError(response.status === 429 ? 'rate_limited' : 'load_failed');
           return;
         }
         const data: GuestbookEntryDto[] = await response.json();
-        setEntries(data);
-      } catch (err) {
-        console.error(err);
-        setError(isKorean ? '방명록을 불러오지 못했습니다.' : 'Unable to load guestbook right now.');
+        if (!abortController.signal.aborted) {
+          setEntries(data);
+        }
+      } catch (fetchError) {
+        if (abortController.signal.aborted || (fetchError instanceof Error && fetchError.name === 'AbortError')) {
+          return;
+        }
+        setLoadError('load_failed');
       } finally {
-        setLoading(false);
+        if (!abortController.signal.aborted) {
+          setLoading(false);
+        }
       }
     }
 
     void fetchEntries();
-  }, [invitationStatus, isKorean, previewEntries, previewMode, slug]);
+    return () => abortController.abort();
+  }, [invitationStatus, previewMode, slug]);
 
   useEffect(() => {
     if (!previewMode) return;
@@ -151,6 +204,17 @@ export function PublicGuestbook({
   };
 
   const quizAvailable = Boolean(quiz?.enabled && quiz.questions.length > 0);
+  const loadErrorMessage =
+    loadError === 'rate_limited'
+      ? isKorean
+        ? '요청이 너무 많습니다. 잠시 후 페이지를 새로고침해 주세요.'
+        : 'Too many requests. Please refresh the page later.'
+      : loadError === 'load_failed'
+        ? isKorean
+          ? '방명록을 불러오지 못했습니다.'
+          : 'Unable to load guestbook right now.'
+        : null;
+  const displayedError = error ?? loadErrorMessage;
 
   return (
     <div className="space-y-6">
@@ -240,7 +304,7 @@ export function PublicGuestbook({
               </span>
             )}
             {successMessage && <span className="text-sm text-emerald-100">{successMessage}</span>}
-            {error && <span className="text-sm text-amber-200">{error}</span>}
+            {displayedError && <span className="text-sm text-amber-200">{displayedError}</span>}
           </div>
         </form>
       )}
