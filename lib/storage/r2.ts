@@ -192,10 +192,6 @@ export class R2StorageProvider implements StorageProvider {
     await this.deleteObject(this.config.uploadBucket, key);
   }
 
-  async deleteRecognizedPublicObject(key: string): Promise<void> {
-    await this.deleteObject(this.config.publicBucket, key);
-  }
-
   private async deleteObject(bucket: string, key: string): Promise<void> {
     try {
       await this.client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));

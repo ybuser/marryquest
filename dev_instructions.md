@@ -254,15 +254,15 @@ Current code behavior:
 - Inputs are limited to jpeg/png/webp and 10 MiB, then rechecked from stored object metadata and actual Sharp decode.
 - The server applies an 80-megapixel input limit and creates a metadata-free square `640x640` WebP at quality 82.
 - Temporary and final keys are server-derived; finalize is idempotent for one upload ID.
-- Saved Timeline cleanup recognizes only the configured public origin and the current invitation prefix. External, legacy, and other-invitation URLs are not deleted.
+- Timeline save changes PostgreSQL only. It never deletes a public final R2 object on the request path because a database-reference check and object deletion cannot be made atomic across PostgreSQL and R2.
 - `next.config.js` derives narrow R2 CSP origins and a public `timeline/**` image pattern from validated build-time values. Supabase image/connect patterns were removed.
 
 Current operational state and limitations:
 
-- The Cloudflare R2 staging buckets, API token, custom domain, and Netlify R2 environment values have not been created/configured by Recovery-03.
-- Post-merge Netlify upload, readiness, post-processing, and 429 smoke tests remain required.
+- The Cloudflare R2 staging buckets, API token, custom domain, and Netlify R2 environment values have not been created/configured by Recovery-03. They must be prepared before merge because a `master` merge automatically starts the stable staging deploy.
+- Before merge, the PR-head Deploy Preview must pass Next.js/OpenNext packaging, secret scanning, and post-processing for both rate-limit rules with public fail-closed Preview values. After merge, verify the automatic stable deploy and run readiness, upload/finalize/save/render, and controlled 429 smoke tests.
 - Gallery photos continue to render from DB URLs; there is no Gallery upload flow.
-- Finalized assets abandoned before Timeline save, invitation soft-delete cleanup, and Gallery cleanup require later reconciliation work.
+- Finalized-before-save objects and images removed by a later Timeline save are retained as orphan candidates; live-asset preservation takes priority over immediate storage reclamation. Invitation soft-delete and Gallery cleanup also require later reconciliation work.
 - Follow `docs/ops/r2-storage.md` before provisioning or deploying storage.
 
 ## 11. Environment Variables
@@ -356,7 +356,7 @@ Fresh-start validation on 2026-07-12 used disposable PostgreSQL 17.10. Migration
 
 Recovery-02 validation on 2026-07-15 used a localhost-bound disposable PostgreSQL 17.10 container. The complete migration chain and single-owner HTTP flow passed, including generic credential failures, one-row owner upsert, JWT session/logout, redirect protection, protected readiness, and the admin statistics passphrase contract. TypeScript, non-interactive lint (`0` errors, the same `2` warnings), and the production build succeeded. Netlify staging was subsequently deployed and its health, protected readiness, and owner login were validated; production remains unprovisioned.
 
-Recovery-03 validation on 2026-07-18 used localhost-bound disposable PostgreSQL 17.10 and MinIO `RELEASE.2025-09-07T16-13-09Z`. The API and real-browser checks covered direct browser/S3 upload, server-side image validation, idempotent finalize, temporary-object retry/deletion policy, explicit Timeline save, recognized saved-asset cleanup, external/legacy URL preservation, and two-bucket readiness without accessing Neon, Supabase, Cloudflare R2, or production. `git diff --check`, clean `npm ci`, Prisma validate/generate, TypeScript, non-interactive lint, and a fail-closed Preview-placeholder production build all exited `0`; lint and build reported only the same two existing `react-hooks/exhaustive-deps` warnings. Cloudflare resources, Netlify R2 variables, deploy post-processing, and staging upload/429 smoke remain post-merge gates.
+Recovery-03 validation on 2026-07-18 used localhost-bound disposable PostgreSQL 17.10 and MinIO `RELEASE.2025-09-07T16-13-09Z`. The API and real-browser checks covered direct browser/S3 upload, server-side image validation, idempotent finalize, temporary-object retry/deletion policy, explicit Timeline save, the absence of request-time public-object deletion, and two-bucket readiness without accessing Neon, Supabase, Cloudflare R2, or production. `git diff --check`, clean `npm ci`, Prisma validate/generate, TypeScript, non-interactive lint, and a fail-closed Preview-placeholder production build all exited `0`; lint and build reported only the same two existing `react-hooks/exhaustive-deps` warnings. Cloudflare staging resources and Netlify `Production`-context R2 values must be prepared before merge, and the PR-head Deploy Preview must be green. Stable readiness, upload/render, and controlled 429 smoke remain post-merge gates after the automatic merge-commit deploy.
 
 ## 14. Current Project Status
 
@@ -369,7 +369,7 @@ As of 2026-07-18:
 - Builder walkthrough and `...` menu are implemented
 - Builder preview isolated scrolling is implemented
 - Guestbook delete with confirmation is implemented
-- Timeline upload code uses authenticated browser-direct private uploads and server-finalized public WebP assets; R2 staging provisioning and deployment are pending
+- Timeline upload code uses authenticated browser-direct private uploads and server-finalized public WebP assets; R2 staging pre-provisioning and deployment verification are pending
 - Environment-backed single-owner authentication replaces the removed public test-user system
 - Mobile/layout polish pass is implemented across landing, builder, walkthrough, and public invitation sections
 - Builder and dashboard expose sign-out actions for owner JWT sessions
@@ -379,6 +379,6 @@ As of 2026-07-18:
 - Walkthrough overlays now clamp to the viewport with internal scrolling, so guide controls stay reachable on short laptop screens and phones
 - Mobile builder now uses a dedicated small-screen workflow: icon-based tab grid, simplified header actions, a sticky bottom save bar, a floating preview button that opens a separate mobile preview sheet, and arrow-button ordering controls for sections, food vote options, timeline cards, and correct-order cards
 
-The Netlify staging application baseline exists and its health/readiness/owner-login checks were completed before Recovery-03. Recovery-03 adds code/config only: no Cloudflare bucket, R2 API token, asset custom domain, Netlify R2 value, or new deploy has been created by this step. Production Neon, production storage, the production domain, and public launch remain unapproved.
+The Netlify staging application baseline exists and its health/readiness/owner-login checks were completed before Recovery-03. Recovery-03 adds code/config only: it does not perform Cloudflare or Netlify Dashboard work. Before merge, operators must create the approved staging buckets/token/custom domain, configure only the Netlify `Production`-context R2 values, retain public fail-closed Preview values, and confirm the PR-head Deploy Preview is green. Merging then triggers the stable staging deploy automatically; runtime smoke follows that deploy. Production Neon, production storage, the production domain, and public launch remain unapproved.
 
 There is no persisted deployment state in this file. New Codex sessions should confirm the current branch, commit, and approved operational gate before acting.

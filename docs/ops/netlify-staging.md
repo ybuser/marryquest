@@ -4,7 +4,7 @@
 
 The stable Netlify staging site has been deployed, and public health, protected readiness, and owner login were validated before Recovery-03. Neon PostgreSQL 17 staging was also validated separately. Production Neon, the production domain, and a production release are not provisioned or approved, and this runbook does not authorize a database migration.
 
-Recovery-03 adds the browser-direct/two-bucket R2 code path only. No R2 bucket, API token, custom asset domain, Netlify R2 variable, or Recovery-03 deploy has been created by this change. Upload acceptance remains a post-merge staging gate. Do not reuse recovered Supabase credentials.
+Recovery-03 adds the browser-direct/two-bucket R2 code path only. It does not perform Cloudflare or Netlify Dashboard work. Because a merge to `master` automatically starts the stable staging deploy, Cloudflare resources and Netlify `Production`-context R2 values must be prepared before merge. The PR-head Deploy Preview is also a pre-merge packaging, secret-scanning, and rate-rule post-processing gate; stable upload acceptance follows the automatic merge-commit deploy. Do not reuse recovered Supabase credentials.
 
 ## Repository baseline
 
@@ -16,7 +16,7 @@ The repository now declares exactly two Netlify Free code-based Edge rate-limit 
 - `POST /api/upload/timeline-card/*`: 20 requests per 60 seconds, covering presign and finalize together.
 - Both aggregate by client IP and domain, use the default 429 block behavior, and pass allowed requests through without reading or changing request/response bodies.
 
-These rules are evaluated by Netlify, not by `next dev` or `next start`. A successful local TypeScript check or Next.js build does not prove that the platform accepted the rules. Netlify validates code-based rate limits during deploy post-processing, and an invalid rule does not necessarily fail the deploy. Always inspect the post-processing log and perform a controlled 429 smoke test after deployment.
+These rules are evaluated by Netlify, not by `next dev` or `next start`. A successful local TypeScript check or Next.js build does not prove that the platform accepted the rules. Netlify validates code-based rate limits during deploy post-processing, and an invalid rule does not necessarily fail the deploy. Inspect the PR-head Preview post-processing before merge, then perform a controlled 429 smoke test against the automatic stable deploy after merge.
 
 The two available code-based rule slots are now consumed. Do not add another code rule without changing the approved platform plan or replacing an existing rule. Both declarations still require deploy post-processing inspection and controlled staging 429 tests.
 
@@ -61,58 +61,50 @@ The Netlify `DIRECT_URL` alias exists only so `npm ci` postinstall can run `pris
 
 Do not use a Deploy Preview URL as the canonical `NEXTAUTH_URL`. Authentication smoke tests must use the stable staging site URL. Environment-variable changes require a redeploy.
 
-R2 credentials are server-only and must never use a `NEXT_PUBLIC_*` name. Mark the access key, secret key, and any value treated as sensitive by the team as `Contains secret values`. Configure them only after the two staging buckets, bucket-scoped token, lifecycle, CORS, and custom domain in `r2-storage.md` have been reviewed. Unlike Prisma's Netlify-only `DIRECT_URL` pooled alias, `R2_ENDPOINT` is the actual staging S3 API endpoint required by server Functions; it is not a migration credential.
+R2 credentials are server-only and must never use a `NEXT_PUBLIC_*` name. Mark the access key, secret key, and any value treated as sensitive by the team as `Contains secret values`. Configure them only after the two staging buckets, bucket-scoped token, lifecycle, CORS, and custom domain in `r2-storage.md` have been created and verified, and do so before merge. Unlike Prisma's Netlify-only `DIRECT_URL` pooled alias, `R2_ENDPOINT` is the actual staging S3 API endpoint required by server Functions; it is not a migration credential.
 
 ## Deploy Preview and branch-deploy policy
 
-Deploy Previews and branch deploys must never receive actual staging database, owner, signing, admin, or R2 values. The initial policy is to give those contexts public fail-closed placeholders only:
+Deploy Previews and branch deploys must never receive actual staging database, owner, signing, admin, or R2 values. Give those contexts public fail-closed placeholders that satisfy only the build-time shape described below:
 
-```text
-DATABASE_URL=postgresql://preview_user:preview_password@preview-pooler.invalid/preview_db?sslmode=require&connect_timeout=15
-DIRECT_URL=postgresql://preview_user:preview_password@preview-pooler.invalid/preview_db?sslmode=require&connect_timeout=15
-NEXTAUTH_URL=https://preview.invalid
-NEXTAUTH_SECRET=replace-with-preview-nextauth-secret
-OWNER_LOGIN_ID=replace-with-preview-owner-login-id
-OWNER_EMAIL=replace-with-owner-email@example.com
-OWNER_NAME=Preview Placeholder
-OWNER_PASSWORD_HASH=replace-with-preview-generated-scrypt-hash
-QUIZ_BADGE_SECRET=replace-with-preview-quiz-badge-secret
-ADMIN_PASSPHRASE=replace-with-preview-admin-passphrase
-R2_ACCOUNT_ID=replace-with-preview-r2-account-id
-R2_ACCESS_KEY_ID=replace-with-preview-r2-access-key-id
-R2_SECRET_ACCESS_KEY=replace-with-preview-r2-secret-access-key
-R2_ENDPOINT=https://replace-with-preview-r2-account-id.r2.cloudflarestorage.com
-R2_UPLOAD_BUCKET=replace-with-preview-upload-bucket
-R2_PUBLIC_BUCKET=replace-with-preview-public-bucket
-R2_PUBLIC_BASE_URL=https://assets-preview.invalid
-SKIP_PRISMA_GENERATION=false
-```
+| Variable | Preview shape and fail-closed semantics |
+| --- | --- |
+| `DATABASE_URL`, `DIRECT_URL` | The same syntactically valid PostgreSQL URL with public dummy credentials, a non-routable `.invalid` hostname, TLS required, and a 15-second timeout. It exists only for Prisma generation/schema parsing. |
+| `NEXTAUTH_URL` | A syntactically valid HTTPS URL under `.invalid`, never a deploy or stable-site URL. |
+| `NEXTAUTH_SECRET`, `QUIZ_BADGE_SECRET`, `ADMIN_PASSPHRASE` | Distinct public `replace-with-*` sentinels that runtime validation rejects. |
+| `OWNER_LOGIN_ID`, `OWNER_PASSWORD_HASH` | Public `replace-with-*` sentinels that cannot authenticate. |
+| `OWNER_EMAIL` | A syntactically valid email-shaped public sentinel whose local part begins with `replace-with-`; use a Preview-specific value different from `.env.example`. |
+| `OWNER_NAME` | A non-sensitive display placeholder. |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Distinct public `replace-with-*` sentinels rejected by storage configuration. |
+| `R2_ENDPOINT`, `R2_PUBLIC_BASE_URL` | Syntactically valid HTTPS placeholder URLs that are non-routable or deliberately rejected by the build/runtime validators. |
+| `R2_UPLOAD_BUCKET`, `R2_PUBLIC_BUCKET` | Distinct public placeholder names; they must not name a real bucket. |
+| `SKIP_PRISMA_GENERATION` | Boolean false so normal Prisma generation remains exercised. |
+
+Choose context-specific placeholder literals in the Netlify UI and do not copy their exact assignments into this public repository, deploy logs, or tickets. In particular, do not reuse the exact `.env.example` owner-email sentinel as a Netlify Preview value; exact-value duplication can be reported by Netlify secret scanning even when the value is intentionally public. Keep secret scanning and smart detection enabled, do not omit the Preview placeholders to evade scanning, and do not add a broad safelist.
 
 The `.invalid` hostnames are deliberately non-routable, and every `replace-with-*` value is deliberately rejected at runtime. The build-time CSP/image parser also ignores invalid and placeholder R2 URLs. These values exist only to let dependency installation, Prisma generation, type checking, linting, and compilation run without a shared database, R2 request, or private secret. Preview authentication, direct upload, DB-backed SSR, and readiness are not acceptance targets. Run actual authentication, readiness, and upload smoke only against the stable staging `Production` deploy.
 
 If this fail-closed placeholder environment cannot build, do not provide staging secrets to make the Preview pass. Record the failure and disable Deploy Previews and branch deploys until a preview-safe database or configuration is explicitly approved.
 
-## Dashboard procedure after merge
+## Continuous-deployment rollout procedure
 
-The site/authentication baseline above is already present. The following is manual Recovery-03 work after merge and explicit staging approval:
+The site/authentication baseline above is already present. Follow this order because merging to `master` automatically starts the stable staging `Production`-context deploy:
 
-1. Complete the two staging buckets, lifecycle, CORS, bucket-scoped token, and asset custom-domain procedure in `r2-storage.md`.
-2. Keep the build command `npm run build`, publish directory blank, and Node.js 20.
-3. Add the seven actual R2 values to the stable staging `Production` context only. Never place them in All deploys, Deploy Preview, Branch deploy, or Local development contexts.
-4. Mark sensitive values as `Contains secret values` and retain `Deploy without sensitive variables`, or at minimum `Require approval`; never use `Deploy without restrictions`.
-5. Keep Preview/branch contexts on the public fail-closed placeholders above. Do not bulk-import an environment file.
-6. Verify the private bucket CORS origin exactly matches the stable staging origin, without a path or trailing slash.
-7. Deploy the exact merged Recovery-03 commit. This is a code deploy, not a database migration.
-8. Confirm Netlify applies its maintained Next.js adapter and generates the required Pages Router SSR/API Functions.
-9. Inspect deploy post-processing and confirm both rate-limit declarations: credentials 10/60 and upload wildcard 20/60, each grouped by IP and domain.
-10. Check build, post-processing, Edge, and Function logs for connection strings, credentials, bucket/endpoint details, and presigned URLs.
-11. Check public `/api/health` and protected `/api/ready` with missing, wrong, and correct admin passphrases. Correct auth is 200 only when the DB and both R2 buckets are ready.
-12. Reconfirm owner login/session behavior on the stable HTTPS URL.
-13. Upload JPEG, PNG, and WebP timeline images and verify the browser sequence is presign JSON → direct R2 PUT → finalize JSON; no original binary may appear in a Netlify Function request.
-14. Confirm the returned asset uses the staging custom domain, is 640×640 WebP, persists after explicit Timeline save/reload, and renders on the public invitation.
-15. Remove a recognized saved image and confirm its final object is deleted without affecting external/legacy URLs.
-16. Perform controlled 429 tests for both credentials and upload rules. Do not treat local behavior or a successful build as platform acceptance.
-17. Record any temp/final orphan and readiness behavior without exposing object keys or signed URLs.
+1. Complete the focused PR review fix.
+2. Create the private upload and public asset staging buckets.
+3. Configure the exact private-bucket CORS origin and the one-day lifecycle.
+4. Create the staging-only, bucket-scoped Object Read & Write token.
+5. Connect and verify the public staging custom domain.
+6. Add the seven actual R2 values to the stable staging `Production` context only. Mark sensitive values as `Contains secret values`; never place actual values in All deploys, Deploy Preview, Branch deploy, or Local development contexts.
+7. Keep Preview/branch contexts on context-specific public fail-closed values. Keep secret scanning enabled, retain `Deploy without sensitive variables` or at minimum `Require approval`, never use `Deploy without restrictions`, and do not bulk-import an environment file.
+8. Push the review-fix commit and require the PR-head Deploy Preview to pass Next.js/OpenNext packaging, secret scanning, and post-processing that recognizes credentials 10/60 and upload wildcard 20/60, both grouped by IP and domain.
+9. Merge only after the Preview is green.
+10. Confirm the merge commit's automatic stable staging `Production`-context deploy succeeds with the maintained Next.js adapter and required Pages Router SSR/API Functions.
+11. On the stable HTTPS URL, verify `/api/health`, protected `/api/ready`, owner login/session, JPEG/PNG/WebP presign → direct R2 PUT → finalize, explicit save/reload/public rendering, and controlled 429 behavior for both rules.
+
+During both Preview and stable deploys, inspect build, post-processing, Edge, and Function logs for connection strings, credentials, bucket/endpoint details, and presigned URLs. For the stable upload smoke, confirm the original binary never appears in a Netlify Function request and the returned asset is a 640×640 WebP on the staging custom domain. When a saved image is removed, confirm only the DB/UI reference is removed; the public final object remains an orphan candidate for Recovery-04 reconciliation. Record temp/final orphan and readiness behavior without exposing object keys or signed URLs.
+
+Cloudflare resources and stable Netlify `Production`-context values are intentionally prepared before merge. The currently deployed pre-Recovery-03 code does not consume them until the merge triggers the Recovery-03 staging deploy. Keep the build command `npm run build`, publish directory blank, and Node.js 20 throughout this procedure.
 
 Also review the team's billing controls before enabling continuous deploys. Keep automatic recharge disabled unless explicitly approved, enable usage notifications, and monitor Edge Function and serverless-function usage.
 

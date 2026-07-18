@@ -34,7 +34,6 @@ export interface StorageProvider {
   writePublicObject(key: string, body: Buffer): Promise<void>;
   headPublicObject(key: string): Promise<StorageObjectHead | null>;
   deleteTemporaryObject(key: string): Promise<void>;
-  deleteRecognizedPublicObject(key: string): Promise<void>;
   publicUrlForKey(key: string): string;
   readiness(): Promise<void>;
 }

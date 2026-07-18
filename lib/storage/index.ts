@@ -6,7 +6,6 @@ export {
   buildFinalTimelineKey,
   buildTemporaryTimelineKey,
   isSafeStorageSegment,
-  parseRecognizedTimelinePublicUrl,
   parseTemporaryTimelineKey
 } from '@/lib/storage/keys';
 export { createTimelineWebp } from '@/lib/storage/image';

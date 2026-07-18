@@ -4,11 +4,6 @@ import prisma from '@/lib/db';
 import { requireApiAuth } from '@/lib/auth';
 import { validate } from '@/lib/validate';
 import { withRateLimit } from '@/lib/security/rateLimit';
-import {
-  createStorageProvider,
-  loadStorageConfig,
-  parseRecognizedTimelinePublicUrl
-} from '@/lib/storage';
 
 const cardSchema = z.object({
   text: z.string().trim().min(1).max(120),
@@ -35,12 +30,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const invitation = await prisma.invitation.findFirst({
     where: { id: invitationId, userId: session.user.id, deletedAt: null },
-    select: {
-      id: true,
-      timelinePuzzle: {
-        select: { cards: { select: { photoUrl: true } } }
-      }
-    }
+    select: { id: true }
   });
 
   if (!invitation) {
@@ -100,75 +90,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   if (!refreshed) {
     return res.status(500).json({ error: 'Unable to save timeline' });
-  }
-
-  const previousPhotoUrls = invitation.timelinePuzzle?.cards
-    .map((card) => card.photoUrl)
-    .filter((value): value is string => Boolean(value)) ?? [];
-
-  if (previousPhotoUrls.length > 0) {
-    try {
-      const storageConfig = loadStorageConfig();
-      const storage = createStorageProvider(storageConfig);
-      const currentTimeline = await prisma.timelinePuzzle.findUnique({
-        where: { id: refreshed.id },
-        select: {
-          cards: {
-            orderBy: { order: 'asc' },
-            select: { id: true, photoUrl: true }
-          }
-        }
-      });
-      const savedCardIds = refreshed.cards.map((card) => card.id);
-      const currentCardIds = currentTimeline?.cards.map((card) => card.id) ?? [];
-      const savedRevisionIsCurrent =
-        savedCardIds.length === currentCardIds.length &&
-        savedCardIds.every((id, index) => id === currentCardIds[index]);
-
-      if (!savedRevisionIsCurrent) {
-        console.error('[timeline-assets] SAVED_ASSET_CLEANUP_STALE_REVISION');
-      } else {
-        const retainedKeys = new Set(
-          (currentTimeline?.cards ?? [])
-            .map((card) =>
-              card.photoUrl
-                ? parseRecognizedTimelinePublicUrl(
-                    card.photoUrl,
-                    storageConfig.publicBaseUrl,
-                    invitationId
-                  )
-                : null
-            )
-            .filter((key): key is string => Boolean(key))
-        );
-        const removedKeys = [
-          ...new Set(
-            previousPhotoUrls
-              .map((url) =>
-                parseRecognizedTimelinePublicUrl(url, storageConfig.publicBaseUrl, invitationId)
-              )
-              .filter((key): key is string => key !== null && !retainedKeys.has(key))
-          )
-        ];
-
-        const cleanupResults = await Promise.allSettled(
-          removedKeys.map(async (key) => {
-            const publicUrl = storage.publicUrlForKey(key);
-            const currentReferenceCount = await prisma.timelineCard.count({
-              where: { photoUrl: publicUrl }
-            });
-            if (currentReferenceCount === 0) {
-              await storage.deleteRecognizedPublicObject(key);
-            }
-          })
-        );
-        if (cleanupResults.some((result) => result.status === 'rejected')) {
-          console.error('[timeline-assets] SAVED_ASSET_CLEANUP_FAILED');
-        }
-      }
-    } catch {
-      console.error('[timeline-assets] SAVED_ASSET_CLEANUP_SKIPPED');
-    }
   }
 
   return res.status(200).json({

@@ -10,7 +10,7 @@ At the time of this change:
 - No R2 staging bucket or API token has been created by this change.
 - The R2 custom domain has not been connected.
 - Netlify does not yet have the R2 variables.
-- No upload has been sent to Cloudflare R2 and no post-merge Netlify upload smoke has run.
+- No upload has been sent to Cloudflare R2 and no stable Recovery-03 Netlify upload smoke has run.
 - Production Neon, production R2 resources, the production domain, and a production release remain unprovisioned and unapproved.
 
 The recovered Supabase backup and Storage objects are not imported. Do not restore old Supabase credentials as a fallback.
@@ -46,7 +46,7 @@ Finalize is idempotent. The deterministic final key means a repeated request ret
 
 ## Staging resource setup
 
-This is manual Cloudflare Dashboard work after the Recovery-03 PR is merged and explicitly approved.
+This is manual Cloudflare Dashboard work to complete after the Recovery-03 review fix and before merge. Merging to `master` automatically creates the stable staging deploy, so the required buckets, token, custom domain, and Netlify `Production`-context values must already be ready. The currently deployed pre-Recovery-03 code does not use these R2 values before the merge.
 
 Recommended staging resources:
 
@@ -103,7 +103,7 @@ The origin has no trailing slash or path. Do not use `*`. The implementation sig
 
 ## Server-only environment variables
 
-Configure these values only in the Netlify stable staging `Production` deploy context after the Cloudflare resources exist:
+After the Cloudflare staging resources exist, configure these values only in the Netlify stable staging `Production` deploy context and do so before the PR is merged:
 
 - `R2_ACCOUNT_ID`
 - `R2_ACCESS_KEY_ID`
@@ -117,7 +117,7 @@ The S3 client uses region `auto`, the explicit R2 endpoint, and server-only cred
 
 Mark the access key and secret as containing secret values. Keep all actual R2 values out of Deploy Preview, branch deploy, local-development, and all-deploy contexts. See `netlify-staging.md` for the public-repository context policy and fail-closed preview placeholders.
 
-## Readiness and post-merge staging gate
+## Continuous-deployment rollout and readiness gates
 
 Protected `/api/ready` now requires all of the following:
 
@@ -128,7 +128,23 @@ Protected `/api/ready` now requires all of the following:
 
 Failure remains `503 {"status":"not_ready"}` and does not expose credentials, endpoint, bucket, or SDK error details.
 
-After setting the approved staging variables and deploying the exact merged commit:
+Use this rollout order:
+
+1. Complete the focused PR review fix.
+2. Create the private upload and public asset staging buckets.
+3. Configure the private-bucket CORS policy and one-day lifecycle.
+4. Create the staging-only, bucket-scoped Object Read & Write token.
+5. Connect and verify the public staging custom domain.
+6. Configure the seven actual R2 values only in the stable staging Netlify `Production` deploy context.
+7. Keep Deploy Preview and branch-deploy contexts on public fail-closed values; never provide actual staging DB, owner, signing, admin, or R2 values.
+8. Push the review-fix commit and require the PR-head Deploy Preview to pass Next.js/OpenNext packaging, secret scanning, and post-processing that recognizes both rate-limit rules.
+9. Merge only after that Preview is green.
+10. Confirm that the merge commit's automatic stable staging `Production`-context deploy succeeds.
+11. Run protected readiness, upload/finalize/save/render, and controlled rate-limit smoke tests against that stable deploy.
+
+Cloudflare resources and Netlify `Production`-context values are deliberately prepared before merge. The already deployed pre-Recovery-03 application does not consume them until the Recovery-03 code reaches `master`.
+
+After the automatic stable deploy:
 
 1. Confirm deploy post-processing accepts both code-based rate-limit rules.
 2. Confirm missing/wrong admin passphrases still return 401 from `/api/ready`.
@@ -137,23 +153,34 @@ After setting the approved staging variables and deploying the exact merged comm
 5. Upload JPEG, PNG, and WebP timeline photos and confirm the browser sends JSON to presign, binary directly to R2, and JSON to finalize.
 6. Confirm the public URL uses the staging asset domain and the object is a 640×640 WebP.
 7. Save the Timeline tab, reload the Builder, and open the public invitation.
-8. Remove a saved photo, save again, and confirm only the recognized old staging object is deleted.
+8. Remove a saved photo, save again, and confirm the database/UI no longer references it while its public object is retained for Recovery-04 reconciliation.
 9. Perform a controlled upload-rate test and confirm requests above 20 POSTs in 60 seconds receive 429. Local testing is not evidence that Netlify accepted this rule.
 10. Inspect deploy and Function logs for accidental presigned URL, endpoint, bucket, or credential disclosure.
 
 Do not run Prisma migration commands, seed commands, or R2 administration from a Netlify build or Function.
 
-## Saved-asset cleanup and known limitations
+## Public-asset retention and Recovery-04 reconciliation
 
-Timeline save takes the old photo URL snapshot before its existing DB transaction. After a successful transaction, cleanup first confirms that the transaction's card IDs still match the current saved revision, then checks that each candidate URL has zero current `TimelineCard` references before deleting it. It deletes only removed URLs that exactly match the configured public origin and `timeline/{invitationId}/` final-key format. External URLs, legacy Supabase URLs, malformed URLs, and another invitation's prefix are ignored. Cleanup failure or a newer concurrent revision is logged with a fixed code and never rolls back or fails the DB save. PostgreSQL and R2 do not share a transaction, so this remains best-effort and later orphan reconciliation is still required.
+Timeline save changes PostgreSQL only and does not delete any public final R2 object on the request path. A DB reference-count check and an R2 delete cannot be atomic: another Timeline save can commit a live reference between those operations, causing the object behind a newly live URL to be deleted. Preventing live-asset loss takes priority over immediate storage reclamation.
 
-Recovery-03 does not fully collect:
+Both a finalized object abandoned before Timeline save and an image removed by a later save are therefore orphan candidates. Invitation soft-delete and Gallery assets also remain outside request-time cleanup. Recovery-03 intentionally retains these public objects and does not implement a reconciliation job.
 
-- a finalized asset when the owner closes the browser before saving the Timeline tab;
-- all assets when an invitation is soft-deleted;
-- Gallery assets.
+Recovery-04 reconciliation must include all of the following before public deletion is approved:
 
-Use lifecycle/usage monitoring now. Add an approved orphan-reconciliation job and invitation-delete/Gallery cleanup in a later Recovery step; do not broadly delete public objects without comparing them with stored DB URLs.
+1. Inventory public objects only under the recognized `timeline/` namespace.
+2. Build the current set of all recognized `TimelineCard.photoUrl` values from PostgreSQL.
+3. Require a grace period of at least 24 hours before an unreferenced object is eligible.
+4. Produce a dry-run report before any deletion mode is enabled.
+5. Derive and validate the invitation-to-object mapping for every candidate.
+6. Use bounded batch sizes rather than unbounded listing or deletion.
+7. Recheck the current DB reference immediately before deleting each object.
+8. Prevent concurrent reconciliation runs with an explicit single-run lock or equivalent exclusion.
+9. Retry delete failures with bounded attempts and preserve failed candidates for later review.
+10. Record object checksum/ETag and relevant object metadata in the audit result without recording credentials or signed URLs.
+11. Complete a staging restore-and-cleanup drill before any production reconciliation is approved.
+12. Never issue a broad prefix delete; every deletion must be an individually validated candidate.
+
+Continue lifecycle and usage monitoring while this work is pending. The private one-day lifecycle bounds temporary uploads only; it does not authorize automatic deletion from the public bucket.
 
 ## Production separation
 
