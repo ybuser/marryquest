@@ -1,6 +1,6 @@
 # MarryQuest – Next.js Baseline
 
-Recovery baseline for the MarryQuest invitation experience using the **Next.js Pages Router**, TypeScript, Tailwind CSS, and shadcn/ui-inspired primitives. Neon staging and the Netlify staging application baseline are validated; R2 staging provisioning, production infrastructure, and production-domain gates remain outstanding.
+Recovery baseline for the MarryQuest invitation experience using the **Next.js Pages Router**, TypeScript, Tailwind CSS, and shadcn/ui-inspired primitives. Neon, Netlify, and two-bucket R2 staging baselines are validated; production infrastructure and production-domain gates remain outstanding.
 
 ## Requirements
 - Node 20 LTS (see `.nvmrc`)
@@ -74,14 +74,15 @@ Timeline card storage requires the following server-only R2 values:
 - `R2_PUBLIC_BUCKET` – distinct public optimized-asset bucket.
 - `R2_PUBLIC_BASE_URL` – public asset origin/custom-domain base URL.
 
-The browser requests a presigned URL, sends the original directly to the private bucket, and calls a small finalize JSON API. Only server-validated 640×640 WebP output is written to the public bucket. No R2 value is a `NEXT_PUBLIC_*` variable. See [`docs/ops/r2-storage.md`](docs/ops/r2-storage.md). Because merging to `master` automatically creates the stable staging deploy, the Cloudflare staging resources and Netlify `Production`-context R2 values must be prepared before this PR is merged.
+The browser requests a presigned URL, sends the original directly to the private bucket, and calls a small finalize JSON API. Only server-validated 640×640 WebP output is written to the public bucket. No R2 value is a `NEXT_PUBLIC_*` variable. See [`docs/ops/r2-storage.md`](docs/ops/r2-storage.md).
 
 ## Notes
 - The project intentionally omits the `/app` directory. Pages Router only.
 - Upgrade the in-memory rate limiter before deploying behind multiple instances.
 - Public fixed test credentials and quick-login UI have been removed; local and deployed environments use the same server-configured single-owner flow.
-- The Netlify staging baseline has been deployed and its health, protected readiness, and owner login were validated before Recovery-03. This PR does not create Cloudflare resources or change Netlify Dashboard values. Complete the pre-provisioning and fail-closed Deploy Preview gate in [`docs/ops/netlify-staging.md`](docs/ops/netlify-staging.md) and [`docs/ops/r2-storage.md`](docs/ops/r2-storage.md) before merge; then verify the automatic stable staging deploy of the merge commit.
+- The Netlify staging baseline and browser-direct R2 Timeline flow were validated before Recovery-03A. This hotfix performs no Dashboard work or deploy; its merge-commit staging deploy and Timeline smoke remain separate gates.
 - Do not run database migrations in the Netlify build. Any future environment apply is a separate reviewed operation using `DIRECT_URL`.
 - Netlify must not store the actual direct endpoint: its Production context duplicates the pooled `DATABASE_URL` as a `DIRECT_URL` build-compatibility alias, while actual migration credentials remain in a separately approved operator environment. On Free this alias may also be visible to Functions, but application queries continue to use only `DATABASE_URL`.
-- Timeline upload code no longer has a Supabase runtime path or a Netlify multipart body. The repository declares exactly two Netlify code-based rate limits: credentials callback and timeline-upload wildcard. The PR-head Deploy Preview must pass Next.js/OpenNext packaging, secret scanning, and both-rule post-processing before merge; stable readiness, upload/render, and controlled 429 smoke follow the automatic merge-commit deploy.
+- Timeline upload code no longer has a Supabase runtime path or a Netlify multipart body. Timeline section visibility is controlled in Sections, while `TimelinePuzzle.enabled` is derived on explicit save from a valid 5–7-card configuration. Builder preview shows incomplete drafts non-interactively; public SSR omits incomplete Timelines. Existing ready cards stored with `enabled=false` are repaired by pressing Save Timeline without changing the cards or R2 URL.
+- The repository declares exactly two Netlify code-based rate limits: credentials callback and timeline-upload wildcard. Recovery-03A must pass its PR-head Deploy Preview before merge; stable readiness, Timeline save/render, upload regression, and controlled 429 smoke follow the automatic merge-commit deploy.
 - See [`docs/ops/fresh-start-database.md`](docs/ops/fresh-start-database.md) for the Fresh-start decision, staging procedure, prohibited commands, and rollback policy.

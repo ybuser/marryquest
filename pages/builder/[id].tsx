@@ -39,6 +39,7 @@ import type { QuizDto, QuizQuestionDto } from '@/types/quiz';
 import { EMPTY_QUIZ } from '@/types/quiz';
 import type { TimelineCardDto, TimelinePuzzleDto } from '@/types/timeline';
 import { EMPTY_TIMELINE } from '@/types/timeline';
+import { getTimelineReadiness } from '@/lib/timeline/readiness';
 import type { FoodVoteOptionDto } from '@/types/foodvote';
 
 interface BuilderPageProps {
@@ -641,8 +642,19 @@ export default function InvitationBuilder({
     });
   }, [draftFoodVoteOptions, savedFoodVoteOptions]);
 
-  const hasTimelineChanges = useMemo(() => {
-    if (draftTimeline.enabled !== savedTimeline.enabled) return true;
+  const draftTimelineReadiness = useMemo(
+    () => getTimelineReadiness(draftTimeline.cards),
+    [draftTimeline.cards]
+  );
+  const savedTimelineReadiness = useMemo(
+    () => getTimelineReadiness(savedTimeline.cards),
+    [savedTimeline.cards]
+  );
+  const derivedTimelineEnabled = draftTimelineReadiness.status === 'ready';
+  const timelineNeedsRepair = savedTimelineReadiness.status === 'ready' && !savedTimeline.enabled;
+  const timelineSectionEnabled = draftSections.find((section) => section.key === 'timeline')?.enabled ?? false;
+
+  const hasTimelineDraftChanges = useMemo(() => {
     if (draftTimeline.cards.length !== savedTimeline.cards.length) return true;
     return draftTimeline.cards.some((card, index) => {
       const saved = savedTimeline.cards[index];
@@ -655,7 +667,8 @@ export default function InvitationBuilder({
         card.correctOrder !== saved.correctOrder
       );
     });
-  }, [draftTimeline, savedTimeline]);
+  }, [draftTimeline.cards, savedTimeline.cards]);
+  const hasTimelineChanges = hasTimelineDraftChanges || derivedTimelineEnabled !== savedTimeline.enabled;
 
   const hasPublishChanges = useMemo(
     () => draftInvitation.slug !== savedInvitation.slug || draftInvitation.status !== savedInvitation.status,
@@ -668,7 +681,7 @@ export default function InvitationBuilder({
     hasGuestbookChanges ||
     hasQuizChanges ||
     hasFoodVoteChanges ||
-    hasTimelineChanges ||
+    hasTimelineDraftChanges ||
     hasPublishChanges;
 
   useEffect(() => {
@@ -967,32 +980,20 @@ export default function InvitationBuilder({
       description: card.description?.trim() || null
     }));
 
-    if (draftTimeline.enabled) {
-      if (trimmedCards.length < 5 || trimmedCards.length > 7) {
-        showError(isKorean ? '타임라인 퍼즐은 카드 5~7장이 필요합니다.' : 'Timeline needs 5 to 7 cards');
-        setTimelineSaving(false);
-        return;
-      }
-
-      if (trimmedCards.some((card) => !card.text)) {
-        showError(isKorean ? '타임라인 카드 내용을 모두 입력해 주세요.' : 'Please fill in all timeline cards');
-        setTimelineSaving(false);
-        return;
-      }
-
-      const correctOrders = trimmedCards.map((card) => card.correctOrder);
-      const uniqueOrders = new Set(correctOrders);
-      if (uniqueOrders.size !== trimmedCards.length) {
-        showError(isKorean ? '정답 순서는 중복 없이 설정해 주세요.' : 'Correct order values must be unique');
-        setTimelineSaving(false);
-        return;
-      }
-      const maxOrder = Math.max(...correctOrders);
-      if (maxOrder >= trimmedCards.length) {
-        showError(isKorean ? '정답 순서는 카드 개수 범위 안에서 설정해 주세요.' : 'Correct order values must be within card range');
-        setTimelineSaving(false);
-        return;
-      }
+    const readiness = getTimelineReadiness(trimmedCards);
+    if (readiness.status === 'incomplete') {
+      const countError = readiness.reason === 'too_few_cards' || readiness.reason === 'too_many_cards';
+      showError(
+        countError
+          ? isKorean
+            ? '타임라인은 카드를 모두 비우거나 5~7장으로 완성해야 저장할 수 있습니다.'
+            : 'Save either an empty Timeline or a complete set of 5-7 cards.'
+          : isKorean
+            ? '카드 제목과 정답 순서를 확인해 주세요.'
+            : 'Check each card title and the correct order.'
+      );
+      setTimelineSaving(false);
+      return;
     }
 
     try {
@@ -1000,7 +1001,6 @@ export default function InvitationBuilder({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          enabled: draftTimeline.enabled,
           cards: trimmedCards.map((card) => ({
             text: card.text,
             description: card.description,
@@ -1193,6 +1193,37 @@ export default function InvitationBuilder({
     () => [...draftTimeline.cards].sort((a, b) => a.correctOrder - b.correctOrder),
     [draftTimeline.cards]
   );
+
+  const timelineReadinessMessage = (() => {
+    if (draftTimelineReadiness.status === 'empty') {
+      return isKorean ? '타임라인 카드 5~7장을 추가해 주세요.' : 'Add 5-7 Timeline cards.';
+    }
+
+    if (draftTimelineReadiness.status === 'ready') {
+      if (timelineNeedsRepair) {
+        return isKorean
+          ? '기존 카드 구성은 준비되었습니다. 내용을 바꾸지 않아도 타임라인 저장을 눌러 상태를 복구할 수 있습니다.'
+          : 'The existing cards are ready. Save Timeline to repair the stored readiness state without changing them.';
+      }
+      return isKorean ? '타임라인 퍼즐을 저장할 준비가 되었습니다.' : 'The Timeline puzzle is ready to save.';
+    }
+
+    if (draftTimelineReadiness.reason === 'too_few_cards') {
+      return isKorean
+        ? `현재 ${draftTimeline.cards.length}장입니다. 퍼즐을 저장하려면 최소 5장이 필요합니다.`
+        : `There are ${draftTimeline.cards.length} cards. At least 5 are required to save the puzzle.`;
+    }
+
+    if (draftTimelineReadiness.reason === 'too_many_cards') {
+      return isKorean ? '타임라인 카드는 최대 7장까지 저장할 수 있습니다.' : 'A Timeline can contain at most 7 cards.';
+    }
+
+    if (draftTimelineReadiness.reason === 'blank_title') {
+      return isKorean ? '모든 카드 제목을 입력해 주세요.' : 'Enter a title for every card.';
+    }
+
+    return isKorean ? '정답 순서는 중복 없이 카드 범위 안에서 설정해 주세요.' : 'Set a unique in-range correct order for every card.';
+  })();
 
   function getMoveTargetIndex(currentIndex: number, length: number, direction: 'up' | 'down') {
     const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
@@ -1567,6 +1598,10 @@ export default function InvitationBuilder({
                 ? publishSaving
                 : false;
 
+  const tabHasDiscardableChanges = (tab: TabKey) =>
+    tab === 'Timeline' ? hasTimelineDraftChanges : tabHasChanges(tab);
+  const activeTabSaveBlocked = activeTab === 'Timeline' && draftTimelineReadiness.status === 'incomplete';
+
   const saveActiveTab = useCallback(async () => {
     if (activeTab === 'Basic' && hasBasicChanges && !basicSaving) {
       await saveBasic();
@@ -1634,7 +1669,7 @@ export default function InvitationBuilder({
 
   const trySwitchTab = (nextTab: TabKey) => {
     if (nextTab === activeTab) return;
-    if (!tabHasChanges(activeTab)) {
+    if (!tabHasDiscardableChanges(activeTab)) {
       setMobilePreviewOpen(false);
       setActiveTab(nextTab);
       return;
@@ -1981,7 +2016,7 @@ export default function InvitationBuilder({
               <button
                 type="button"
                 onClick={() => discardDraftChanges(activeTab)}
-                disabled={!tabHasChanges(activeTab)}
+                disabled={!tabHasDiscardableChanges(activeTab)}
                 className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               >
                 {isKorean ? '현재 탭 되돌리기' : 'Discard current tab'}
@@ -1991,7 +2026,7 @@ export default function InvitationBuilder({
                 onClick={() => {
                   void saveActiveTab();
                 }}
-                disabled={!tabHasChanges(activeTab) || activeTabSaving || activeTab === 'Export'}
+                disabled={!tabHasChanges(activeTab) || activeTabSaving || activeTab === 'Export' || activeTabSaveBlocked}
                 className="inline-flex h-10 items-center justify-center rounded-full bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
               >
                 {activeTabSaving ? (isKorean ? '저장 중…' : 'Saving...') : isKorean ? '현재 탭 저장' : 'Save current tab'}
@@ -2407,27 +2442,31 @@ export default function InvitationBuilder({
                 <button
                   className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
                   onClick={saveTimeline}
-                  disabled={!hasTimelineChanges || timelineSaving}
+                  disabled={!hasTimelineChanges || timelineSaving || draftTimelineReadiness.status === 'incomplete'}
                 >
                   {timelineSaving ? (isKorean ? '저장 중…' : 'Saving...') : isKorean ? '타임라인 저장' : 'Save Timeline'}
                 </button>
               </div>
-              <div className="flex flex-col gap-3 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">{isKorean ? '타임라인 퍼즐 사용' : 'Enable timeline puzzle'}</p>
-                  <p className="text-xs text-slate-600">{isKorean ? '청첩장을 공개하면 하객이 타임라인 퍼즐을 볼 수 있습니다.' : 'Guests will only see the timeline after publishing.'}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setDraftTimeline((prev) => ({ ...prev, enabled: !prev.enabled }))}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
-                    draftTimeline.enabled
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                      : 'border-slate-200 bg-slate-100 text-slate-600'
+              <div className="space-y-2 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                {!timelineSectionEnabled && (
+                  <p className="text-sm font-medium text-amber-700">
+                    {isKorean
+                      ? 'Sections 탭에서 타임라인 섹션을 사용 설정해야 공개 청첩장에 표시됩니다.'
+                      : 'Enable the Timeline section in the Sections tab to show it on the public invitation.'}
+                  </p>
+                )}
+                <p
+                  className={`text-sm ${
+                    draftTimelineReadiness.status === 'ready' ? 'text-emerald-700' : 'text-slate-700'
                   }`}
                 >
-                  {draftTimeline.enabled ? (isKorean ? '사용 중' : 'Enabled') : isKorean ? '사용 안 함' : 'Disabled'}
-                </button>
+                  {timelineReadinessMessage}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {isKorean
+                    ? '퍼즐 준비 상태는 카드 구성에서 자동으로 결정됩니다.'
+                    : 'Puzzle readiness is derived automatically from the saved card configuration.'}
+                </p>
               </div>
 
               <div className="space-y-3">
@@ -2466,9 +2505,6 @@ export default function InvitationBuilder({
                   </SortableContext>
                 </DndContext>
                 {timelineUploadError && <p className="text-xs text-red-600">{timelineUploadError}</p>}
-                {draftTimeline.enabled && draftTimeline.cards.length < 5 && (
-                  <p className="text-xs text-amber-600">{isKorean ? '퍼즐을 사용하려면 카드가 최소 5장 필요합니다.' : 'Add at least 5 cards to enable the puzzle.'}</p>
-                )}
               </div>
 
               <div className="space-y-3">
@@ -2721,7 +2757,7 @@ export default function InvitationBuilder({
               <button
                 type="button"
                 onClick={() => discardDraftChanges(activeTab)}
-                disabled={!tabHasChanges(activeTab)}
+                disabled={!tabHasDiscardableChanges(activeTab)}
                 className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               >
                 {isKorean ? '되돌리기' : 'Discard'}
@@ -2731,7 +2767,7 @@ export default function InvitationBuilder({
                 onClick={() => {
                   void saveActiveTab();
                 }}
-                disabled={!tabHasChanges(activeTab) || activeTabSaving}
+                disabled={!tabHasChanges(activeTab) || activeTabSaving || activeTabSaveBlocked}
                 className="inline-flex h-12 items-center justify-center rounded-2xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
               >
                 {activeTabSaving ? (isKorean ? '저장 중…' : 'Saving...') : isKorean ? '저장하기' : 'Save'}

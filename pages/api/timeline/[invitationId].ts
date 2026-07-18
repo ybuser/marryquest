@@ -4,6 +4,7 @@ import prisma from '@/lib/db';
 import { requireApiAuth } from '@/lib/auth';
 import { validate } from '@/lib/validate';
 import { withRateLimit } from '@/lib/security/rateLimit';
+import { getTimelineReadiness } from '@/lib/timeline/readiness';
 
 const cardSchema = z.object({
   text: z.string().trim().min(1).max(120),
@@ -13,8 +14,8 @@ const cardSchema = z.object({
 });
 
 const timelineSchema = z.object({
-  enabled: z.boolean(),
-  cards: z.array(cardSchema).min(0).max(7)
+  enabled: z.boolean().optional(),
+  cards: z.array(cardSchema).max(8)
 });
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -44,27 +45,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   const payload = validation.data;
 
-  if (payload.enabled && (payload.cards.length < 5 || payload.cards.length > 7)) {
-    return res.status(400).json({ error: 'Timeline needs 5 to 7 cards' });
+  const readiness = getTimelineReadiness(payload.cards);
+  if (readiness.status === 'incomplete') {
+    const countError = readiness.reason === 'too_few_cards' || readiness.reason === 'too_many_cards';
+    return res.status(400).json({
+      error: countError ? 'Timeline needs either no cards or 5 to 7 cards' : 'Timeline card configuration is invalid'
+    });
   }
 
-  if (payload.enabled) {
-    const correctOrders = payload.cards.map((card) => card.correctOrder);
-    const uniqueOrders = new Set(correctOrders);
-    if (uniqueOrders.size !== payload.cards.length) {
-      return res.status(400).json({ error: 'Correct order values must be unique' });
-    }
-    const maxOrder = Math.max(...correctOrders);
-    if (maxOrder >= payload.cards.length) {
-      return res.status(400).json({ error: 'Correct order values must be within card range' });
-    }
-  }
+  const enabled = readiness.status === 'ready';
 
   const refreshed = await prisma.$transaction(async (tx) => {
     const puzzle = await tx.timelinePuzzle.upsert({
       where: { invitationId },
-      update: { enabled: payload.enabled },
-      create: { invitationId, enabled: payload.enabled }
+      update: { enabled },
+      create: { invitationId, enabled }
     });
 
     await tx.timelineCard.deleteMany({ where: { puzzleId: puzzle.id } });

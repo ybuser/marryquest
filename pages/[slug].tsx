@@ -8,6 +8,7 @@ import type { GalleryPhoto, InvitationDetails, SectionConfig } from '@/types/inv
 import { DEFAULT_SECTIONS } from '@/types/invitation';
 import type { QuizDto } from '@/types/quiz';
 import type { TimelinePuzzleDto } from '@/types/timeline';
+import { isTimelineReady } from '@/lib/timeline/readiness';
 
 interface PublicInvitationPageProps {
   invitation: InvitationDetails;
@@ -99,7 +100,13 @@ export const getServerSideProps: GetServerSideProps<PublicInvitationPageProps> =
       }
     : null;
 
-  const timelinePuzzle: TimelinePuzzleDto | null = invitation.timelinePuzzle
+  const timelineSectionEnabled = normalizedSections.some(
+    (section) => section.key === 'timeline' && section.enabled
+  );
+  const timelinePuzzle: TimelinePuzzleDto | null = invitation.timelinePuzzle &&
+    timelineSectionEnabled &&
+    invitation.timelinePuzzle.enabled &&
+    isTimelineReady(invitation.timelinePuzzle.cards)
     ? {
         id: invitation.timelinePuzzle.id,
         invitationId: invitation.id,

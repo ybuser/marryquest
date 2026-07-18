@@ -3,25 +3,28 @@ import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from 
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useLanguage } from '@/components/i18n/LanguageProvider';
-import type { InvitationDetails } from '@/types/invitation';
 import type { TimelineCardDto, TimelinePuzzleDto } from '@/types/timeline';
 import type { MusicResponseDto } from '@/types/music';
+import { getTimelineReadiness } from '@/lib/timeline/readiness';
 
 interface TimelineSectionProps {
   invitationId: string;
   slug: string;
-  invitationStatus: InvitationDetails['status'];
   puzzle?: TimelinePuzzleDto | null;
   previewMode?: boolean;
 }
 
 interface SortableCardProps {
   card: TimelineCardDto;
+  disabled?: boolean;
 }
 
-function SortableCard({ card }: SortableCardProps) {
+function SortableCard({ card, disabled = false }: SortableCardProps) {
   const { isKorean } = useLanguage();
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: card.id,
+    disabled
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -39,7 +42,7 @@ function SortableCard({ card }: SortableCardProps) {
       {...listeners}
     >
       <div className="flex items-center gap-3">
-        <span className="cursor-grab text-slate-400">↕</span>
+        <span className={disabled ? 'text-slate-300' : 'cursor-grab text-slate-400'}>↕</span>
         {card.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={card.photoUrl} alt="" className="h-14 w-14 rounded-xl object-cover" />
@@ -212,9 +215,9 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
   );
 }
 
-export function TimelineSection({ invitationId, slug, invitationStatus, puzzle, previewMode }: TimelineSectionProps) {
+export function TimelineSection({ invitationId, slug, puzzle, previewMode }: TimelineSectionProps) {
   const { isKorean } = useLanguage();
-  const previewing = previewMode && invitationStatus !== 'published';
+  const previewing = Boolean(previewMode);
   const [cards, setCards] = useState<TimelineCardDto[]>(() => puzzle?.cards ?? []);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<'idle' | 'success' | 'error'>('idle');
@@ -258,13 +261,15 @@ export function TimelineSection({ invitationId, slug, invitationStatus, puzzle, 
   }, []);
 
   const displayCards = useMemo(() => cards, [cards]);
+  const readiness = useMemo(() => getTimelineReadiness(puzzle?.cards ?? []), [puzzle?.cards]);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
-  if (!puzzle || !puzzle.enabled || displayCards.length === 0) {
-    return <p className="text-sm text-slate-600">{isKorean ? '타임라인 퍼즐이 아직 준비되지 않았습니다.' : 'Timeline puzzle is not available.'}</p>;
+  if (!previewing && (!puzzle || !puzzle.enabled || readiness.status !== 'ready')) {
+    return null;
   }
 
   const handleDragEnd = (event: any) => {
+    if (previewing) return;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -317,26 +322,44 @@ export function TimelineSection({ invitationId, slug, invitationStatus, puzzle, 
       <p className="text-sm leading-6 text-slate-600">
         {isKorean ? '우리 이야기 속 순간을 올바른 순서로 맞춰 보세요.' : 'Drag the moments into the correct order.'}
       </p>
-      {previewing && <p className="mt-2 text-xs text-slate-500">{isKorean ? '미리보기에서는 플레이할 수 없습니다. 공개 후 확인해 주세요.' : 'Preview mode: publish to play.'}</p>}
-      <div className="mt-4 space-y-2">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={displayCards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
-            {displayCards.map((card) => (
-              <SortableCard key={card.id} card={card} />
-            ))}
-          </SortableContext>
-        </DndContext>
-      </div>
-      <button
-        type="button"
-        onClick={handleSubmit}
-        disabled={previewing || submitting}
-        className="mq-timeline-submit mt-4 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-      >
-        {submitting ? (isKorean ? '확인 중…' : 'Checking…') : isKorean ? '순서 확인하기' : 'Submit timeline'}
-      </button>
+      {previewing && (
+        <p
+          className={`mt-2 rounded-lg px-3 py-2 text-xs ${
+            readiness.status === 'ready' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+          }`}
+        >
+          {readiness.status === 'ready'
+            ? isKorean
+              ? '미리보기: 공개할 준비가 되었습니다. 하객 참여 기능은 비활성화되어 있습니다.'
+              : 'Preview: ready for public display. Guest interactions are disabled.'
+            : isKorean
+              ? '미리보기 / 아직 공개 준비 전: 유효한 카드 5~7장을 완성해 주세요.'
+              : 'Preview / not ready: complete 5-7 valid cards before public display.'}
+        </p>
+      )}
+      {displayCards.length > 0 && (
+        <>
+          <div className="mt-4 space-y-2">
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={displayCards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
+                {displayCards.map((card) => (
+                  <SortableCard key={card.id} card={card} disabled={previewing} />
+                ))}
+              </SortableContext>
+            </DndContext>
+          </div>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={previewing || submitting}
+            className="mq-timeline-submit mt-4 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {submitting ? (isKorean ? '확인 중…' : 'Checking…') : isKorean ? '순서 확인하기' : 'Submit timeline'}
+          </button>
+        </>
+      )}
       {message && <p className={`mt-2 text-sm ${result === 'success' ? 'text-emerald-600' : 'text-slate-600'}`}>{message}</p>}
-      {result === 'success' && <MusicPanel invitationId={invitationId} slug={slug} />}
+      {result === 'success' && !previewing && <MusicPanel invitationId={invitationId} slug={slug} />}
     </div>
   );
 }
