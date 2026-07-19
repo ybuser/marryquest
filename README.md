@@ -49,7 +49,8 @@ Templates are defined in `/components/theme/tokens.ts`:
 
 ## Validation & rate limiting
 - Use `validate`/`assertValid` from `/lib/validate.ts` for Zod-backed input validation.
-- Wrap API routes with `withRateLimit` from `/lib/security/rateLimit.ts` (in-memory, IP keyed; upgrade for distributed environments).
+- Wrap API routes with `withRateLimit` from `/lib/security/rateLimit.ts`. Each wrapped handler has an independent in-memory store and separates counters by HTTP method and client key.
+- The limiter is still process-local: serverless instances do not share counters, and cold starts or redeploys reset them. Database counts/constraints remain the final guest-participation protection; use platform/distributed controls for global abuse defense.
 
 ## Environment variables
 The Prisma datasource supports separate runtime and migration URLs. The approved Neon PostgreSQL 17 staging database has migrations `000` through `011` applied and validated with zero application rows at the verification point. Production Neon is not provisioned.
@@ -84,5 +85,6 @@ The browser requests a presigned URL, sends the original directly to the private
 - Do not run database migrations in the Netlify build. Any future environment apply is a separate reviewed operation using `DIRECT_URL`.
 - Netlify must not store the actual direct endpoint: its Production context duplicates the pooled `DATABASE_URL` as a `DIRECT_URL` build-compatibility alias, while actual migration credentials remain in a separately approved operator environment. On Free this alias may also be visible to Functions, but application queries continue to use only `DATABASE_URL`.
 - Timeline upload code no longer has a Supabase runtime path or a Netlify multipart body. Timeline section visibility is controlled in Sections, while `TimelinePuzzle.enabled` is derived on explicit save from a valid 5–7-card configuration. Builder preview shows incomplete drafts non-interactively; public SSR omits incomplete Timelines. Existing ready cards stored with `enabled=false` are repaired by pressing Save Timeline without changing the cards or R2 URL.
-- The repository declares exactly two Netlify code-based rate limits: credentials callback and timeline-upload wildcard. Recovery-03A must pass its PR-head Deploy Preview before merge; stable readiness, Timeline save/render, upload regression, and controlled 429 smoke follow the automatic merge-commit deploy.
+- Builder dedicated save buttons, the common current-tab save, and `Ctrl/Cmd+S` use the latest rendered draft state. Public Guestbook data is fetched once per published slug/status change with no polling or automatic retry; Builder preview never fetches public Guestbook data.
+- The repository declares exactly two Netlify code-based rate limits: credentials callback and timeline-upload wildcard. Recovery-03B must pass its PR-head Deploy Preview before merge; stable readiness, current-tab save freshness, Guestbook idle-network behavior, and controlled API smoke follow the automatic merge-commit deploy.
 - See [`docs/ops/fresh-start-database.md`](docs/ops/fresh-start-database.md) for the Fresh-start decision, staging procedure, prohibited commands, and rollback policy.
