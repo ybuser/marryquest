@@ -2,12 +2,12 @@
 
 ## Scope and current state
 
-Recovery-03 replaced the Netlify Function multipart upload with a two-bucket, browser-direct R2 flow. The repository contains the storage provider, presign/finalize APIs, image validation, readiness check, and upload rate-limit declaration. Recovery-03A does not redesign or reconfigure this storage architecture.
+Recovery-03 replaced the Netlify Function multipart upload with a two-bucket, browser-direct R2 flow. The repository contains the storage provider, presign/finalize APIs, image validation, readiness check, and upload rate-limit declaration. Recovery-03C does not redesign or reconfigure this storage architecture; it only makes the existing read-only bucket readiness failures role-specific and secret-safe.
 
 At the time of this change:
 
 - The Netlify staging deployment, `/api/health`, protected `/api/ready`, owner login, two-bucket readiness, and browser-direct Timeline upload flow were validated before Recovery-03A.
-- Recovery-03A creates no R2 resource or token, changes no Netlify environment value, and performs no deploy.
+- Recovery-03C creates no R2 resource or token, changes no Netlify environment value, and performs no deploy. The operator-reported Netlify credit balance is exhausted, so Preview and stable checks remain blocked until service resumes.
 - Production Neon, production R2 resources, the production domain, and a production release remain unprovisioned and unapproved.
 
 The recovered Supabase backup and Storage objects are not imported. Do not restore old Supabase credentials as a fallback.
@@ -148,6 +148,17 @@ Use this rollout order:
 10. Confirm that the merge commit's automatic stable staging `Production`-context deploy succeeds.
 11. Run protected readiness, upload/finalize/save/render, and controlled rate-limit smoke tests against that stable deploy.
 
+### Secret-safe bucket diagnosis
+
+The readiness response never identifies a provider, endpoint, credential, or bucket. A valid admin request that cannot load storage configuration returns generic HTTP 503 and writes only `READINESS_STORAGE_CONFIGURATION_INVALID`. The two existing read-only `HeadBucket` calls then run in role order:
+
+1. private temporary-upload bucket → `READINESS_STORAGE_UPLOAD_BUCKET_UNAVAILABLE`
+2. public optimized-asset bucket → `READINESS_STORAGE_PUBLIC_BUCKET_UNAVAILABLE`
+
+If both roles are unavailable, the upload role is reported first; correct that evidence-backed issue and make one later controlled readiness request before evaluating the public role. An unmatched storage error uses `READINESS_STORAGE_UNAVAILABLE`. Never log the SDK error, endpoint, token, bucket name, or object key to make the code more descriptive.
+
+Use the HTTP status and Function log timestamp together. A `401` is an admin-header failure and does not prove an R2 problem. A `503` with `READINESS_CONFIGURATION_INVALID` or `READINESS_DATABASE_UNAVAILABLE` also does not authorize changing R2. Correct environment-only failures in the stable staging `Production` context without adding code fallbacks, and do not run writes, lists, or deletes as a readiness probe.
+
 For a new or replacement environment, Cloudflare resources and Netlify `Production`-context values are deliberately prepared before the first consuming merge. Existing deployed code does not consume them until that code reaches `master`.
 
 After the automatic stable deploy:
@@ -203,6 +214,8 @@ Do not reuse staging buckets, keys, token, or custom domain. This runbook does n
 ## Cost and monitoring
 
 Cloudflare's R2 free tier applies to Standard storage, not Infrequent Access. Review the current [R2 pricing](https://developers.cloudflare.com/r2/pricing/) before provisioning. The temp lifecycle limits storage growth, but also monitor object count, stored bytes, and Class A/B operations. Configure usage notifications and a budget alert. A budget alert is notification and visibility, not a hard spending cap.
+
+Netlify hosting credits are separate from R2 storage usage. Follow [`netlify-credit-controls.md`](netlify-credit-controls.md) for Preview/stable deploy cadence, Function/web-request meters, the current credit-exhaustion gate, and paused-project recovery.
 
 ## Rollback
 

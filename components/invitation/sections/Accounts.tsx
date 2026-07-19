@@ -23,7 +23,7 @@ export function AccountsSection({ groomName, brideName, accountGroom, accountBri
           <button
             type="button"
             onClick={() => setRevealed((prev) => !prev)}
-            className="mq-toggle-btn rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold tracking-wide text-[var(--mq-fg)] transition hover:-translate-y-0.5 hover:shadow-lg"
+            className="mq-toggle-btn mq-themed-control rounded-full border px-4 py-2 text-xs font-semibold tracking-wide transition hover:-translate-y-0.5 hover:shadow-lg"
           >
             {revealed ? (isKorean ? '숨기기' : 'Hide') : isKorean ? '보기' : 'Show'}
           </button>
@@ -41,8 +41,8 @@ export function AccountsSection({ groomName, brideName, accountGroom, accountBri
       {hasAccounts && revealed && (
         <div className="grid gap-4 md:grid-cols-2">
           {accountGroom && (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.2em] opacity-70" style={{ letterSpacing: 'var(--mq-letter-spacing)' }}>
+            <div className="mq-themed-surface-elevated rounded-2xl border p-4">
+              <p className="mq-themed-muted text-xs uppercase tracking-[0.2em]" style={{ letterSpacing: 'var(--mq-letter-spacing)' }}>
                 {groomName}
               </p>
               <p className="mt-2 break-words text-sm font-semibold" style={{ fontFamily: 'var(--mq-heading-font)' }}>
@@ -51,8 +51,8 @@ export function AccountsSection({ groomName, brideName, accountGroom, accountBri
             </div>
           )}
           {accountBride && (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.2em] opacity-70" style={{ letterSpacing: 'var(--mq-letter-spacing)' }}>
+            <div className="mq-themed-surface-elevated rounded-2xl border p-4">
+              <p className="mq-themed-muted text-xs uppercase tracking-[0.2em]" style={{ letterSpacing: 'var(--mq-letter-spacing)' }}>
                 {brideName}
               </p>
               <p className="mt-2 break-words text-sm font-semibold" style={{ fontFamily: 'var(--mq-heading-font)' }}>

@@ -37,24 +37,24 @@ function SortableCard({ card, disabled = false }: SortableCardProps) {
       ref={setNodeRef}
       style={style}
       data-preview-id={`timeline-card-${card.id}`}
-      className="mq-timeline-card flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 shadow-sm sm:flex-row sm:items-center"
+      className="mq-timeline-card mq-themed-focus-ring mq-themed-surface flex flex-col gap-3 rounded-2xl border px-3 py-3 text-sm shadow-sm sm:flex-row sm:items-center"
       {...attributes}
       {...listeners}
     >
       <div className="flex items-center gap-3">
-        <span className={disabled ? 'text-slate-300' : 'cursor-grab text-slate-400'}>↕</span>
+        <span className={disabled ? 'mq-themed-muted' : 'mq-themed-muted cursor-grab'}>↕</span>
         {card.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={card.photoUrl} alt="" className="h-14 w-14 rounded-xl object-cover" />
         ) : (
-          <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-dashed border-slate-200 text-[10px] text-slate-400">
+          <div className="mq-themed-surface-elevated mq-themed-muted flex h-14 w-14 items-center justify-center rounded-xl border border-dashed text-[10px]">
             {isKorean ? '사진 없음' : 'No photo'}
           </div>
         )}
       </div>
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-slate-800">{card.text}</p>
-        {card.description && <p className="mt-1 text-xs leading-5 text-slate-500">{card.description}</p>}
+        <p className="text-sm font-semibold text-[var(--mq-surface-fg)]">{card.text}</p>
+        {card.description && <p className="mq-themed-muted mt-1 text-xs leading-5">{card.description}</p>}
       </div>
     </div>
   );
@@ -153,29 +153,29 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
   return (
     <div className="mt-6 space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-lg font-semibold text-slate-900">{isKorean ? '식전 음악 투표' : 'Music voting'}</p>
-        {alreadyUsed && <span className="text-xs font-medium text-slate-500">{isKorean ? '투표 완료' : 'Vote used'}</span>}
+        <p className="text-lg font-semibold text-[var(--mq-surface-fg)]">{isKorean ? '식전 음악 투표' : 'Music voting'}</p>
+        {alreadyUsed && <span className="mq-themed-status text-xs font-medium">{isKorean ? '투표 완료' : 'Vote used'}</span>}
       </div>
-      {loading && <p className="text-sm text-slate-500">{isKorean ? '곡 목록을 불러오는 중…' : 'Loading tracks…'}</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {loading && <p className="mq-themed-status text-sm">{isKorean ? '곡 목록을 불러오는 중…' : 'Loading tracks…'}</p>}
+      {error && <p className="mq-themed-error text-sm">{error}</p>}
       {!loading && musicData && (
         <div className="space-y-3">
           {musicData.tracks.length === 0 && (
-            <p className="text-sm text-slate-600">{isKorean ? '아직 등록된 곡이 없습니다. 아래에서 직접 추가해 주세요.' : 'No tracks yet. Add one below.'}</p>
+            <p className="mq-themed-muted text-sm">{isKorean ? '아직 등록된 곡이 없습니다. 아래에서 직접 추가해 주세요.' : 'No tracks yet. Add one below.'}</p>
           )}
           {musicData.tracks.map((track) => (
-            <div key={track.id} className="mq-music-track flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div key={track.id} className="mq-music-track mq-themed-surface flex flex-col gap-3 rounded-2xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-800">{track.title}</p>
-                {track.artist && <p className="text-xs text-slate-500">{track.artist}</p>}
+                <p className="text-sm font-medium text-[var(--mq-surface-fg)]">{track.title}</p>
+                {track.artist && <p className="mq-themed-muted text-xs">{track.artist}</p>}
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-slate-700">{track.voteCount}</span>
+                <span className="text-sm font-semibold text-[var(--mq-surface-fg)]">{track.voteCount}</span>
                 <button
                   type="button"
                   onClick={() => handleVote(track.id)}
                   disabled={alreadyUsed || submitting}
-                  className="mq-music-action rounded-md bg-slate-900 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                  className="mq-music-action mq-themed-control rounded-md border px-3 py-1 text-xs font-semibold"
                 >
                   {isKorean ? '투표' : 'Vote'}
                 </button>
@@ -184,21 +184,21 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
           ))}
         </div>
       )}
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-sm font-semibold text-slate-800">{isKorean ? '직접 곡 추가' : 'Add a song'}</p>
+      <div className="mq-themed-surface-elevated rounded-2xl border p-4">
+        <p className="text-sm font-semibold text-[var(--mq-surface-fg)]">{isKorean ? '직접 곡 추가' : 'Add a song'}</p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder={isKorean ? '곡 제목' : 'Song title'}
-            className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+            className="mq-themed-field w-full rounded-md border px-3 py-2 text-sm"
             disabled={alreadyUsed || submitting}
           />
           <input
             value={artist}
             onChange={(e) => setArtist(e.target.value)}
             placeholder={isKorean ? '가수명 (선택)' : 'Artist (optional)'}
-            className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+            className="mq-themed-field w-full rounded-md border px-3 py-2 text-sm"
             disabled={alreadyUsed || submitting}
           />
         </div>
@@ -206,7 +206,7 @@ function MusicPanel({ invitationId, slug }: { invitationId: string; slug: string
           type="button"
           onClick={handleAdd}
           disabled={alreadyUsed || submitting || !title.trim()}
-          className="mq-music-action mt-3 rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="mq-music-action mq-themed-control mt-3 rounded-md border px-3 py-2 text-sm font-semibold"
         >
           {isKorean ? '추가하고 투표하기' : 'Add & Vote'}
         </button>
@@ -319,14 +319,12 @@ export function TimelineSection({ invitationId, slug, puzzle, previewMode }: Tim
 
   return (
     <div>
-      <p className="text-sm leading-6 text-slate-600">
+      <p className="mq-themed-muted text-sm leading-6">
         {isKorean ? '우리 이야기 속 순간을 올바른 순서로 맞춰 보세요.' : 'Drag the moments into the correct order.'}
       </p>
       {previewing && (
         <p
-          className={`mt-2 rounded-lg px-3 py-2 text-xs ${
-            readiness.status === 'ready' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-          }`}
+          className={`mt-2 text-xs ${readiness.status === 'ready' ? 'mq-themed-success' : 'mq-themed-warning'}`}
         >
           {readiness.status === 'ready'
             ? isKorean
@@ -352,13 +350,13 @@ export function TimelineSection({ invitationId, slug, puzzle, previewMode }: Tim
             type="button"
             onClick={handleSubmit}
             disabled={previewing || submitting}
-            className="mq-timeline-submit mt-4 rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            className="mq-timeline-submit mq-themed-control mt-4 rounded-md border px-4 py-2 text-sm font-semibold"
           >
             {submitting ? (isKorean ? '확인 중…' : 'Checking…') : isKorean ? '순서 확인하기' : 'Submit timeline'}
           </button>
         </>
       )}
-      {message && <p className={`mt-2 text-sm ${result === 'success' ? 'text-emerald-600' : 'text-slate-600'}`}>{message}</p>}
+      {message && <p className={`mt-2 text-sm ${result === 'success' ? 'mq-themed-success' : 'mq-themed-error'}`}>{message}</p>}
       {result === 'success' && !previewing && <MusicPanel invitationId={invitationId} slug={slug} />}
     </div>
   );

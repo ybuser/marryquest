@@ -19,6 +19,7 @@ Visit `http://localhost:3000`.
 - `npm run build` – generate Prisma client and create a production build
 - `npm run start` – serve the production build
 - `npm run lint` – lint with `next lint`
+- `npm run theme:contrast` – verify the seven public-template semantic color pairs against WCAG contrast targets
 - `npm run db:migrate` – apply database migrations (one-off)
 - `npm run auth:hash` – read an owner password from stdin and emit one versioned scrypt hash
 - `npm run secret:generate` – emit one random application secret
@@ -44,8 +45,13 @@ Templates are defined in `/components/theme/tokens.ts`:
 - **Mono Minimal** – monospaced rhythm
 - **Editorial Magazine** – serif, airy spacing
 - **Film Strip** – cinematic gallery focus
+- **Bloom Pop**, **Luxe Signature**, **Modern Clean**, and **Hanok Calm**
 
-`ThemeProvider` selects a template by `templateKey` (e.g., query string or page props) and injects CSS variables for typography, spacing, and gallery behavior.
+`ThemeProvider` selects a template by `templateKey` and injects CSS variables for typography, spacing, gallery behavior, and semantic public surfaces. Surface, muted text, fields, placeholders, borders, controls, success, warning, and error states use owned foreground/background pairs rather than assuming a light Slate card. This keeps Timeline, Music, RSVP, Guestbook, Quiz, and Food Vote legible across all seven templates.
+
+## Protected readiness
+
+`GET /api/ready` remains protected by the exact `ADMIN_PASSPHRASE` header. A missing or wrong header returns `401`; valid authentication with invalid application configuration, unavailable PostgreSQL, or unavailable storage returns `503`; full readiness returns `200`. The JSON body stays intentionally generic. Operators must use the HTTP status and secret-safe fixed Function log code together. Storage diagnostics distinguish configuration, the private upload bucket, and the public asset bucket without logging an endpoint or bucket name. See [`docs/ops/netlify-staging.md`](docs/ops/netlify-staging.md).
 
 ## Validation & rate limiting
 - Use `validate`/`assertValid` from `/lib/validate.ts` for Zod-backed input validation.
@@ -86,5 +92,6 @@ The browser requests a presigned URL, sends the original directly to the private
 - Netlify must not store the actual direct endpoint: its Production context duplicates the pooled `DATABASE_URL` as a `DIRECT_URL` build-compatibility alias, while actual migration credentials remain in a separately approved operator environment. On Free this alias may also be visible to Functions, but application queries continue to use only `DATABASE_URL`.
 - Timeline upload code no longer has a Supabase runtime path or a Netlify multipart body. Timeline section visibility is controlled in Sections, while `TimelinePuzzle.enabled` is derived on explicit save from a valid 5–7-card configuration. Builder preview shows incomplete drafts non-interactively; public SSR omits incomplete Timelines. Existing ready cards stored with `enabled=false` are repaired by pressing Save Timeline without changing the cards or R2 URL.
 - Builder dedicated save buttons, the common current-tab save, and `Ctrl/Cmd+S` use the latest rendered draft state. Public Guestbook data is fetched once per published slug/status change with no polling or automatic retry; Builder preview never fetches public Guestbook data.
-- The repository declares exactly two Netlify code-based rate limits: credentials callback and timeline-upload wildcard. Recovery-03B must pass its PR-head Deploy Preview before merge; stable readiness, current-tab save freshness, Guestbook idle-network behavior, and controlled API smoke follow the automatic merge-commit deploy.
+- The repository declares exactly two Netlify code-based rate limits: credentials callback and timeline-upload wildcard. Recovery-03C does not change them; a future PR-head Preview and stable readiness/theme smoke remain separate deployment gates.
+- Netlify credit-based Free usage is governed by [`docs/ops/netlify-credit-controls.md`](docs/ops/netlify-credit-controls.md). The operator-reported balance is currently exhausted, so Recovery-03C Preview/stable deploy checks remain `BLOCKED_BY_NETLIFY_CREDITS` until the Dashboard shows service restored. Local validation does not change the plan or prove a deploy.
 - See [`docs/ops/fresh-start-database.md`](docs/ops/fresh-start-database.md) for the Fresh-start decision, staging procedure, prohibited commands, and rollback policy.
