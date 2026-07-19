@@ -1654,7 +1654,10 @@ export default function InvitationBuilder({
     }
   }
 
-  saveActiveTabRef.current = saveActiveTab;
+  useEffect(() => {
+    // Keep the keyboard shortcut pointed at the latest committed save dispatcher.
+    saveActiveTabRef.current = saveActiveTab;
+  });
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
