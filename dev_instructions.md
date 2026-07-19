@@ -1,6 +1,6 @@
 # MarryQuest Dev Instructions
 
-Last updated: 2026-07-18
+Last updated: 2026-07-19
 
 This file is the handoff document for new Codex sessions. Treat it as the current source of truth for project state, recent architectural decisions, and operational rules. Older logs and temporary drift-audit files were intentionally cleaned up.
 
@@ -161,7 +161,7 @@ Templates currently supported:
 - `modern`
 - `hanok`
 
-Template tokens live in `components/theme/tokens.ts`.
+Template tokens live in `components/theme/tokens.ts`. Each template explicitly owns semantic public colors for its main background, section surfaces, muted copy, fields/placeholders, borders, focus indicator, and controls. Public invitation components must use these paired tokens instead of placing a Slate text color on an unknown themed background. Run `npm run theme:contrast` after changing a public palette or semantic class.
 
 ## 8. Database and Prisma Rules
 
@@ -262,6 +262,7 @@ Current code behavior:
 - Temporary and final keys are server-derived; finalize is idempotent for one upload ID.
 - Timeline save changes PostgreSQL only. It never deletes a public final R2 object on the request path because a database-reference check and object deletion cannot be made atomic across PostgreSQL and R2.
 - `next.config.js` derives narrow R2 CSP origins and a public `timeline/**` image pattern from validated build-time values. Supabase image/connect patterns were removed.
+- Protected readiness performs read-only PostgreSQL and `HeadBucket` checks. Its client body remains generic; server logs distinguish invalid application configuration, database failure, storage configuration failure, private upload-bucket failure, and public asset-bucket failure with fixed codes only.
 
 Current operational state and limitations:
 
@@ -348,6 +349,7 @@ npx prisma validate
 npx prisma generate
 npx tsc --noEmit
 npm run lint
+npm run theme:contrast
 npm run build
 ```
 
@@ -366,11 +368,13 @@ Recovery-03 validation on 2026-07-18 used localhost-bound disposable PostgreSQL 
 
 Recovery-03A validation on 2026-07-18 used localhost-bound disposable PostgreSQL 17.10 and local HTTP/browser harnesses; no R2 upload retest or MinIO was required because storage contracts were unchanged. The matrix reproduced the old `enabled=false` mismatch, then verified empty/5/7-card saves, rejection and transaction invariance for incomplete or invalid sets, explicit legacy-row repair with `photoUrl` preservation, non-interactive incomplete/ready Builder preview, public SSR omission for disabled/not-ready Timeline data, and guarded public attempts. `git diff --check`, clean `npm ci`, Prisma validate/generate, TypeScript, non-interactive lint, and the production build exited `0`; lint and build reported only the same two existing `react-hooks/exhaustive-deps` warnings. The PR-head Deploy Preview and merge-commit staging smoke are still separate gates.
 
+Recovery-03C local validation on 2026-07-19 uses disposable PostgreSQL 17.10 and MinIO only; it does not contact Neon, production, Supabase, or Cloudflare R2. The readiness matrix covers protected 401 responses, configuration/DB/private-bucket/public-bucket 503 fixed codes, and full 200 readiness without returning infrastructure identifiers. The R2 storage pipeline still completes a presigned direct PUT, bounded read, metadata-free 640x640 WebP write, and temporary-object deletion. The semantic token matrix passes WCAG targets for all seven templates, and desktop/mobile browser checks cover Timeline, Music, Food Vote, Guestbook, Quiz, and RSVP in Korean and English. The previous Food Vote hook warning was removed by tracking the current locale in its loader callback. After the operator initially reported exhausted credits, PR #32's GitHub Netlify Deploy Preview status completed successfully; the Dashboard balance and raw build-log stages were not inspected, and a stable deploy remains a separate approval gate under `docs/ops/netlify-credit-controls.md`.
+
 ## 14. Current Project Status
 
-As of 2026-07-18:
+As of 2026-07-19:
 
-- Build, TypeScript, and non-interactive lint checks are green
+- Build, TypeScript, non-interactive lint, and the seven-template semantic contrast check are green locally
 - The Fresh-start migration chain recreates the current Prisma schema in an empty PostgreSQL 17 database without importing legacy data or creating seed records
 - Neon staging PostgreSQL 17 has the validated `000`-`011` schema and no application rows at the verification point; production Neon is not provisioned
 - Dashboard walkthrough is implemented
@@ -380,6 +384,8 @@ As of 2026-07-18:
 - Timeline upload uses authenticated browser-direct private uploads and server-finalized public WebP assets; its staging baseline was validated before Recovery-03A
 - Timeline public visibility comes from the Sections tab, while puzzle readiness is derived from the saved 5–7-card configuration; incomplete public Timelines are omitted and incomplete Builder drafts remain previewable
 - Active-tab save actions use the latest draft across dedicated save, common save, and `Ctrl/Cmd+S`; Public Guestbook has no polling loop, and API in-memory quotas are isolated by wrapped handler and HTTP method
+- Protected readiness retains a generic response while fixed logs identify application configuration, PostgreSQL, storage configuration, upload bucket, or public bucket failures without identifiers
+- Seven public templates expose semantic surface/field/control colors; public Timeline/Music, RSVP, Guestbook, Quiz, and Food Vote no longer depend on light-only Slate assumptions
 - Environment-backed single-owner authentication replaces the removed public test-user system
 - Mobile/layout polish pass is implemented across landing, builder, walkthrough, and public invitation sections
 - Builder and dashboard expose sign-out actions for owner JWT sessions
@@ -389,6 +395,6 @@ As of 2026-07-18:
 - Walkthrough overlays now clamp to the viewport with internal scrolling, so guide controls stay reachable on short laptop screens and phones
 - Mobile builder now uses a dedicated small-screen workflow: icon-based tab grid, simplified header actions, a sticky bottom save bar, a floating preview button that opens a separate mobile preview sheet, and arrow-button ordering controls for sections, food vote options, timeline cards, and correct-order cards
 
-The Netlify staging application and two-bucket R2 upload baseline exist, and their health/readiness/owner/upload checks were completed before Recovery-03A. Recovery-03B performs no Dashboard configuration or deploy. Its PR-head Deploy Preview is a pre-merge gate; merging then triggers the stable staging deploy automatically, after which operators must verify latest-draft saves and the absence of an idle Guestbook request storm. Production Neon, production storage, the production domain, and public launch remain unapproved.
+The Netlify staging application and two-bucket R2 upload baseline exist, and their earlier health/readiness/owner/upload checks were completed before Recovery-03A. The latest operator evidence reports `/api/health` 200 and a generic `not_ready` body, but no runtime log file or HTTP status was available during Recovery-03C, so the current readiness root cause is not diagnosed. The operator also reported exhausted credits; PR #32 subsequently received a successful GitHub Netlify Deploy Preview status, while the Dashboard balance and detailed Netlify build log remained uninspected. Do not infer stable-deploy approval from that Preview. Production Neon, production storage, the production domain, and public launch remain unapproved.
 
 There is no persisted deployment state in this file. New Codex sessions should confirm the current branch, commit, and approved operational gate before acting.

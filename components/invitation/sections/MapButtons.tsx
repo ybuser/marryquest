@@ -31,10 +31,10 @@ export function MapButtons({ venueName, address }: MapButtonsProps) {
             href={links[provider.key]}
             target="_blank"
             rel="noreferrer"
-            className="mq-map-link group relative flex items-center justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-medium text-[var(--mq-fg)] shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+            className="mq-map-link mq-themed-control group relative flex items-center justify-between overflow-hidden rounded-2xl border px-4 py-3 text-sm font-medium shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
           >
             <span>{provider.label}</span>
-            <span className="text-xs uppercase tracking-[0.2em] text-[var(--mq-accent)]">{isKorean ? '열기' : 'Open'}</span>
+            <span className="text-xs uppercase tracking-[0.2em]">{isKorean ? '열기' : 'Open'}</span>
             <span className="absolute inset-0 bg-gradient-to-br from-white/0 via-white/10 to-white/0 opacity-0 transition group-hover:opacity-100" />
           </a>
         ))}

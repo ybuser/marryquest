@@ -38,7 +38,17 @@ export function ThemeProvider({ templateKey = 'mono', children, className }: The
     '--mq-bg': selected.palette.background,
     '--mq-fg': selected.palette.foreground,
     '--mq-muted': selected.palette.muted,
-    '--mq-accent': selected.palette.accent
+    '--mq-accent': selected.palette.accent,
+    '--mq-surface': selected.palette.surface,
+    '--mq-surface-elevated': selected.palette.surfaceElevated,
+    '--mq-surface-fg': selected.palette.surfaceForeground,
+    '--mq-surface-muted-fg': selected.palette.surfaceMutedForeground,
+    '--mq-field-bg': selected.palette.fieldBackground,
+    '--mq-field-fg': selected.palette.fieldForeground,
+    '--mq-field-placeholder': selected.palette.fieldPlaceholder,
+    '--mq-border': selected.palette.border,
+    '--mq-control-bg': selected.palette.controlBackground,
+    '--mq-control-fg': selected.palette.controlForeground
   } as React.CSSProperties;
 
   const value: ThemeContextValue = {

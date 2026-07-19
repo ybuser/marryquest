@@ -206,12 +206,15 @@ export class R2StorageProvider implements StorageProvider {
 
   async readiness(): Promise<void> {
     try {
-      await Promise.all([
-        this.client.send(new HeadBucketCommand({ Bucket: this.config.uploadBucket })),
-        this.client.send(new HeadBucketCommand({ Bucket: this.config.publicBucket }))
-      ]);
+      await this.client.send(new HeadBucketCommand({ Bucket: this.config.uploadBucket }));
     } catch {
-      throw new StorageError('STORAGE_UNAVAILABLE');
+      throw new StorageError('STORAGE_UPLOAD_BUCKET_UNAVAILABLE');
+    }
+
+    try {
+      await this.client.send(new HeadBucketCommand({ Bucket: this.config.publicBucket }));
+    } catch {
+      throw new StorageError('STORAGE_PUBLIC_BUCKET_UNAVAILABLE');
     }
   }
 }

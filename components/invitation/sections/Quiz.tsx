@@ -76,11 +76,11 @@ export function QuizSection({ quiz, invitationId, invitationStatus, onBadgeEarne
   }
 
   if (!quiz?.enabled || questions.length === 0) {
-    return <p className="text-sm text-[var(--mq-fg)]/80">{isKorean ? '퀴즈가 아직 열리지 않았습니다.' : 'Quiz is disabled for now.'}</p>;
+    return <p className="mq-themed-muted text-sm">{isKorean ? '퀴즈가 아직 열리지 않았습니다.' : 'Quiz is disabled for now.'}</p>;
   }
 
   if (invitationStatus !== 'published') {
-    return <p className="text-sm text-[var(--mq-fg)]/80">{isKorean ? '청첩장이 공개되면 퀴즈에 참여할 수 있습니다.' : 'Quiz will unlock once this invitation is published.'}</p>;
+    return <p className="mq-themed-muted text-sm">{isKorean ? '청첩장이 공개되면 퀴즈에 참여할 수 있습니다.' : 'Quiz will unlock once this invitation is published.'}</p>;
   }
 
   return (
@@ -90,21 +90,21 @@ export function QuizSection({ quiz, invitationId, invitationStatus, onBadgeEarne
           <div
             key={question.id ?? questionIndex}
             data-preview-id={`quiz-question-${questionIndex}`}
-            className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm"
+            className="mq-themed-surface rounded-2xl border p-4 shadow-sm"
           >
             <div className="flex items-center justify-between gap-3">
-              <p className="text-base font-semibold text-[var(--mq-fg)]">{isKorean ? `${questionIndex + 1}번 문제` : `Question ${questionIndex + 1}`}</p>
-              {localBadge && <span className="text-xs font-medium text-emerald-100">{isKorean ? '배지 획득 가능' : 'Badge unlocked'}</span>}
+              <p className="text-base font-semibold text-[var(--mq-surface-fg)]">{isKorean ? `${questionIndex + 1}번 문제` : `Question ${questionIndex + 1}`}</p>
+              {localBadge && <span className="mq-themed-success text-xs font-medium">{isKorean ? '배지 획득 가능' : 'Badge unlocked'}</span>}
             </div>
-            <p className="mt-1 text-[var(--mq-fg)]/90">{question.prompt}</p>
+            <p className="mt-1 text-[var(--mq-surface-fg)]">{question.prompt}</p>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {question.options.map((option, optionIndex) => (
                 <label
                   key={optionIndex}
-                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
+                  className={`mq-themed-focus-ring flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
                     answers[questionIndex] === optionIndex
-                      ? 'border-[var(--mq-fg)] bg-[var(--mq-fg)]/10 text-[var(--mq-fg)]'
-                      : 'border-white/10 bg-white/5 text-[var(--mq-fg)]/80'
+                      ? 'mq-themed-surface-elevated ring-2 ring-[var(--mq-accent)]'
+                      : 'mq-themed-surface'
                   } ${submitted ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
                 >
                   <input
@@ -130,21 +130,21 @@ export function QuizSection({ quiz, invitationId, invitationStatus, onBadgeEarne
         <button
           type="submit"
           disabled={submitting || submitted || !allAnswered}
-          className="w-full rounded-full bg-[var(--mq-fg)] px-4 py-2 text-sm font-semibold text-[var(--mq-bg)] transition hover:opacity-90 disabled:opacity-50"
+          className="mq-themed-control w-full rounded-full border px-4 py-2 text-sm font-semibold transition"
         >
           {submitted ? (isKorean ? '제출 완료' : 'Quiz submitted') : submitting ? (isKorean ? '제출 중…' : 'Submitting…') : isKorean ? '정답 제출하기' : 'Submit answers'}
         </button>
         {result === 'success' && (
-          <p className="text-sm text-emerald-100">
+          <p className="mq-themed-success text-sm">
             {isKorean
               ? '전부 정답입니다. 방명록에 사용할 특별 배지가 준비되었습니다.'
               : 'Perfect score! A quizPerfect badge token is ready for your guestbook message.'}
           </p>
         )}
-        {result === 'failure' && <p className="text-sm text-amber-200">{isKorean ? '전부 맞혀야 배지를 받을 수 있습니다.' : 'Only a perfect score unlocks the badge.'}</p>}
-        {error && <p className="text-sm text-amber-200">{error}</p>}
+        {result === 'failure' && <p className="mq-themed-warning text-sm">{isKorean ? '전부 맞혀야 배지를 받을 수 있습니다.' : 'Only a perfect score unlocks the badge.'}</p>}
+        {error && <p className="mq-themed-error text-sm">{error}</p>}
         {localBadge && !result && (
-          <p className="text-xs text-emerald-100">
+          <p className="mq-themed-success text-xs">
             {isKorean ? '방명록에서 사용할 배지가 10분 동안 유지됩니다.' : 'Your badge token is ready for the guestbook for the next 10 minutes.'}
           </p>
         )}

@@ -2,7 +2,7 @@
 
 ## Current state and scope
 
-The stable Netlify staging site, public health, protected readiness, owner login, and browser-direct two-bucket R2 Timeline flow were validated before Recovery-03A. Neon PostgreSQL 17 staging was also validated separately. Production Neon, production R2, the production domain, and a production release are not provisioned or approved, and this runbook does not authorize a database migration.
+The stable Netlify staging site, public health, protected readiness, owner login, and browser-direct two-bucket R2 Timeline flow were validated before Recovery-03A. Neon PostgreSQL 17 staging was also validated separately. The latest operator evidence reports `/api/health` 200, a generic `/api/ready` `not_ready` body, and an initially exhausted team credit balance. No HTTP status or runtime log was available during Recovery-03C, so the current readiness root cause is unknown. PR #32 later received a successful GitHub Netlify Deploy Preview status plus successful Header/Redirect checks; the raw Netlify build log and Dashboard balance were not inspected, and stable deploy verification remains unperformed. Production Neon, production R2, the production domain, and a production release are not provisioned or approved, and this runbook does not authorize a database migration.
 
 Recovery-03A fixes Timeline readiness and rendering without changing R2, Netlify environment values, rate-limit rules, or Dashboard resources. Its PR-head Deploy Preview is a pre-merge packaging, secret-scanning, and rate-rule post-processing gate; the affected Timeline flow must then be rechecked after the automatic merge-commit staging deploy. Do not reuse recovered Supabase credentials.
 
@@ -138,6 +138,38 @@ After merge, use the automatic stable staging deploy for this manual smoke:
 Do not supply actual database, owner, signing, admin, or R2 values to Deploy Preview. DB-backed Preview behavior is not an acceptance target; perform the checks above only on the stable staging `Production`-context deploy after merge.
 
 Also review the team's billing controls before enabling continuous deploys. Keep automatic recharge disabled unless explicitly approved, enable usage notifications, and monitor Edge Function and serverless-function usage.
+
+## Recovery-03C readiness and contrast gate
+
+Protected readiness intentionally uses the same response body for every failure. Diagnose it in this order:
+
+1. Send `GET /api/ready` with the approved `x-admin-passphrase` through a client that does not echo the value.
+2. Record the HTTP status, not just the JSON body:
+   - `401` means the header is missing or wrong. Do not change readiness source or investigate DB/R2 from that response.
+   - `503` means authenticated readiness found invalid application configuration, an unavailable database, or unavailable storage.
+   - `200` means the checks completed at that request time.
+3. For a `503`, correlate the request time with exactly one fixed Function log code. Do not copy a raw SDK error, endpoint, bucket name, owner identity, or connection string into a ticket.
+
+Current fixed codes:
+
+- `READINESS_CONFIGURATION_INVALID`
+- `READINESS_DATABASE_UNAVAILABLE`
+- `READINESS_STORAGE_CONFIGURATION_INVALID`
+- `READINESS_STORAGE_UPLOAD_BUCKET_UNAVAILABLE`
+- `READINESS_STORAGE_PUBLIC_BUCKET_UNAVAILABLE`
+- `READINESS_STORAGE_UNAVAILABLE` only for an unexpected storage failure that did not match the known role-specific errors
+
+The private and public checks remain read-only `HeadBucket` calls. If the log proves a configuration failure, correct the affected stable staging `Production`-context value in the Dashboard; do not add a source fallback or expose the value. If it proves a bucket failure, check token scope, bucket existence, and the configured role mapping without changing presign/finalize contracts.
+
+Recovery-03C also introduces seven-template semantic surface/field/control tokens. Once credits recover, require one PR-head Preview that completes secret scanning and OpenNext packaging before merge. After the automatic stable deploy:
+
+1. Verify `/api/health` 200.
+2. Verify protected `/api/ready` and record its HTTP status plus fixed log code if it is not 200.
+3. Render all seven public templates and inspect Film, Mono, and Luxe Timeline/Music text, typed input values, placeholders, focus rings, disabled fields, success/error states, Guestbook, Food Vote, and RSVP on desktop and mobile.
+4. Confirm both code-based rate-limit rules remain present and unchanged.
+5. Confirm no secret or infrastructure identifier appears in the readiness response or Function logs.
+
+Do not trigger repeated stable deploys while diagnosing. Batch any evidence-backed environment correction with the reviewed release and follow [`netlify-credit-controls.md`](netlify-credit-controls.md). This PR does not change the Netlify plan or Dashboard.
 
 ## Database and deployment gates
 

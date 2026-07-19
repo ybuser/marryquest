@@ -13,15 +13,15 @@ export function SectionCard({ title, eyebrow, actions, children, className }: Se
     <div
       className={cn(
         'mq-section-card',
+        'mq-themed-surface',
         'relative overflow-hidden rounded-3xl border shadow-[0_25px_80px_rgba(15,23,42,0.28)] backdrop-blur-xl',
-        'border-white/10 bg-[rgba(255,255,255,0.08)]',
         'transition duration-300',
         className
       )}
       style={{ padding: 'var(--mq-card-padding)' }}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5" aria-hidden />
-      <div className="relative space-y-4 text-[var(--mq-fg)]">
+      <div className="relative space-y-4 text-[var(--mq-surface-fg)]">
         {(title || eyebrow || actions) && (
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>

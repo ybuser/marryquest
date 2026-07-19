@@ -219,11 +219,11 @@ export function PublicGuestbook({
   return (
     <div className="space-y-6">
       {quizAvailable && (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="mq-themed-surface-elevated rounded-2xl border p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-[var(--mq-fg)]">{isKorean ? '축하 퀴즈' : 'Quiz challenge'}</p>
-              <p className="text-xs text-[var(--mq-fg)]/70">
+              <p className="text-sm font-semibold text-[var(--mq-surface-fg)]">{isKorean ? '축하 퀴즈' : 'Quiz challenge'}</p>
+              <p className="mq-themed-muted text-xs">
                 {isKorean
                   ? '퀴즈를 모두 맞히면 방명록에 특별 배지를 함께 남길 수 있어요.'
                   : 'Solve the wedding quiz to unlock a special guestbook badge.'}
@@ -232,14 +232,14 @@ export function PublicGuestbook({
             <button
               type="button"
               onClick={() => setQuizOpen((prev) => !prev)}
-              className="mq-toggle-btn rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-[var(--mq-fg)] transition hover:border-white/40"
+              className="mq-toggle-btn mq-themed-control rounded-full border px-4 py-2 text-sm font-semibold transition"
               aria-expanded={quizOpen}
             >
               {quizOpen ? (isKorean ? '퀴즈 접기' : 'Close quiz') : isKorean ? '퀴즈 열기' : 'Open quiz'}
             </button>
           </div>
           {quizOpen && quiz && (
-            <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+            <div className="mq-themed-surface mt-4 rounded-2xl border p-4">
               <QuizSection
                 quiz={quiz}
                 invitationId={invitationId}
@@ -257,26 +257,26 @@ export function PublicGuestbook({
       ) : (
         <form onSubmit={submitEntry} className="space-y-4">
           {previewMode && (
-            <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[var(--mq-fg)]/80">
+            <p className="mq-themed-warning text-sm">
               {isKorean ? '미리보기에서는 방명록 작성이 비활성화됩니다.' : 'Preview mode: guestbook submissions are disabled.'}
             </p>
           )}
           <div className="grid gap-3 md:grid-cols-2">
             <label className="space-y-1 text-sm font-medium">
-              <span className="opacity-80">{isKorean ? '성함 또는 닉네임' : 'Nickname'}</span>
+              <span className="mq-themed-muted">{isKorean ? '성함 또는 닉네임' : 'Nickname'}</span>
               <input
                 required
                 maxLength={20}
                 value={nickname}
                 onChange={(event) => setNickname(event.target.value)}
                 placeholder={isKorean ? '이름이나 닉네임을 입력해 주세요' : 'Your nickname'}
-                className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-base text-[var(--mq-fg)] placeholder:text-white/70 focus:border-white/40 focus:outline-none"
+                className="mq-themed-field w-full rounded-xl border px-3 py-2 text-base"
                 disabled={previewMode}
               />
-              <span className="block text-xs opacity-70">{characterCounts.nickname}/20</span>
+              <span className="mq-themed-muted block text-xs">{characterCounts.nickname}/20</span>
             </label>
             <label className="space-y-1 text-sm font-medium">
-              <span className="opacity-80">{isKorean ? '축하 메시지' : 'Message'}</span>
+              <span className="mq-themed-muted">{isKorean ? '축하 메시지' : 'Message'}</span>
               <textarea
                 required
                 maxLength={300}
@@ -284,34 +284,34 @@ export function PublicGuestbook({
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
                 placeholder={isKorean ? '축하의 마음을 남겨 주세요' : 'Share your wishes'}
-                className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-base text-[var(--mq-fg)] placeholder:text-white/70 focus:border-white/40 focus:outline-none"
+                className="mq-themed-field w-full rounded-xl border px-3 py-2 text-base"
                 disabled={previewMode}
               />
-              <span className="block text-xs opacity-70">{characterCounts.message}/300</span>
+              <span className="mq-themed-muted block text-xs">{characterCounts.message}/300</span>
             </label>
           </div>
           <div className="flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <button
               type="submit"
               disabled={previewMode || submitting || !nickname.trim() || !message.trim()}
-              className="mq-guestbook-submit rounded-full bg-[var(--mq-fg)] px-5 py-2 text-sm font-semibold text-[var(--mq-bg)] transition hover:opacity-90 disabled:opacity-50"
+              className="mq-guestbook-submit mq-themed-control rounded-full border px-5 py-2 text-sm font-semibold transition"
             >
               {submitting ? (isKorean ? '등록 중…' : 'Submitting…') : isKorean ? '방명록 남기기' : 'Sign guestbook'}
             </button>
             {badgeToken && (
-              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-[var(--mq-fg)]">
+              <span className="mq-themed-surface-elevated rounded-full border px-3 py-1 text-xs font-semibold">
                 {isKorean ? '퀴즈 배지가 준비되었어요' : 'quizPerfect badge ready'}
               </span>
             )}
-            {successMessage && <span className="text-sm text-emerald-100">{successMessage}</span>}
-            {displayedError && <span className="text-sm text-amber-200">{displayedError}</span>}
+            {successMessage && <span className="mq-themed-success text-sm">{successMessage}</span>}
+            {displayedError && <span className="mq-themed-error text-sm">{displayedError}</span>}
           </div>
         </form>
       )}
 
       <div className="space-y-4">
-        {loading && <p className="opacity-80">{isKorean ? '방명록을 불러오는 중…' : 'Loading messages…'}</p>}
-        {!loading && entries.length === 0 && <p className="opacity-70">{isKorean ? '아직 남겨진 방명록이 없습니다.' : 'No guestbook entries yet.'}</p>}
+        {loading && <p className="mq-themed-status">{isKorean ? '방명록을 불러오는 중…' : 'Loading messages…'}</p>}
+        {!loading && entries.length === 0 && <p className="mq-themed-muted">{isKorean ? '아직 남겨진 방명록이 없습니다.' : 'No guestbook entries yet.'}</p>}
         <ul className="space-y-3">
           {entries.map((entry) => {
             const isPerfect = entry.badge === 'quizPerfect';
@@ -320,21 +320,19 @@ export function PublicGuestbook({
                 key={entry.id}
                 data-preview-id={`guestbook-entry-${entry.id}`}
                 className={`mq-guestbook-item rounded-2xl border p-4 shadow-lg ${
-                  isPerfect
-                    ? 'border-amber-300/70 bg-amber-100/10 shadow-amber-200/20'
-                    : 'border-white/10 bg-white/5'
+                  isPerfect ? 'mq-themed-warning shadow-amber-200/20' : 'mq-themed-surface'
                 }`}
               >
-                <div className="flex flex-wrap items-center justify-between gap-2 text-sm opacity-80">
-                  <span className="font-semibold text-[var(--mq-fg)]">{entry.nickname}</span>
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span className="font-semibold">{entry.nickname}</span>
                   <span>{format(new Date(entry.createdAt), 'PPP', { locale: getDateLocale(language) })}</span>
                 </div>
                 {badgeLabel(entry.badge) && (
-                  <span className="mt-1 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-[var(--mq-fg)]">
+                  <span className="mq-themed-surface-elevated mt-1 inline-flex rounded-full border px-3 py-1 text-xs font-medium">
                     {badgeLabel(entry.badge)}
                   </span>
                 )}
-                <p className="mt-2 leading-relaxed text-[var(--mq-fg)]/90">{entry.message}</p>
+                <p className="mt-2 leading-relaxed">{entry.message}</p>
               </li>
             );
           })}

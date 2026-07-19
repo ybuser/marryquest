@@ -36,6 +36,16 @@ export interface ThemeTokens {
     foreground: string;
     muted: string;
     accent: string;
+    surface: string;
+    surfaceElevated: string;
+    surfaceForeground: string;
+    surfaceMutedForeground: string;
+    fieldBackground: string;
+    fieldForeground: string;
+    fieldPlaceholder: string;
+    border: string;
+    controlBackground: string;
+    controlForeground: string;
   };
 }
 
@@ -73,7 +83,17 @@ export const themeTokens: Record<TemplateKey, ThemeTokens> = {
       background: '#0b1120',
       foreground: '#f8fafc',
       muted: '#1e293b',
-      accent: '#22d3ee'
+      accent: '#22d3ee',
+      surface: '#111827',
+      surfaceElevated: '#1e293b',
+      surfaceForeground: '#f8fafc',
+      surfaceMutedForeground: '#cbd5e1',
+      fieldBackground: '#0f172a',
+      fieldForeground: '#f8fafc',
+      fieldPlaceholder: '#cbd5e1',
+      border: '#64748b',
+      controlBackground: '#22d3ee',
+      controlForeground: '#083344'
     }
   },
   editorial: {
@@ -109,7 +129,17 @@ export const themeTokens: Record<TemplateKey, ThemeTokens> = {
       background: '#f8fafc',
       foreground: '#0f172a',
       muted: '#e2e8f0',
-      accent: '#8b5cf6'
+      accent: '#7c3aed',
+      surface: '#ffffff',
+      surfaceElevated: '#f1f5f9',
+      surfaceForeground: '#0f172a',
+      surfaceMutedForeground: '#475569',
+      fieldBackground: '#ffffff',
+      fieldForeground: '#0f172a',
+      fieldPlaceholder: '#475569',
+      border: '#64748b',
+      controlBackground: '#7c3aed',
+      controlForeground: '#ffffff'
     }
   },
   film: {
@@ -145,7 +175,17 @@ export const themeTokens: Record<TemplateKey, ThemeTokens> = {
       background: '#0f172a',
       foreground: '#e2e8f0',
       muted: '#1f2937',
-      accent: '#f97316'
+      accent: '#f97316',
+      surface: '#1f2937',
+      surfaceElevated: '#293548',
+      surfaceForeground: '#f8fafc',
+      surfaceMutedForeground: '#cbd5e1',
+      fieldBackground: '#111827',
+      fieldForeground: '#f8fafc',
+      fieldPlaceholder: '#cbd5e1',
+      border: '#94a3b8',
+      controlBackground: '#f97316',
+      controlForeground: '#111827'
     }
   },
   bloom: {
@@ -181,7 +221,17 @@ export const themeTokens: Record<TemplateKey, ThemeTokens> = {
       background: '#fff7fb',
       foreground: '#4c1d4f',
       muted: '#fce7f3',
-      accent: '#f472b6'
+      accent: '#be185d',
+      surface: '#ffffff',
+      surfaceElevated: '#fdf2f8',
+      surfaceForeground: '#4c1d4f',
+      surfaceMutedForeground: '#6b214f',
+      fieldBackground: '#ffffff',
+      fieldForeground: '#4c1d4f',
+      fieldPlaceholder: '#6b214f',
+      border: '#a8557b',
+      controlBackground: '#be185d',
+      controlForeground: '#ffffff'
     }
   },
   luxe: {
@@ -217,7 +267,17 @@ export const themeTokens: Record<TemplateKey, ThemeTokens> = {
       background: '#13100b',
       foreground: '#f8f3ea',
       muted: '#2a241b',
-      accent: '#d4af37'
+      accent: '#d4af37',
+      surface: '#251f17',
+      surfaceElevated: '#30281e',
+      surfaceForeground: '#f8f3ea',
+      surfaceMutedForeground: '#ded5c7',
+      fieldBackground: '#1d1812',
+      fieldForeground: '#f8f3ea',
+      fieldPlaceholder: '#d4c8b5',
+      border: '#9c8242',
+      controlBackground: '#d4af37',
+      controlForeground: '#1a150d'
     }
   },
   modern: {
@@ -253,7 +313,17 @@ export const themeTokens: Record<TemplateKey, ThemeTokens> = {
       background: '#f8fafc',
       foreground: '#0f172a',
       muted: '#e2e8f0',
-      accent: '#0ea5e9'
+      accent: '#0369a1',
+      surface: '#ffffff',
+      surfaceElevated: '#f1f5f9',
+      surfaceForeground: '#0f172a',
+      surfaceMutedForeground: '#475569',
+      fieldBackground: '#ffffff',
+      fieldForeground: '#0f172a',
+      fieldPlaceholder: '#475569',
+      border: '#64748b',
+      controlBackground: '#0369a1',
+      controlForeground: '#ffffff'
     }
   },
   hanok: {
@@ -289,7 +359,17 @@ export const themeTokens: Record<TemplateKey, ThemeTokens> = {
       background: '#f6f1e7',
       foreground: '#2d2a26',
       muted: '#e6dcc8',
-      accent: '#8b5e34'
+      accent: '#8b5e34',
+      surface: '#fffaf0',
+      surfaceElevated: '#eee4d2',
+      surfaceForeground: '#2d2a26',
+      surfaceMutedForeground: '#5f5347',
+      fieldBackground: '#fffaf0',
+      fieldForeground: '#2d2a26',
+      fieldPlaceholder: '#5f5347',
+      border: '#7a6047',
+      controlBackground: '#8b5e34',
+      controlForeground: '#fffaf0'
     }
   }
 };

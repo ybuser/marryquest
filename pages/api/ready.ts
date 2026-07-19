@@ -3,7 +3,7 @@ import prisma from '@/lib/db';
 import { verifyAdminPassphrase } from '@/lib/security/adminPassphrase';
 import { isConfiguredServerSecret } from '@/lib/security/configValue';
 import { loadOwnerConfig } from '@/lib/security/ownerAuth';
-import { createStorageProvider } from '@/lib/storage';
+import { createStorageProvider, StorageError, type StorageProvider } from '@/lib/storage';
 
 function hasValidNextAuthUrl(value: string | undefined): boolean {
   if (!value) return false;
@@ -65,11 +65,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(503).json({ status: 'not_ready' });
   }
 
+  let storage: StorageProvider;
   try {
-    const storage = createStorageProvider();
-    await storage.readiness();
+    storage = createStorageProvider();
   } catch {
-    console.error('[ready] READINESS_STORAGE_UNAVAILABLE');
+    console.error('[ready] READINESS_STORAGE_CONFIGURATION_INVALID');
+    return res.status(503).json({ status: 'not_ready' });
+  }
+
+  try {
+    await storage.readiness();
+  } catch (error) {
+    const readinessCode =
+      error instanceof StorageError && error.code === 'STORAGE_UPLOAD_BUCKET_UNAVAILABLE'
+        ? 'READINESS_STORAGE_UPLOAD_BUCKET_UNAVAILABLE'
+        : error instanceof StorageError && error.code === 'STORAGE_PUBLIC_BUCKET_UNAVAILABLE'
+          ? 'READINESS_STORAGE_PUBLIC_BUCKET_UNAVAILABLE'
+          : 'READINESS_STORAGE_UNAVAILABLE';
+    console.error(`[ready] ${readinessCode}`);
     return res.status(503).json({ status: 'not_ready' });
   }
 
