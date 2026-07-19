@@ -7,7 +7,7 @@ Recovery-03 replaced the Netlify Function multipart upload with a two-bucket, br
 At the time of this change:
 
 - The Netlify staging deployment, `/api/health`, protected `/api/ready`, owner login, two-bucket readiness, and browser-direct Timeline upload flow were validated before Recovery-03A.
-- Recovery-03C creates no R2 resource or token, changes no Netlify environment value, and performs no deploy. The operator-reported Netlify credit balance is exhausted, so Preview and stable checks remain blocked until service resumes.
+- Recovery-03C creates no R2 resource or token and changes no Netlify environment value. The operator initially reported exhausted Netlify credits; PR #32 later received a successful GitHub Deploy Preview status. No stable deploy, Dashboard balance inspection, or raw Netlify build-log review was performed.
 - Production Neon, production R2 resources, the production domain, and a production release remain unprovisioned and unapproved.
 
 The recovered Supabase backup and Storage objects are not imported. Do not restore old Supabase credentials as a fallback.
@@ -215,7 +215,7 @@ Do not reuse staging buckets, keys, token, or custom domain. This runbook does n
 
 Cloudflare's R2 free tier applies to Standard storage, not Infrequent Access. Review the current [R2 pricing](https://developers.cloudflare.com/r2/pricing/) before provisioning. The temp lifecycle limits storage growth, but also monitor object count, stored bytes, and Class A/B operations. Configure usage notifications and a budget alert. A budget alert is notification and visibility, not a hard spending cap.
 
-Netlify hosting credits are separate from R2 storage usage. Follow [`netlify-credit-controls.md`](netlify-credit-controls.md) for Preview/stable deploy cadence, Function/web-request meters, the current credit-exhaustion gate, and paused-project recovery.
+Netlify hosting credits are separate from R2 storage usage. Follow [`netlify-credit-controls.md`](netlify-credit-controls.md) for Preview/stable deploy cadence, Function/web-request meters, evidence required after a reported credit-exhaustion incident, and paused-project recovery.
 
 ## Rollback
 

@@ -6,7 +6,7 @@ Last verified against the official Netlify documentation: 2026-07-19.
 
 This runbook controls deploy and runtime credit usage for the MarryQuest staging site. It does not change the Netlify plan, purchase credits, enable auto recharge, or modify Dashboard settings. Before using the numbers below, confirm the team's actual plan under **Usage & billing > Plan details**: accounts created before September 4, 2025 can still be on a legacy plan whose meters differ.
 
-The current operator-reported state is that the team's credits are exhausted. Until the Dashboard shows an available balance again, treat Deploy Preview and stable deployment checks as `BLOCKED_BY_NETLIFY_CREDITS`; do not report them as successful based on a local build.
+The operator reported that the team's credits were exhausted at the start of Recovery-03C. After PR #32 was pushed, GitHub reported its Netlify Deploy Preview, Header rules, and Redirect rules checks as successful. Record that Preview as restored service, not as proof of the current Dashboard balance or approval for a stable deploy. The raw Netlify build log was not inspected, so its individual secret-scan, OpenNext-packaging, and rate-rule post-processing lines remain separate evidence gates. If a future Preview cannot start while the Dashboard still reports no available balance, record it as `BLOCKED_BY_NETLIFY_CREDITS`; never substitute a local build for an actual platform result.
 
 ## Credit-based Free limits and meters
 
